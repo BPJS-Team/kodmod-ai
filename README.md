@@ -25,7 +25,7 @@ Di situlah KODMOD hadir. Ia bekerja sebagai tutor percakapan yang mengikuti kuri
 kodmod-ai/
 ├── apps/
 │   ├── ai-engine/      Backend agentic (Python, FastAPI, LangGraph)
-│   └── web/            Antarmuka (React 19, Vite, Tailwind v4)
+│   └── web/            Antarmuka (Next.js App Router, React 19, Tailwind v4)
 ├── docs/               Arsitektur, API, aksesibilitas, deployment
 ├── infra/docker/       Compose produksi, Caddy, Prometheus
 ├── assets/logo/        Aset merek
@@ -55,7 +55,7 @@ Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | Embedding | BGE-M3 (multilingual) |
 | Basis data | PostgreSQL 16 + pgvector, Redis |
 | API | FastAPI + WebSocket |
-| Antarmuka | React 19, Vite, Tailwind v4, TypeScript |
+| Antarmuka | Next.js App Router, React 19, Tailwind v4, TypeScript |
 
 ## Cara menjalankan
 
@@ -63,7 +63,7 @@ Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 make infra-up     # nyalain Postgres (pgvector) + Redis
 make install      # pasang dependensi ai-engine dan web
 make api          # jalanin ai-engine  -> http://localhost:8000
-make web          # jalanin antarmuka  -> http://localhost:5173
+make web          # jalanin antarmuka  -> http://localhost:3100
 ```
 
 Ketik `make help` buat lihat semua perintah yang tersedia.

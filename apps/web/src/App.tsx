@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import SkipLink from "./components/SkipLink";
 import LiveRegion from "./components/LiveRegion";

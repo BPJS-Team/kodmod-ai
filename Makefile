@@ -17,7 +17,7 @@ install: ## Pasang dependensi ai-engine dan web
 api: ## Jalankan ai-engine (port 8000)
 	cd $(ENGINE) && uvicorn api.main:app --reload --port 8000
 
-web: ## Jalankan frontend (port 5173)
+web: ## Jalankan frontend Next.js (port 3100)
 	npm run dev:web
 
 test: ## Jalankan test ai-engine

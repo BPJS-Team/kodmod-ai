@@ -1,9 +1,9 @@
 /**
  * Klien HTTP tipis ke ai-engine.
- * Saat dev, Vite mem-proxy /api dan /ws ke http://localhost:8000
- * (lihat vite.config.ts), jadi tidak perlu URL absolut.
+ * Untuk browser: Next.js meneruskan /api/* ke FastAPI tanpa prefiks /api
+ * (lihat next.config.ts), jadi tidak perlu URL absolut.
  */
-const BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api";
 
 export class ApiError extends Error {
   constructor(

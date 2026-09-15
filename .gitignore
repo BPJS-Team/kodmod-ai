@@ -30,7 +30,9 @@ htmlcov/
 
 # ---------- Node / frontend ----------
 node_modules/
-.vite/
+.next/
+*.tsbuildinfo
+next-env.d.ts
 apps/web/dist/
 apps/web/dev-dist/
 *.local
@@ -58,6 +60,7 @@ models--*/
 .codegraph/
 .mcp.json
 AGENTS.md
+/apps/web/CLAUDE.md
 GEMINI.md
 opencode.jsonc
 *.swp
