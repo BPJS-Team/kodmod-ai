@@ -68,6 +68,53 @@ make web          # jalanin antarmuka  -> http://localhost:3100
 
 Ketik `make help` buat lihat semua perintah yang tersedia.
 
+### Frontend Next.js
+
+Jalankan dari root proyek:
+
+```bash
+npm install
+npm run dev:web
+```
+
+Buka `http://localhost:3100`. Untuk port lain: `npm run dev:web -- --port 3110`.
+Salin `apps/web/.env.example` ke `apps/web/.env.local` jika alamat FastAPI perlu diubah.
+`API_ORIGIN` dibaca pada server Next.js; default `http://127.0.0.1:8000`.
+
+Fitur frontend saat ini:
+
+- Landing page, login, pendaftaran dengan undangan, dan logout.
+- Sesi cookie HttpOnly; role diverifikasi ke `/auth/me` pada halaman dan tindakan terproteksi.
+- Admin: ringkasan akun/undangan, pencarian pengguna, tambah/edit akun, aktif/nonaktif, buat/salin/cabut undangan.
+- Halaman awal siswa/guru setelah login. Materi, tutor, kuis, analytics sekolah dan audit log masih tahap berikutnya.
+- Logo dan font disajikan lokal; tampilan menyesuaikan desktop maupun ponsel.
+
+Login membutuhkan FastAPI serta akun yang sudah tersedia. Buat admin awal menggunakan panduan backend/script `apps/ai-engine/scripts/create_admin.py`; tidak ada akun demo bawaan pada frontend. Production harus menggunakan HTTPS karena cookie sesi menggunakan `Secure`. Logout menghapus sesi browser, tetapi backend belum menyediakan pencabutan token JWT individual.
+
+### Pengujian frontend tanpa database sekolah
+
+Fixture hanya untuk pengujian lokal dan tidak diimpor oleh aplikasi. Jalankan dua terminal PowerShell:
+
+```powershell
+# Terminal 1, dari root proyek
+node apps/web/tests/api-fixture.mjs
+
+# Terminal 2, dari root proyek
+$env:API_ORIGIN='http://127.0.0.1:8109'
+npm run dev:web -- --port 3110
+```
+
+Pada `http://127.0.0.1:3110/masuk`, akun fixture adalah `admin.test`, `guru.test`, atau `siswa.test`, dengan sandi fixture `fixture-only-123`. Data sementara kembali ke awal ketika fixture dimulai ulang. Jangan gunakan konfigurasi fixture untuk deployment.
+
+```bash
+node --test apps/web/tests/access.test.mjs
+npm run lint --workspace @kodmod/web
+npm run typecheck --workspace @kodmod/web
+npm run build --workspace @kodmod/web
+```
+
+Tes akses memerlukan dua server fixture di atas. Verifikasi manual alur mutasi: tambah/edit/nonaktifkan pengguna, kode undangan buat/cabut, daftar memakai kode, filter pengguna, logout, dan akses lintas peran. Setelah pengujian, hentikan kedua terminal; terminal normal kembali menggunakan FastAPI sesuai `.env.local`.
+
 ## Aturan aksesibilitas
 
 Empat hal ini adalah syarat produk, bukan sekadar preferensi gaya:
