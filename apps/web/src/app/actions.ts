@@ -46,11 +46,11 @@ export async function login(
     path: "/",
     maxAge: Math.max(0, result.expires_in),
   });
-  redirect(homeFor(result.user.role));
+  redirect(`${homeFor(result.user.role)}?success=signed-in`);
 }
 export async function logout() {
   (await cookies()).delete(SESSION_COOKIE);
-  redirect("/masuk");
+  redirect("/masuk?success=signed-out");
 }
 export async function register(
   _state: ActionState,
@@ -109,7 +109,7 @@ export async function register(
     path: "/",
     maxAge: Math.max(0, result.expires_in),
   });
-  redirect(homeFor(result.user.role));
+  redirect(`${homeFor(result.user.role)}?success=registered`);
 }
 export async function saveUser(
   _state: ActionState,

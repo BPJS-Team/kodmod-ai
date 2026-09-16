@@ -1,6 +1,6 @@
 import { Brand, Heading } from "./ui";
-import { BookOpen, LogOut } from "lucide-react";
-import { logout } from "@/app/actions";
+import { BookOpen } from "lucide-react";
+import { LogoutButton } from "./logout-button";
 import { requireSession } from "@/lib/session";
 export async function RoleHome({ role }: { role: "student" | "teacher" }) {
   const { user } = await requireSession(role);
@@ -8,11 +8,7 @@ export async function RoleHome({ role }: { role: "student" | "teacher" }) {
     <div className="role-page">
       <header className="site-header">
         <Brand />
-        <form action={logout}>
-          <button className="button secondary">
-            Keluar <LogOut size={17} aria-hidden="true" />
-          </button>
-        </form>
+        <LogoutButton />
       </header>
       <main id="konten-utama" tabIndex={-1}>
         <Heading

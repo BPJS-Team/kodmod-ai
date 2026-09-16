@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { Brand } from "@/components/ui";
 import { AdminNav } from "@/components/admin-nav";
 import { requireSession } from "@/lib/session";
-import { logout } from "@/app/actions";
+import { LogoutButton } from "@/components/logout-button";
 export default async function AdminLayout({
   children,
 }: {
@@ -33,15 +33,7 @@ export default async function AdminLayout({
               <strong>{user.full_name}</strong>
               <small>Administrator</small>
             </span>
-            <form action={logout}>
-              <button
-                className="icon-button"
-                title="Keluar"
-                aria-label="Keluar dari akun"
-              >
-                <LogOut size={19} />
-              </button>
-            </form>
+            <LogoutButton compact />
           </div>
         </header>
         <main id="konten-utama" tabIndex={-1} className="workspace-main">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, LoaderCircle, Check } from "lucide-react";
 import {
@@ -10,22 +10,13 @@ import {
   createInvitation,
   revokeInvitation,
 } from "@/app/actions";
-import { roleLabel, type ActionState, type User } from "@/lib/types";
+import {
+  ActionFeedback as Feedback,
+  useConfirmedAction,
+} from "./action-feedback";
+import { confirmAction, notifyResult } from "@/lib/dialogs";
+import { roleLabel, type User } from "@/lib/types";
 
-function Feedback({ state }: { state: ActionState }) {
-  return (
-    <>
-      <div role="alert" aria-atomic="true">
-        {state.error && <p className="alert error-message">{state.error}</p>}
-      </div>
-      <div role="status" aria-live="polite">
-        {state.success && (
-          <p className="alert success-message">{state.success}</p>
-        )}
-      </div>
-    </>
-  );
-}
 function Submit({
   pending,
   children,
@@ -42,7 +33,7 @@ function Submit({
     </button>
   );
 }
-function Password({
+export function Password({
   label,
   autoComplete,
   minLength,
@@ -83,10 +74,18 @@ function Password({
   );
 }
 export function LoginForm() {
-  const [state, action, pending] = useActionState(login, {});
+  const [state, action, pending] = useConfirmedAction(login, {
+    title: "Masuk ke KODMOD?",
+    text: "Lanjutkan masuk menggunakan akun yang telah Anda isi.",
+    confirmText: "Ya, masuk",
+  });
   const [username, setUsername] = useState("");
   return (
-    <form onReset={(event) => event.preventDefault()} action={action} className="form-stack">
+    <form
+      onReset={(event) => event.preventDefault()}
+      action={action}
+      className="form-stack"
+    >
       <div className="field">
         <label htmlFor="username">Username</label>
         <input
@@ -125,12 +124,20 @@ export function UserForm({
   user?: User;
   self?: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveUser, {});
+  const [state, action, pending] = useConfirmedAction(saveUser, {
+    title: user ? "Simpan perubahan pengguna?" : "Buat pengguna baru?",
+    text: "Pastikan nama dan peran sudah sesuai. Peran menentukan akses pengguna.",
+    confirmText: user ? "Ya, simpan" : "Ya, buat pengguna",
+  });
   const [name, setName] = useState(user?.full_name || "");
   const [username, setUsername] = useState(user?.username || "");
   const [role, setRole] = useState(user?.role || "student");
   return (
-    <form onReset={(event) => event.preventDefault()} action={action} className="panel form-panel">
+    <form
+      onReset={(event) => event.preventDefault()}
+      action={action}
+      className="panel form-panel"
+    >
       <input type="hidden" name="id" value={user?.id || ""} />
       <div className="form-grid">
         <div className="field">
@@ -174,7 +181,7 @@ export function UserForm({
             id="role"
             name="role"
             value={role}
-            onChange={(e) => setRole(e.target.value as User['role'])}
+            onChange={(e) => setRole(e.target.value as User["role"])}
             disabled={self}
           >
             {Object.entries(roleLabel).map(([v, t]) => (
@@ -206,7 +213,12 @@ export function UserForm({
   );
 }
 export function StatusForm({ user, self }: { user: User; self: boolean }) {
-  const [state, action, pending] = useActionState(toggleUser, {});
+  const [state, action, pending] = useConfirmedAction(toggleUser, {
+    title: user.is_active ? "Nonaktifkan akun?" : "Aktifkan akun?",
+    text: `${user.full_name}: ${user.is_active ? "akses masuk akan dihentikan. Data dan riwayat tetap disimpan." : "pengguna dapat masuk kembali."}`,
+    confirmText: user.is_active ? "Ya, nonaktifkan" : "Ya, aktifkan",
+    destructive: user.is_active,
+  });
   return (
     <section className="panel">
       <h2>Akses akun</h2>
@@ -216,37 +228,36 @@ export function StatusForm({ user, self }: { user: User; self: boolean }) {
           : "Penonaktifan menghentikan akses masuk. Data dan riwayat pengguna tetap disimpan."}
       </p>
       {!self && (
-        <details className="confirm">
-          <summary>
-            {user.is_active ? "Nonaktifkan akun" : "Aktifkan akun"}
-          </summary>
-          <form onReset={(event) => event.preventDefault()} action={action}>
-            <input type="hidden" name="id" value={user.id} />
-            <input
-              type="hidden"
-              name="active"
-              value={String(!user.is_active)}
-            />
-            <p>
-              Ubah akses masuk untuk <strong>{user.full_name}</strong>?
-            </p>
-            <Submit pending={pending}>
-              {user.is_active ? "Ya, nonaktifkan" : "Ya, aktifkan"}
-            </Submit>
-          </form>
-        </details>
+        <form onReset={(event) => event.preventDefault()} action={action}>
+          <input type="hidden" name="id" value={user.id} />
+          <input type="hidden" name="active" value={String(!user.is_active)} />
+          <p>
+            Ubah akses masuk untuk <strong>{user.full_name}</strong>?
+          </p>
+          <Submit pending={pending}>
+            {user.is_active ? "Ya, nonaktifkan" : "Ya, aktifkan"}
+          </Submit>
+        </form>
       )}
       <Feedback state={state} />
     </section>
   );
 }
 export function InvitationForm() {
-  const [state, action, pending] = useActionState(createInvitation, {});
+  const [state, action, pending] = useConfirmedAction(createInvitation, {
+    title: "Buat kode undangan?",
+    text: "Kode ini membuka pendaftaran siswa dan guru sesuai kuota dan masa berlaku yang Anda isi.",
+    confirmText: "Ya, buat undangan",
+  });
   const [label, setLabel] = useState("");
   const [quota, setQuota] = useState("20");
   const [days, setDays] = useState("14");
   return (
-    <form onReset={(event) => event.preventDefault()} action={action} className="panel form-panel">
+    <form
+      onReset={(event) => event.preventDefault()}
+      action={action}
+      className="panel form-panel"
+    >
       <div className="field">
         <label htmlFor="label">Nama undangan</label>
         <input
@@ -302,10 +313,14 @@ export function InvitationForm() {
   );
 }
 export function RevokeForm({ id, code }: { id: string; code: string }) {
-  const [state, action, pending] = useActionState(revokeInvitation, {});
+  const [state, action, pending] = useConfirmedAction(revokeInvitation, {
+    title: "Cabut kode undangan?",
+    text: `Kode ${code} tidak dapat dipakai lagi. Akun yang sudah terdaftar tetap ada.`,
+    confirmText: "Ya, cabut kode",
+    destructive: true,
+  });
   return (
-    <details className="confirm">
-      <summary>Cabut kode</summary>
+    <div className="revoke-action">
       <form onReset={(event) => event.preventDefault()} action={action}>
         <input type="hidden" name="id" value={id} />
         <p>
@@ -315,7 +330,7 @@ export function RevokeForm({ id, code }: { id: string; code: string }) {
         <Submit pending={pending}>Ya, cabut kode</Submit>
         <Feedback state={state} />
       </form>
-    </details>
+    </div>
   );
 }
 export function CopyCode({ code }: { code: string }) {
@@ -326,10 +341,23 @@ export function CopyCode({ code }: { code: string }) {
         type="button"
         className="button small secondary"
         onClick={async () => {
+          if (
+            !(await confirmAction({
+              title: "Salin kode undangan?",
+              text: "Kode akan disalin ke clipboard. Bagikan hanya kepada calon pengguna sekolah.",
+              confirmText: "Ya, salin",
+            }))
+          )
+            return;
           try {
             await navigator.clipboard.writeText(code);
             setStatus("Kode disalin.");
+            await notifyResult("Kode undangan berhasil disalin.");
           } catch {
+            await notifyResult(
+              "Belum dapat menyalin. Pilih teks kode lalu salin secara manual.",
+              true,
+            );
             setStatus(
               "Belum dapat menyalin. Pilih teks kode lalu salin secara manual.",
             );

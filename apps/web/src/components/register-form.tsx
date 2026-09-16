@@ -1,21 +1,30 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { register } from "@/app/actions";
+import { Password } from "./forms";
+import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 export function RegisterForm() {
-  const [state, action, pending] = useActionState(register, {});
+  const [state, action, pending] = useConfirmedAction(register, {
+    title: "Buat akun KODMOD?",
+    text: "Pastikan data dan peran sudah benar. Kode undangan akan digunakan untuk mendaftarkan akun ini.",
+    confirmText: "Ya, buat akun",
+  });
   const [fields, setFields] = useState({
     full_name: "",
     username: "",
     role: "student",
     invitation_code: "",
-    password: "",
   });
   function update(key: keyof typeof fields, value: string) {
     setFields((previous) => ({ ...previous, [key]: value }));
   }
   return (
-    <form className="form-stack" onReset={(event) => event.preventDefault()} action={action}>
+    <form
+      className="form-stack"
+      onReset={(event) => event.preventDefault()}
+      action={action}
+    >
       <div className="form-grid">
         {[
           { key: "full_name" as const, label: "Nama lengkap", max: 200 },
@@ -54,27 +63,12 @@ export function RegisterForm() {
           </select>
         </div>
       </div>
-      <div className="field">
-        <label htmlFor="password">Kata sandi</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          minLength={8}
-          maxLength={72}
-          required
-          autoComplete="new-password"
-          value={fields.password}
-          onChange={(e) => update("password", e.target.value)}
-        />
-        <small>
-          Minimal 8 karakter. Gunakan kata sandi yang belum dipakai di layanan
-          lain.
-        </small>
-      </div>
-      <div role="alert">
-        {state.error && <p className="alert error-message">{state.error}</p>}
-      </div>
+      <Password label="Kata sandi" autoComplete="new-password" minLength={8} />
+      <p className="form-help">
+        Minimal 8 karakter. Gunakan kata sandi yang belum dipakai di layanan
+        lain.
+      </p>
+      <ActionFeedback state={state} />
       <button type="submit" className="button primary" disabled={pending}>
         {pending ? "Membuat akun…" : "Buat akun dan mulai"}
       </button>
