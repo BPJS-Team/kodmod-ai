@@ -5,6 +5,7 @@ Every nested resource repeats the class membership check on the server.
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,8 +13,15 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import current_user, db_session, require_teacher
-from database.models import ClassActivity, ClassMaterial, Classroom, Enrollment, User
+from api.dependencies import current_user, db_session, require_student, require_teacher
+from database.models import (
+    ClassActivity,
+    ClassMaterial,
+    Classroom,
+    Enrollment,
+    MaterialProgress,
+    User,
+)
 
 router = APIRouter(tags=["classes"])
 
@@ -131,6 +139,47 @@ async def create_class(
     await session.flush()
     record(session, row, user, "class.created")
     return await summary(session, row, user)
+
+
+def progress_info(row):
+    return {
+        "completed": bool(row and row.completed),
+        "bookmarked": bool(row and row.bookmarked),
+        "completed_at": row.completed_at.isoformat() if row and row.completed_at else None,
+    }
+
+
+@router.get("/student/materials")
+async def student_materials(
+    user: User = Depends(require_student), session: AsyncSession = Depends(db_session)
+):
+    rows = (
+        await session.execute(
+            select(ClassMaterial, Classroom, MaterialProgress)
+            .join(Classroom, ClassMaterial.class_id == Classroom.id)
+            .join(
+                Enrollment,
+                (Enrollment.class_id == Classroom.id) & (Enrollment.student_id == user.id),
+            )
+            .outerjoin(
+                MaterialProgress,
+                (MaterialProgress.material_id == ClassMaterial.id)
+                & (MaterialProgress.student_id == user.id),
+            )
+            .where(Classroom.is_archived.is_(False), ClassMaterial.published.is_(True))
+            .order_by(ClassMaterial.created_at.desc(), ClassMaterial.id)
+        )
+    ).all()
+    return [
+        {
+            **material_info(material),
+            "class_id": str(room.id),
+            "class_name": room.name,
+            "subject": room.subject,
+            "progress": progress_info(progress),
+        }
+        for material, room, progress in rows
+    ]
 
 
 @router.get("/{class_id}")
@@ -254,7 +303,55 @@ async def read_material(
     row = await session.get(ClassMaterial, material_id)
     if row is None or row.class_id != class_id or (user.role == "student" and not row.published):
         raise HTTPException(404, "Materi tidak ditemukan.")
-    return {**material_info(row), "content": row.content}
+    progress = (
+        await session.get(MaterialProgress, (material_id, user.id))
+        if user.role == "student"
+        else None
+    )
+    return {**material_info(row), "content": row.content, "progress": progress_info(progress)}
+
+
+class ProgressWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    completed: bool | None = None
+    bookmarked: bool | None = None
+
+
+@router.patch("/{class_id}/materials/{material_id}/progress")
+async def update_progress(
+    class_id: uuid.UUID,
+    material_id: uuid.UUID,
+    body: ProgressWrite,
+    user: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
+):
+    await accessible(session, class_id, user)
+    # Serialize first-time progress creation and publication changes in PostgreSQL.
+    material = await session.scalar(
+        select(ClassMaterial)
+        .where(
+            ClassMaterial.id == material_id,
+            ClassMaterial.class_id == class_id,
+            ClassMaterial.published.is_(True),
+        )
+        .with_for_update()
+    )
+    if material is None:
+        raise HTTPException(404, "Materi tidak ditemukan.")
+    row = await session.get(MaterialProgress, (material_id, user.id))
+    if row is None:
+        row = MaterialProgress(material_id=material_id, student_id=user.id)
+        session.add(row)
+    if body.completed is not None:
+        if body.completed and not row.completed:
+            row.completed_at = datetime.now(UTC)
+        elif not body.completed:
+            row.completed_at = None
+        row.completed = body.completed
+    if body.bookmarked is not None:
+        row.bookmarked = body.bookmarked
+    await session.flush()
+    return progress_info(row)
 
 
 @router.put("/{class_id}/materials/{material_id}")

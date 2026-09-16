@@ -164,6 +164,19 @@ class ClassMaterial(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class MaterialProgress(Base):
+    __tablename__ = "material_progress"
+    material_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("class_materials.id", ondelete="CASCADE"), primary_key=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    bookmarked: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ClassActivity(Base):
     __tablename__ = "class_activities"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

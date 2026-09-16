@@ -13,10 +13,90 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.dependencies import current_user, db_session
 from api.routes import classrooms
-from database.models import Base, ClassActivity, ClassMaterial, Classroom, Enrollment, User
+from database.models import (
+    Base,
+    ClassActivity,
+    ClassMaterial,
+    Classroom,
+    Enrollment,
+    MaterialProgress,
+    User,
+)
 
 
 class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
+    async def test_student_library_progress_is_private_and_reversible(self):
+        cid = await self.create_class()
+        for name in ("student", "outsider"):
+            await self.client.post(f"/classes/{cid}/members", json={"username": name})
+        mid = (
+            await self.client.post(
+                f"/classes/{cid}/materials",
+                json={"title": "Pecahan", "content": "Materi pecahan", "published": True},
+            )
+        ).json()["id"]
+        await self.client.post(
+            f"/classes/{cid}/materials", json={"title": "Rahasia draft", "content": "Draft"}
+        )
+        self.actor = self.student
+        response = await self.client.get("/classes/student/materials")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        path = f"/classes/{cid}/materials/{mid}/progress"
+        response = await self.client.patch(path, json={"completed": True, "bookmarked": True})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["completed"])
+        self.assertIsNotNone(response.json()["completed_at"])
+        self.assertTrue(
+            (await self.client.get("/classes/student/materials")).json()[0]["progress"][
+                "bookmarked"
+            ]
+        )
+        self.actor = self.outsider
+        self.assertFalse(
+            (await self.client.get("/classes/student/materials")).json()[0]["progress"]["completed"]
+        )
+        self.actor = self.student
+        response = await self.client.patch(path, json={"completed": False})
+        self.assertFalse(response.json()["completed"])
+        self.assertIsNone(response.json()["completed_at"])
+        self.assertTrue(response.json()["bookmarked"])
+
+    async def test_progress_cannot_escape_material_access(self):
+        cid = await self.create_class()
+        mid = (
+            await self.client.post(
+                f"/classes/{cid}/materials", json={"title": "Draft", "content": "Isi"}
+            )
+        ).json()["id"]
+        path = f"/classes/{cid}/materials/{mid}/progress"
+        self.assertEqual((await self.client.patch(path, json={"completed": True})).status_code, 403)
+        await self.client.post(f"/classes/{cid}/members", json={"username": "student"})
+        self.actor = self.student
+        self.assertEqual((await self.client.patch(path, json={"completed": True})).status_code, 404)
+        self.actor = self.teacher
+        await self.client.put(
+            f"/classes/{cid}/materials/{mid}",
+            json={"title": "Terbit", "content": "Isi", "published": True},
+        )
+        self.actor = self.student
+        self.assertEqual(
+            (
+                await self.client.patch(
+                    path, json={"completed": True, "student_id": str(self.outsider.id)}
+                )
+            ).status_code,
+            422,
+        )
+        self.assertEqual(
+            (await self.client.patch(path, json={"bookmarked": True})).status_code, 200
+        )
+        self.actor = self.teacher
+        await self.client.delete(f"/classes/{cid}/members/{self.student.id}")
+        self.actor = self.student
+        self.assertEqual((await self.client.get("/classes/student/materials")).json(), [])
+        self.assertEqual((await self.client.patch(path, json={"completed": True})).status_code, 404)
+
     async def asyncSetUp(self):
         self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
         async with self.engine.begin() as conn:
@@ -30,6 +110,7 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
                         Enrollment.__table__,
                         ClassMaterial.__table__,
                         ClassActivity.__table__,
+                        MaterialProgress.__table__,
                     ],
                 )
             )
