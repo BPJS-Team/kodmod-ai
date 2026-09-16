@@ -8,7 +8,7 @@ import uuid
 
 import httpx
 from fastapi import FastAPI
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.dependencies import current_user, db_session
@@ -20,6 +20,7 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
         async with self.engine.begin() as conn:
+            await conn.execute(text("PRAGMA foreign_keys=ON"))
             await conn.run_sync(
                 lambda c: Base.metadata.create_all(
                     c,
@@ -191,6 +192,7 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
             ).status_code,
             422,
         )
+
         cid = await self.create_class()
         self.assertEqual(
             (
@@ -205,4 +207,55 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
                 )
             ).status_code,
             422,
+        )
+
+    async def test_publish_unpublish_restore_and_cross_class_material(self):
+        cid = await self.create_class()
+        other = await self.create_class()
+        await self.client.post(f"/classes/{cid}/members", json={"username": "student"})
+        draft = await self.client.post(
+            f"/classes/{cid}/materials", json={"title": "Draft", "content": "Isi"}
+        )
+        mid = draft.json()["id"]
+        body = {"title": "Materi terbaru", "content": "Isi terbaru", "published": True}
+        self.assertEqual(
+            (await self.client.put(f"/classes/{other}/materials/{mid}", json=body)).status_code,
+            404,
+        )
+        self.assertEqual(
+            (await self.client.get(f"/classes/{other}/materials/{mid}")).status_code, 404
+        )
+        self.assertEqual(
+            (await self.client.put(f"/classes/{cid}/materials/{mid}", json=body)).status_code,
+            200,
+        )
+        self.actor = self.student
+        detail = (await self.client.get(f"/classes/{cid}")).json()
+        self.assertEqual(detail["material_count"], 1)
+        self.assertEqual(detail["members"], [])
+        self.assertEqual(
+            (await self.client.get(f"/classes/{cid}/materials/{mid}")).json()["content"],
+            "Isi terbaru",
+        )
+        self.assertEqual(
+            (await self.client.put(f"/classes/{cid}/materials/{mid}", json=body)).status_code,
+            403,
+        )
+        self.actor = self.teacher
+        await self.client.patch(f"/classes/{cid}", json={"is_archived": True})
+        self.actor = self.student
+        self.assertEqual((await self.client.get("/classes")).json(), [])
+        self.assertEqual(
+            (await self.client.get(f"/classes/{cid}/materials/{mid}")).status_code, 404
+        )
+        self.actor = self.teacher
+        await self.client.patch(f"/classes/{cid}", json={"is_archived": False})
+        self.actor = self.student
+        self.assertEqual(len((await self.client.get("/classes")).json()), 1)
+        self.actor = self.teacher
+        await self.client.put(f"/classes/{cid}/materials/{mid}", json={**body, "published": False})
+        self.actor = self.student
+        self.assertEqual((await self.client.get(f"/classes/{cid}")).json()["material_count"], 0)
+        self.assertEqual(
+            (await self.client.get(f"/classes/{cid}/materials/{mid}")).status_code, 404
         )

@@ -43,6 +43,9 @@ export function ActionFeedback({ state }: { state: ActionState }) {
 }
 
 const messages: Record<string, string> = {
+  "class-created":
+    "Kelas berhasil dibuat. Tambahkan siswa dan materi untuk mulai belajar.",
+  "material-saved": "Materi berhasil disimpan sesuai status publikasinya.",
   "signed-in": "Anda berhasil masuk. Selamat datang di ruang KODMOD.",
   registered:
     "Akun berhasil dibuat. Selamat memulai perjalanan bersama KODMOD.",

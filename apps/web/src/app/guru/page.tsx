@@ -1,4 +1,4 @@
-import { RoleHome } from "@/components/role-home";
+import { ClassIndex } from "@/components/class-pages";
 export default function TeacherPage() {
-  return <RoleHome role="teacher" />;
+  return <ClassIndex role="teacher" dashboard />;
 }
