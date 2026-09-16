@@ -29,11 +29,39 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
+# Freeze the original table set: importing live metadata must not create tables
+# owned by subsequent revisions on a fresh installation.
+BASELINE_TABLES = {
+    "users",
+    "invitation_codes",
+    "subjects",
+    "concepts",
+    "lessons",
+    "exercises",
+    "documents",
+    "curriculum_chunks",
+    "learning_sessions",
+    "interaction_logs",
+    "quiz_sessions",
+    "quiz_questions",
+    "quiz_attempts",
+    "mastery_scores",
+    "misconceptions",
+    "analytics_reports",
+    "recommendations",
+}
+
 
 def upgrade() -> None:
     op.execute(sa.text("CREATE EXTENSION IF NOT EXISTS vector"))
-    Base.metadata.create_all(bind=op.get_bind())
+    Base.metadata.create_all(
+        bind=op.get_bind(),
+        tables=[t for t in Base.metadata.sorted_tables if t.name in BASELINE_TABLES],
+    )
 
 
 def downgrade() -> None:
-    Base.metadata.drop_all(bind=op.get_bind())
+    Base.metadata.drop_all(
+        bind=op.get_bind(),
+        tables=[t for t in Base.metadata.sorted_tables if t.name in BASELINE_TABLES],
+    )

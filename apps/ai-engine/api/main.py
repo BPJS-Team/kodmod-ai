@@ -43,6 +43,7 @@ from api.routes import (
     analytics,
     auth,
     chat,
+    classrooms,
     content,
     exercise,
     health,
@@ -122,6 +123,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth")
 app.include_router(chat.router, prefix="/chat")
+app.include_router(classrooms.router, prefix="/classes")
 app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 app.include_router(student.router, prefix="/student")
 app.include_router(teacher.router, prefix="/teacher")
