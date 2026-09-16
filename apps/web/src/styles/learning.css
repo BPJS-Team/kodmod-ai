@@ -1,3 +1,218 @@
+.student-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.7fr);
+  align-items: center;
+  gap: 30px;
+  padding: 30px;
+  margin-bottom: 32px;
+}
+.student-overview-label {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #3265b9;
+  font-size: 14px;
+}
+.student-overview h2 {
+  font-size: 23px;
+  letter-spacing: -0.035em;
+  margin: 14px 0;
+}
+.student-overview p,
+.reader-controls p,
+.reader-finish p {
+  color: #61718b;
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+.student-overview progress {
+  width: 100%;
+  height: 9px;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  accent-color: #2f69d7;
+}
+.student-overview progress::-webkit-progress-bar {
+  background: #e8effb;
+}
+.student-overview progress::-webkit-progress-value {
+  background: #2f69d7;
+  border-radius: 10px;
+}
+.student-overview-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.student-overview-links .button {
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.library-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 24px;
+  margin-top: 26px;
+}
+.library-search span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.library-result {
+  color: #61718b;
+  margin: 22px 0;
+  font-size: 14px;
+}
+.student-material-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.student-material-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  min-width: 0;
+}
+.student-material-card:hover {
+  border-color: #84aff3;
+}
+.student-material-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #45628c;
+  font-size: 13px;
+}
+.student-material-top > span:nth-child(2) {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.student-material-top > svg {
+  flex-shrink: 0;
+}
+.student-material-card h2 {
+  font-size: 20px;
+  line-height: 1.5;
+  color: #1b3155;
+  margin: 24px 0 8px;
+  overflow-wrap: anywhere;
+}
+.student-material-card p {
+  color: #61718b;
+  margin: 0 0 28px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.student-material-bottom {
+  border-top: 1px solid #e9eef5;
+  padding-top: 18px;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #3265b9;
+  font-size: 13px;
+}
+.student-material-bottom span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.library-reset {
+  margin: 0 24px 24px;
+}
+.library-more {
+  margin-top: 24px;
+}
+.reader-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 24px;
+}
+.reader-controls > div {
+  flex: 1;
+}
+.reader-controls .field {
+  min-width: 135px;
+}
+.reader-contrast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.reader-contrast input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2865d5;
+}
+.reader-status {
+  color: #43618c;
+  font-size: 14px;
+  margin: 24px 0;
+}
+.student-reader .material-reader {
+  max-width: 78ch;
+}
+.student-reader .reader-high-contrast {
+  background: #fff;
+  color: #000;
+  border-color: #111;
+}
+.reader-finish {
+  margin-top: 28px;
+  padding: 28px;
+}
+.reader-finish h2 {
+  font-size: 21px;
+  margin: 0;
+}
+.reader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 22px;
+}
+@media (max-width: 1100px) {
+  .student-material-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .student-overview {
+    grid-template-columns: 1fr;
+  }
+  .reader-controls {
+    flex-wrap: wrap;
+  }
+  .reader-controls > div {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 650px) {
+  .student-material-grid,
+  .library-filters {
+    grid-template-columns: 1fr;
+  }
+  .student-overview {
+    padding: 22px;
+  }
+  .reader-actions {
+    flex-direction: column;
+  }
+  .reader-actions .button {
+    width: 100%;
+    white-space: normal;
+  }
+}
 .learning-shell {
   --learning-muted: #61718b;
 }

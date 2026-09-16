@@ -19,6 +19,8 @@ import type {
 } from "@/lib/class-types";
 import { Badge, Empty, Heading } from "./ui";
 import { ClassAction, MaterialForm } from "./class-forms";
+import { StudentReader } from "./student-reader";
+import { StudentOverview } from "./student-overview";
 
 const baseFor = (role: LearningRole) =>
   role === "teacher" ? "/guru" : "/siswa";
@@ -167,6 +169,7 @@ export async function ClassIndex({
           </div>
         </>
       )}
+      {dashboard && !teacher && <StudentOverview />}
       <div className="learning-section-heading">
         <h2>{dashboard ? "Ruang belajar terbaru" : "Semua ruang belajar"}</h2>
         <span>{rows.length} kelas</span>
@@ -332,6 +335,8 @@ export async function MaterialPage({
       />
       {role === "teacher" && !row.is_archived ? (
         <MaterialForm classId={id} material={material} />
+      ) : role === "student" ? (
+        <StudentReader key={material.id} classId={id} material={material} />
       ) : (
         <article className="panel material-reader" aria-label="Isi materi">
           {material.content}

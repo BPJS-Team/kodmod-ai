@@ -11,11 +11,23 @@ export type Classroom = {
   created_at: string;
 };
 export type Material = {
+  progress?: ReadingProgress;
   id: string;
   title: string;
   published: boolean;
   created_at: string;
   content?: string;
+};
+export type ReadingProgress = {
+  completed: boolean;
+  bookmarked: boolean;
+  completed_at: string | null;
+};
+export type StudentMaterial = Material & {
+  class_id: string;
+  class_name: string;
+  subject: string;
+  progress: ReadingProgress;
 };
 export type ClassDetail = Classroom & {
   materials: Material[];

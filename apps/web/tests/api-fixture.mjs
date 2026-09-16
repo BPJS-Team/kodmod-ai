@@ -1,6 +1,8 @@
 // Local UI contract fixture only. Never import this file into the application.
 // Run: node apps/web/tests/api-fixture.mjs
 import { createServer } from "node:http";
+import { createLearningFixture } from "./learning-fixture.mjs";
+const learning = createLearningFixture();
 const users = [
   {
     id: "test-admin",
@@ -87,6 +89,7 @@ const server = createServer(async (req, res) => {
   );
   if (!user?.is_active) return send(401, {});
   if (url.pathname === "/auth/me") return send(200, user);
+  if (learning(req, url, body, user, send)) return;
   if (user.role !== "admin") return send(403, {});
   if (url.pathname === "/admin/users" && req.method === "GET") {
     return send(
