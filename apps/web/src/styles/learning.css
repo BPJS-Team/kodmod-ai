@@ -134,6 +134,7 @@
   margin-top: 24px;
 }
 .reader-controls {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 24px;
@@ -141,6 +142,19 @@
 }
 .reader-controls > div {
   flex: 1;
+}
+.reader-controls > div:first-child {
+  flex-basis: 100%;
+}
+.reader-controls .reader-settings-actions {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: start;
+}
+.reader-settings-actions > div {
+  flex-basis: 100%;
 }
 .reader-controls .field {
   min-width: 135px;

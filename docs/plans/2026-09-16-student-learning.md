@@ -1,5 +1,7 @@
 # Scope siswa: pustaka dan progres bacaan
 
+Pembaruan 18 September: [preferensi bacaan tersimpan per akun pada browser yang sama](2026-09-18-reading-preferences.md). Batas pengaturan per halaman di laporan awal berikut sudah diperluas; sinkronisasi antarperangkat tetap belum tersedia.
+
 ## Yang diimplementasikan
 
 - `/siswa/materi`: pustaka materi terbit dari kelas aktif yang diikuti siswa. Cari judul/kelas/mapel, filter kelas, belum selesai, sudah dipelajari, dan bookmark. Daftar ditampilkan bertahap 12 item; pencarian/filter berjalan di browser atas metadata yang dikirim API.

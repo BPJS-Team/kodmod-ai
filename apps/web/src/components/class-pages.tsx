@@ -21,6 +21,8 @@ import { Badge, Empty, Heading } from "./ui";
 import { ClassAction, MaterialForm } from "./class-forms";
 import { StudentReader } from "./student-reader";
 import { StudentOverview } from "./student-overview";
+import { readingSettings } from "@/lib/reading-settings";
+import { readingDefaults } from "@/lib/reading-preferences";
 
 const baseFor = (role: LearningRole) =>
   role === "teacher" ? "/guru" : "/siswa";
@@ -316,12 +318,13 @@ export async function MaterialPage({
   id: string;
   materialId: string;
 }) {
-  const [row, material] = await Promise.all([
+  const [row, material, preferences] = await Promise.all([
     classroomData<ClassDetail>(role, `/${encodeURIComponent(id)}`),
     classroomData<Material>(
       role,
       `/${encodeURIComponent(id)}/materials/${encodeURIComponent(materialId)}`,
     ),
+    role === "student" ? readingSettings() : Promise.resolve(readingDefaults),
   ]);
   return (
     <>
@@ -336,7 +339,12 @@ export async function MaterialPage({
       {role === "teacher" && !row.is_archived ? (
         <MaterialForm classId={id} material={material} />
       ) : role === "student" ? (
-        <StudentReader key={material.id} classId={id} material={material} />
+        <StudentReader
+          key={material.id}
+          classId={id}
+          material={material}
+          preferences={preferences}
+        />
       ) : (
         <article className="panel material-reader" aria-label="Isi materi">
           {material.content}

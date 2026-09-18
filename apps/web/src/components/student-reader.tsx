@@ -2,7 +2,14 @@
 import { useState } from "react";
 import { Bookmark, CheckCircle2 } from "lucide-react";
 import { ActionFeedback, useConfirmedAction } from "./action-feedback";
-import { saveReadingProgress } from "@/app/student-actions";
+import {
+  saveReadingProgress,
+  saveReadingSettings,
+} from "@/app/student-actions";
+import {
+  readingDefaults,
+  type ReadingPreferences,
+} from "@/lib/reading-preferences";
 import type { Material } from "@/lib/class-types";
 
 function ProgressButton({
@@ -57,40 +64,94 @@ function ProgressButton({
 export function StudentReader({
   classId,
   material,
+  preferences,
 }: {
   classId: string;
   material: Material;
+  preferences: ReadingPreferences;
 }) {
-  const [size, setSize] = useState("20");
-  const [contrast, setContrast] = useState(false);
+  const [size, setSize] = useState(preferences.size);
+  const [contrast, setContrast] = useState(preferences.contrast);
+  const [spacing, setSpacing] = useState(preferences.spacing);
+  const [settingsState, settingsAction, saving] = useConfirmedAction(
+    saveReadingSettings,
+    {
+      title: "Simpan tampilan bacaan?",
+      text: "Ukuran teks, jarak baris, dan kontras akan digunakan untuk materi lain saat akun ini dibuka di browser yang sama.",
+      confirmText: "Ya, simpan",
+    },
+  );
   return (
     <div className="student-reader">
-      <section className="panel reader-controls" aria-label="Pengaturan bacaan">
+      <form
+        action={settingsAction}
+        onReset={(e) => e.preventDefault()}
+        className="panel reader-controls"
+        aria-label="Pengaturan bacaan"
+      >
         <div>
           <strong>Nyaman dibaca, sesuai kebutuhanmu.</strong>
           <p>
-            Atur tampilan untuk bacaan ini. Tidak ada suara yang diputar
-            otomatis.
+            Pratinjau langsung di bawah. Simpan untuk memakai tampilan ini pada
+            materi lain di browser yang sama.
           </p>
         </div>
         <label className="field">
           Ukuran teks
-          <select value={size} onChange={(e) => setSize(e.target.value)}>
+          <select
+            name="size"
+            value={size}
+            disabled={saving}
+            onChange={(e) => setSize(e.target.value)}
+          >
             <option value="18">Standar</option>
             <option value="20">Besar</option>
             <option value="24">Lebih besar</option>
             <option value="28">Sangat besar</option>
           </select>
         </label>
+        <label className="field">
+          Jarak baris
+          <select
+            name="spacing"
+            value={spacing}
+            disabled={saving}
+            onChange={(e) => setSpacing(e.target.value)}
+          >
+            <option value="1.65">Rapat</option>
+            <option value="1.95">Nyaman</option>
+            <option value="2.3">Lega</option>
+          </select>
+        </label>
         <label className="reader-contrast">
           <input
             type="checkbox"
+            name="contrast"
+            disabled={saving}
             checked={contrast}
             onChange={(e) => setContrast(e.target.checked)}
           />
           Kontras tinggi
         </label>
-      </section>
+        <div className="reader-settings-actions">
+          <button className="button primary" disabled={saving}>
+            {saving ? "Menyimpan…" : "Simpan tampilan"}
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={saving}
+            onClick={() => {
+              setSize(readingDefaults.size);
+              setSpacing(readingDefaults.spacing);
+              setContrast(readingDefaults.contrast);
+            }}
+          >
+            Pratinjau bawaan
+          </button>
+          <ActionFeedback state={settingsState} />
+        </div>
+      </form>
       <div className="reader-status" role="status">
         {material.progress?.completed
           ? "Sudah Anda tandai dipelajari"
@@ -100,7 +161,7 @@ export function StudentReader({
       <article
         className={`panel material-reader ${contrast ? "reader-high-contrast" : ""}`}
         aria-label="Isi materi"
-        style={{ fontSize: `${size}px` }}
+        style={{ fontSize: `${size}px`, lineHeight: spacing }}
       >
         {material.content}
       </article>
