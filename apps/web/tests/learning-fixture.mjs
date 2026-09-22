@@ -96,6 +96,54 @@ export function createLearningFixture() {
     created_at: m.created_at,
   });
   return (req, url, body, user, send) => {
+    if (url.pathname.startsWith("/analytics")) {
+      if (user.role !== "student") {
+        send(403, {});
+        return true;
+      }
+      const window = url.searchParams.get("window") || "week";
+      const summary = {
+        student_id: user.id,
+        student_name: "Siswa Uji",
+        window,
+        n_sessions: 4,
+        total_minutes: 86.5,
+        interaction_count: 18,
+        n_quiz_attempts: 6,
+        quiz_accuracy: 0.833,
+        avg_quiz_score: 0.79,
+        overall_mastery: 0.68,
+        weak_concepts: [
+          { concept_id: "concept-pecahan", concept_name: "Pecahan", mastery: 0.42, n_attempts: 4 },
+        ],
+        strong_concepts: [
+          { concept_id: "concept-bilangan", concept_name: "Bilangan bulat", mastery: 0.88, n_attempts: 5 },
+        ],
+        open_misconceptions: [],
+        engagement_index: 0.61,
+        active_recommendations: [
+          {
+            id: "recommendation-1",
+            kind: "practice",
+            title: "Latihan pecahan bertahap",
+            body: "Coba dua soal pecahan dengan bantuan tutor.",
+            priority: 1,
+          },
+        ],
+        generated_at: "2026-09-22T00:00:00Z",
+      };
+      if (url.pathname === "/analytics/me" && req.method === "GET") {
+        send(200, summary);
+      } else if (url.pathname === "/analytics/me/spoken" && req.method === "GET") {
+        send(200, {
+          summary,
+          spoken: "Progress minggu ini menunjukkan kamu semakin percaya diri memahami konsep pecahan.",
+        });
+      } else {
+        send(404, {});
+      }
+      return true;
+    }
     if (url.pathname.startsWith("/quiz")) {
       if (user.role !== "student") {
         send(403, {});

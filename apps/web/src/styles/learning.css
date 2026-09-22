@@ -1243,6 +1243,286 @@
 .quiz-feedback-alert {
   margin-top: 18px;
 }
+.analytics-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.analytics-toolbar,
+.analytics-card-heading,
+.analytics-progress-meta,
+.analytics-concept-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.analytics-toolbar h2 {
+  color: #1b3155;
+  font-size: clamp(24px, 3vw, 34px);
+  letter-spacing: -0.045em;
+  margin: 9px 0 6px;
+}
+.analytics-toolbar p {
+  color: #6a7d98;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 0;
+}
+.analytics-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3970c9;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.analytics-window-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #dce7f5;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+.analytics-window-tabs button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #71839d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 13px;
+}
+.analytics-window-tabs button:hover:not(:disabled) {
+  color: #2e5fa9;
+  background: #edf4ff;
+}
+.analytics-window-tabs button.active {
+  color: #2359ac;
+  background: #e3efff;
+  box-shadow: 0 2px 7px rgb(31 89 171 / 10%);
+}
+.analytics-window-tabs button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.analytics-error {
+  margin: 0;
+}
+.analytics-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 30px;
+  overflow: hidden;
+  background: radial-gradient(circle at 85% 25%, rgb(145 193 255 / 22%), transparent 28%),
+    linear-gradient(135deg, #f7fbff 0%, #eef5ff 100%);
+}
+.analytics-hero-copy {
+  min-width: 0;
+  max-width: 640px;
+  flex: 1;
+}
+.analytics-hero h3 {
+  color: #1a3560;
+  font-size: 25px;
+  letter-spacing: -0.04em;
+  margin: 8px 0 6px;
+}
+.analytics-hero p {
+  color: #5d7598;
+  font-size: 13px;
+  margin: 0 0 22px;
+}
+.analytics-hero progress,
+.analytics-concept progress {
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 99px;
+  overflow: hidden;
+  accent-color: #3775db;
+}
+.analytics-hero progress::-webkit-progress-bar,
+.analytics-concept progress::-webkit-progress-bar {
+  background: #dbe8f8;
+}
+.analytics-hero progress::-webkit-progress-value,
+.analytics-concept progress::-webkit-progress-value {
+  border-radius: 99px;
+  background: linear-gradient(90deg, #2e66d1, #6e9ff0);
+}
+.analytics-progress-meta {
+  align-items: baseline;
+  margin-top: 10px;
+}
+.analytics-progress-meta strong {
+  color: #235ab3;
+  font-size: 23px;
+}
+.analytics-progress-meta span {
+  color: #6c82a0;
+  font-size: 11px;
+}
+.analytics-hero-mark {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  min-width: 145px;
+  color: #5188dc;
+  text-align: center;
+}
+.analytics-hero-mark span {
+  color: #5878a5;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.analytics-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.analytics-stat-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 11px;
+  row-gap: 4px;
+  padding: 20px;
+}
+.analytics-stat-icon {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.analytics-stat-icon.blue { color: #2c69d2; background: #eaf2ff; }
+.analytics-stat-icon.purple { color: #7657c5; background: #f1edff; }
+.analytics-stat-icon.green { color: #23856d; background: #e6f7f0; }
+.analytics-stat-label {
+  color: #71839d;
+  font-size: 11px;
+}
+.analytics-stat-card strong {
+  color: #1d3a68;
+  font-size: 21px;
+  letter-spacing: -0.035em;
+}
+.analytics-stat-card small {
+  grid-column: 2;
+  color: #8b9ab0;
+  font-size: 10px;
+}
+.analytics-columns,
+.analytics-lower-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.analytics-card {
+  min-width: 0;
+  padding: 24px;
+}
+.analytics-card-heading {
+  align-items: center;
+  margin-bottom: 20px;
+}
+.analytics-card-heading h3 {
+  color: #243f68;
+  font-size: 17px;
+  letter-spacing: -0.025em;
+  margin: 7px 0 0;
+}
+.analytics-card-heading > svg {
+  flex-shrink: 0;
+  color: #6392df;
+}
+.analytics-concept-list {
+  display: grid;
+  gap: 19px;
+}
+.analytics-concept-top {
+  align-items: baseline;
+  margin-bottom: 7px;
+}
+.analytics-concept-top strong {
+  color: #2d466c;
+  font-size: 13px;
+}
+.analytics-concept-top span {
+  color: #567ab0;
+  font-size: 12px;
+  font-weight: 800;
+}
+.analytics-concept small {
+  display: block;
+  color: #8292a8;
+  font-size: 10px;
+  margin-top: 7px;
+}
+.analytics-empty {
+  color: #7b8da7;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+.analytics-recommendations {
+  display: grid;
+  gap: 12px;
+}
+.analytics-recommendation {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e3ebf7;
+  border-radius: 12px;
+  background: #f9fbff;
+}
+.analytics-recommendation > span {
+  display: grid;
+  flex: 0 0 24px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #2c64c3;
+  background: #e6f0ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+.analytics-recommendation strong {
+  color: #2d466c;
+  font-size: 12px;
+}
+.analytics-recommendation p {
+  color: #71839d;
+  font-size: 11px;
+  line-height: 1.55;
+  margin: 4px 0 0;
+}
+.analytics-voice-card {
+  background: linear-gradient(145deg, #fbfdff, #f3f8ff);
+}
+.analytics-spoken {
+  min-height: 62px;
+  color: #516a8d;
+  font-size: 13px;
+  line-height: 1.75;
+  margin: 0 0 18px;
+}
+.analytics-voice-card .voice-panel {
+  margin: 0;
+}
 @media (max-width: 780px) {
   .quiz-progress {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1277,5 +1557,23 @@
   }
   .quiz-progress .small {
     padding: 8px 9px;
+  }
+}
+@media (max-width: 860px) {
+  .analytics-toolbar,
+  .analytics-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .analytics-toolbar .button {
+    align-self: flex-start;
+  }
+  .analytics-hero-mark {
+    display: none;
+  }
+  .analytics-stat-grid,
+  .analytics-columns,
+  .analytics-lower-grid {
+    grid-template-columns: 1fr;
   }
 }

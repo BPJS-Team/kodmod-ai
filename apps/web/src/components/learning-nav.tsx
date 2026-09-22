@@ -7,6 +7,7 @@ import {
   BookOpen,
   ListChecks,
   MessageCircle,
+  LineChart,
 } from "lucide-react";
 export function LearningNav({ base }: { base: string }) {
   const path = usePathname();
@@ -20,6 +21,7 @@ export function LearningNav({ base }: { base: string }) {
               { href: "/siswa/materi", title: "Pustaka materi", icon: BookOpen },
               { href: "/siswa/tutor", title: "Tutor AI", icon: MessageCircle },
               { href: "/siswa/latihan", title: "Latihan", icon: ListChecks },
+              { href: "/siswa/progres", title: "Progres saya", icon: LineChart },
             ]
           : []),
       ].map(({ href, title, icon: Icon }) => {
