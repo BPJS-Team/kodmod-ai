@@ -205,6 +205,11 @@ async def synthesise_bytes(
     rate: float = 1.0,
 ) -> bytes:
     """Synthesise text and return raw audio bytes (mp3/wav depending on backend)."""
+    if settings.TTS_BACKEND == "elevenlabs":
+        return await elevenlabs.synthesise(
+            _strip_ssml(text),
+            voice_id=voice or settings.ELEVENLABS_TTS_VOICE_ID,
+        )
     path = await synthesise_to_file(text, voice=voice, rate=rate)
     try:
         return Path(path).read_bytes()

@@ -11,7 +11,7 @@ Status: backend dan UI siap diuji secara terisolasi; belum ada panggilan live ta
   - error provider diringkas dan tidak mengembalikan body provider atau API key.
 - Semua pilihan provider masuk `config/settings.py`; tidak ada key ElevenLabs di frontend.
 - REST terautentikasi siswa:
-  - `POST /voice/tts` mengembalikan bytes audio.
+  - `POST /voice/tts` mengembalikan bytes audio tanpa menyimpan artefak TTS sementara.
   - `POST /voice/stt` menerima multipart audio dengan batas ukuran.
   - `POST /voice/chat` melakukan transkripsi lalu satu turn graph.
   - `POST /voice/text` menjaga jalur keyboard sebagai fallback.
@@ -50,7 +50,8 @@ tetap dapat dipakai.
    menyimpan key di repository atau browser.
 2. Uji perangkat NVDA/Windows dan TalkBack/Android: izin mikrofon, stop audio
    saat pindah halaman, pembacaan status, dan hasil transkripsi Bahasa Indonesia.
-3. Tetapkan retensi audio/transkrip, rate limit per siswa, dan metrik biaya
-   ElevenLabs sebelum membuka fitur untuk seluruh sekolah.
+3. Tetapkan retensi transkrip, rate limit per siswa, dan metrik biaya
+   ElevenLabs sebelum membuka fitur untuk seluruh sekolah. Artefak audio graph
+   lama tetap perlu kebijakan rotasi terpisah.
 4. Tambahkan fixture voice ke `apps/web/tests/api-fixture.mjs` bila alur browser
    terisolasi akan dijadikan gate CI.
