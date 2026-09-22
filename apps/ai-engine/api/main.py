@@ -40,6 +40,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from api.routes import (
     admin,
+    admin_insights,
     analytics,
     auth,
     chat,
@@ -129,6 +130,7 @@ app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 app.include_router(student.router, prefix="/student")
 app.include_router(teacher.router, prefix="/teacher")
 app.include_router(admin.router, prefix="/admin")
+app.include_router(admin_insights.router, prefix="/admin")
 app.include_router(subjects.router, prefix="/subjects")
 app.include_router(subjects.documents_router, prefix="/documents")
 app.include_router(analytics.router, prefix="/analytics")

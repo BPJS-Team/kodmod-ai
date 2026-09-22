@@ -96,6 +96,42 @@ export function createLearningFixture() {
     created_at: m.created_at,
   });
   return (req, url, body, user, send) => {
+    if (url.pathname.startsWith("/admin")) {
+      if (user.role !== "admin") {
+        send(403, {});
+        return true;
+      }
+      if (url.pathname === "/admin/insights/overview" && req.method === "GET") {
+        send(200, {
+          generated_at: "2026-09-22T00:00:00Z",
+          users: { total: 12, active: 10, students: 8, teachers: 3, admins: 1 },
+          learning: { classrooms: 4, sessions: 22, open_sessions: 3, quiz_sessions: 17 },
+          invitations: { active: 5 },
+          providers: {
+            elevenlabs: { configured: false, tts_backend: "piper", stt_backend: "faster-whisper" },
+          },
+        });
+      } else if (url.pathname === "/admin/activity" && req.method === "GET") {
+        send(200, {
+          items: [
+            {
+              id: "activity-1",
+              type: "learning_session",
+              action: "session.ended",
+              actor_name: "Siswa Uji",
+              actor_role: "student",
+              target_name: "Memahami pecahan",
+              occurred_at: "2026-09-22T00:00:00Z",
+            },
+          ],
+          limit: Number(url.searchParams.get("limit") || 30),
+          generated_at: "2026-09-22T00:00:00Z",
+        });
+      } else {
+        send(404, {});
+      }
+      return true;
+    }
     if (url.pathname.startsWith("/teacher")) {
       if (user.role !== "teacher") {
         send(403, {});

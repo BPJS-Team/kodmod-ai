@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Ticket, ChevronRight } from "lucide-react";
+import { Activity, LayoutDashboard, Users, Ticket, ChevronRight } from "lucide-react";
 const links = [
   { href: "/admin", label: "Ringkasan", Icon: LayoutDashboard },
   { href: "/admin/pengguna", label: "Pengguna", Icon: Users },
   { href: "/admin/undangan", label: "Kode undangan", Icon: Ticket },
+  { href: "/admin/aktivitas", label: "Aktivitas & layanan", Icon: Activity },
 ];
 export function AdminNav() {
   const path = usePathname();

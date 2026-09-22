@@ -17,11 +17,15 @@ import {
   type Invitation,
 } from "@/lib/types";
 import { Badge, Heading, Empty } from "@/components/ui";
+import { AdminInsights } from "@/components/admin-insights";
+import type { AdminActivity, AdminOverview } from "@/lib/admin-insights-types";
 export default async function AdminPage() {
   const { token, user } = await requireSession("admin");
-  const [users, invites] = await Promise.all([
+  const [users, invites, overview, activity] = await Promise.all([
     backend<User[]>("/admin/users", token),
     backend<Invitation[]>("/admin/invitations", token),
+    backend<AdminOverview>("/admin/insights/overview", token),
+    backend<AdminActivity>("/admin/activity?limit=8", token),
   ]);
   const active = users.filter((u) => u.is_active).length;
   return (
@@ -143,6 +147,7 @@ export default async function AdminPage() {
           </Empty>
         )}
       </section>
+      <AdminInsights initialOverview={overview} initialActivity={activity} />
     </>
   );
 }
