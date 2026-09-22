@@ -132,6 +132,7 @@ async def list_sessions(
             "subject_id": str(ls.subject_id) if ls.subject_id else None,
             "subject_name": subject_name,
             "started_at": ls.started_at.isoformat() if ls.started_at else None,
+            "ended_at": ls.ended_at.isoformat() if ls.ended_at else None,
         }
         for ls, subject_name in rows
     ]
@@ -177,6 +178,7 @@ async def get_session(
         "title": row.title or "Sesi tanpa judul",
         "subject_id": str(row.subject_id) if row.subject_id else None,
         "started_at": row.started_at.isoformat() if row.started_at else None,
+        "ended_at": row.ended_at.isoformat() if row.ended_at else None,
         "turns": [
             {
                 "role": t.role,

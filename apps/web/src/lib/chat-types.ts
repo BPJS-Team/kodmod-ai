@@ -4,6 +4,7 @@ export type ChatSessionSummary = {
   subject_id: string | null;
   subject_name: string | null;
   started_at: string | null;
+  ended_at: string | null;
 };
 
 export type ChatTurn = {

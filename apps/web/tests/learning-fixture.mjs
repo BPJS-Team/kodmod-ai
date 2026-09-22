@@ -69,6 +69,7 @@ export function createLearningFixture() {
     subject_id: session.subject_id,
     subject_name: session.subject_id ? "Matematika" : null,
     started_at: session.started_at,
+    ended_at: session.ended_at || null,
   });
   const tutorReply = (text) =>
     /pecahan/i.test(text)
@@ -172,6 +173,7 @@ export function createLearningFixture() {
           if (body.session_id && !session) {
             send(404, {});
           } else {
+            if (session?.ended) session = undefined;
             if (!session) {
               const now = new Date().toISOString();
               session = {
@@ -181,6 +183,7 @@ export function createLearningFixture() {
                 started_at: now,
                 turns: [],
                 ended: false,
+                ended_at: null,
               };
               sessions.set(session.id, session);
             }
@@ -225,7 +228,12 @@ export function createLearningFixture() {
         const session = sessions.get(parts[2]);
         if (!session) send(404, {});
         else {
+          if (session.ended) {
+            send(404, {});
+            return true;
+          }
           session.ended = true;
+          session.ended_at = new Date().toISOString();
           send(204);
         }
       } else {

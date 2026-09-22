@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import {
   Bot,
+  CheckCircle2,
   Clock3,
   LoaderCircle,
   MessageCircle,
@@ -63,12 +64,14 @@ export function StudentTutor({
   const [loadingSession, setLoadingSession] = useState(false);
   const [pending, setPending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [endingId, setEndingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const selectionRef = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const selectedSession = sessions.find((item) => item.id === selectedId);
+  const sessionEnded = Boolean(selectedSession?.ended_at);
   const latestTutorText = [...turns]
     .reverse()
     .find((turn) => turn.role === "assistant" || turn.role === "tutor")?.text ?? "";
@@ -195,6 +198,37 @@ export function StudentTutor({
     await notifyResult("Percakapan berhasil dihapus.");
   }
 
+  async function endSession() {
+    if (!selectedId || sessionEnded || pending) return;
+    if (
+      !(await confirmAction({
+        title: "Akhiri sesi belajar ini?",
+        text: "Sesi akan ditandai selesai dan tidak menerima pertanyaan baru.",
+        confirmText: "Ya, akhiri sesi",
+      }))
+    )
+      return;
+
+    setEndingId(selectedId);
+    try {
+      const response = await fetch(
+        `/api/chat/sessions/${encodeURIComponent(selectedId)}/end`,
+        { method: "POST" },
+      );
+      await readJson<unknown>(response, "Sesi belum dapat diakhiri.");
+      const endedAt = new Date().toISOString();
+      setSessions((current) =>
+        current.map((item) => (item.id === selectedId ? { ...item, ended_at: endedAt } : item)),
+      );
+      setDraft("");
+      setNotice("Sesi belajar sudah diakhiri. Kamu masih bisa membaca riwayatnya.");
+    } catch (caught) {
+      await notifyResult(caught instanceof Error ? caught.message : "Sesi belum dapat diakhiri.", true);
+    } finally {
+      setEndingId(null);
+    }
+  }
+
   return (
     <section className="tutor-workspace" aria-label="Tutor AI siswa">
       <aside className="panel tutor-sidebar" aria-label="Riwayat percakapan">
@@ -272,9 +306,32 @@ export function StudentTutor({
               Tutor membantu menyusun penjelasan. Kamu tetap memegang kendali atas setiap langkah belajar.
             </p>
           </div>
-          <span className="tutor-live-status">
-            <span aria-hidden="true" /> {pending ? "Menyiapkan jawaban" : "Siap membantu"}
-          </span>
+          <div className="tutor-thread-actions">
+            {selectedSession && (
+              sessionEnded ? (
+                <span className="tutor-ended-badge">
+                  <CheckCircle2 size={14} aria-hidden="true" /> Sesi selesai
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="button secondary tutor-end"
+                  onClick={() => void endSession()}
+                  disabled={endingId === selectedId || pending}
+                >
+                  {endingId === selectedId ? (
+                    <LoaderCircle className="spin" size={15} aria-hidden="true" />
+                  ) : (
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                  )}
+                  Akhiri sesi
+                </button>
+              )
+            )}
+            <span className="tutor-live-status">
+              <span aria-hidden="true" /> {pending ? "Menyiapkan jawaban" : sessionEnded ? "Mode baca" : "Siap membantu"}
+            </span>
+          </div>
         </header>
 
         <div className="tutor-messages" role="log" aria-live="polite" aria-label="Isi percakapan">
@@ -344,11 +401,15 @@ export function StudentTutor({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            disabled={pending || loadingSession}
+            disabled={pending || loadingSession || sessionEnded}
           />
           <div className="tutor-composer-footer">
-            <span>{draft.length}/4.000 karakter · Shift + Enter untuk baris baru</span>
-            <button className="button primary" type="submit" disabled={pending || loadingSession || !draft.trim()}>
+            <span>
+              {sessionEnded
+                ? "Sesi selesai · mulai pertanyaan baru untuk melanjutkan"
+                : `${draft.length}/4.000 karakter · Shift + Enter untuk baris baru`}
+            </span>
+            <button className="button primary" type="submit" disabled={pending || loadingSession || sessionEnded || !draft.trim()}>
               {pending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}
               {pending ? "Mengirim…" : "Kirim pertanyaan"}
             </button>

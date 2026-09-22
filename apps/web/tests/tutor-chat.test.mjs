@@ -38,6 +38,11 @@ test("student tutor chat keeps a session history and can remove it", () => {
   assert.equal(detail.data.turns.length, 2);
   assert.equal(detail.data.turns[0].role, "student");
   assert.equal(detail.data.turns[1].role, "tutor");
+  assert.equal(detail.data.ended_at, null);
+
+  assert.equal(request(`/chat/sessions/${sent.data.session_id}/end`, "POST").status, 204);
+  assert.equal(request(`/chat/sessions/${sent.data.session_id}/end`, "POST").status, 404);
+  assert.ok(request(`/chat/sessions/${sent.data.session_id}`).data.ended_at);
 
   assert.equal(
     request("/chat/sessions", "GET", {}, { id: "test-teacher", role: "teacher" }).status,

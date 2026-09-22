@@ -65,14 +65,18 @@ async def open_session(
                     )
                 )
             ).scalar_one_or_none()
-            if existing is not None:
+            if existing is not None and existing.ended_at is None:
                 if subject_id is not None and existing.subject_id != subject_id:
                     existing.subject_id = subject_id
                     await session.commit()
                 return existing.id
 
         row = LearningSession(
-            id=session_id or uuid.uuid4(),
+            # An ended session is intentionally never reopened.  Starting a
+            # fresh row also keeps the transcript boundary visible to the
+            # student and prevents later turns from being appended to a
+            # closed learning session.
+            id=uuid.uuid4(),
             student_id=student_id,
             subject_id=subject_id,
             title=derive_title(first_text),
@@ -167,7 +171,7 @@ async def close_session(session_id: uuid.UUID, student_id: uuid.UUID) -> bool:
                 )
             )
         ).scalar_one_or_none()
-        if row is None:
+        if row is None or row.ended_at is not None:
             return False
         row.ended_at = datetime.now(UTC)
         await session.commit()
