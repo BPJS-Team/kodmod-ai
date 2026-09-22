@@ -491,11 +491,283 @@
     padding: 1rem;
   }
 }
+.voice-preferences-dialog {
+  width: min(560px, calc(100vw - 28px));
+  max-width: none;
+  max-height: min(92dvh, 820px);
+  margin: auto;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: #142d4e;
+}
+.voice-preferences-dialog::backdrop {
+  background: #071a38b8;
+  backdrop-filter: blur(7px);
+}
+.voice-preferences-content {
+  max-height: min(92dvh, 820px);
+  overflow-y: auto;
+  padding: clamp(1.35rem, 5vw, 2.15rem);
+  border: 1px solid #cbdcf4;
+  border-radius: 25px;
+  background:
+    radial-gradient(ellipse at 5% 0, #e6f0ff 0, transparent 42%),
+    linear-gradient(155deg, #fff 18%, #f8fbff 100%);
+  box-shadow: 0 28px 95px #061a3c70;
+}
+.voice-preferences-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+.voice-preferences-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid #c9dcfb;
+  border-radius: 16px;
+  color: #2565e9;
+  background: linear-gradient(145deg, #e9f2ff, #fff);
+  box-shadow: 0 8px 20px #2565e914;
+}
+.voice-preferences-close {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #dce6f3;
+  border-radius: 13px;
+  color: #52677f;
+  background: #fff;
+  cursor: pointer;
+}
+.voice-preferences-dialog h2 {
+  margin: 0;
+  color: #102f58;
+  font-family: "Plus Jakarta Sans Variable", sans-serif;
+  font-size: clamp(1.45rem, 4vw, 1.9rem);
+  line-height: 1.25;
+  letter-spacing: -0.045em;
+}
+.voice-preferences-intro {
+  max-width: 440px;
+  margin: 0.65rem 0 1.35rem;
+  color: #52677f;
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+.voice-preferences-options {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.voice-preference-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1px 42px minmax(0, 1fr) 17px;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 88px;
+  padding: 0.95rem 1rem;
+  border: 1px solid #d9e4f2;
+  border-radius: 17px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.voice-preference-option:hover {
+  border-color: #a8c5f2;
+  background: #fbfdff;
+}
+.voice-preference-option.is-selected {
+  border-color: #4c82e8;
+  background: linear-gradient(115deg, #f2f7ff, #fff 70%);
+  box-shadow: inset 0 0 0 1px #4c82e822, 0 7px 20px #1c4f9e0a;
+}
+.voice-preference-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+.voice-preference-option:focus-within {
+  outline: 3px solid #eab308;
+  outline-offset: 3px;
+}
+.voice-preference-icon {
+  display: grid;
+  grid-column: 2;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  color: #2565e9;
+  background: #eaf2ff;
+}
+.voice-preference-icon.device {
+  color: #405e84;
+  background: #edf2f8;
+}
+.voice-preference-copy {
+  display: grid;
+  gap: 0.22rem;
+  min-width: 0;
+}
+.voice-preference-copy strong {
+  color: #18375f;
+  font-size: 0.98rem;
+}
+.voice-preference-copy small {
+  color: #667b95;
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+.voice-preference-choice {
+  display: grid;
+  grid-column: 4;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 1.5px solid #aab9ca;
+  border-radius: 50%;
+}
+.is-selected .voice-preference-choice {
+  border-color: #2565e9;
+  background: #2565e9;
+  box-shadow: inset 0 0 0 4px #fff;
+}
+.voice-preferences-note {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid #79a7f1;
+  border-radius: 0 12px 12px 0;
+  background: #edf4ff;
+}
+.voice-preferences-note strong {
+  color: #264c7c;
+  font-size: 0.83rem;
+}
+.voice-preferences-note p {
+  margin: 0.3rem 0 0;
+  color: #5b7190;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+.voice-preferences-warning {
+  margin: 0.8rem 0 0;
+  color: #8b4d17;
+  font-size: 0.82rem;
+}
+.voice-cache-confirm {
+  margin-top: 0.8rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #ecd1d1;
+  border-radius: 13px;
+  background: #fff8f8;
+}
+.voice-cache-confirm p,
+.voice-cache-message {
+  margin: 0;
+  color: #704545;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+.voice-cache-confirm > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+}
+.voice-cache-confirm .button {
+  min-height: 40px;
+  margin: 0;
+}
+.voice-cache-confirm .button.danger {
+  color: #8e3038;
+  background: #fff;
+  border: 1px solid #e7b5b9;
+}
+.voice-cache-message {
+  margin-top: 0.7rem;
+  color: #276448;
+}
+.voice-cache-message.is-error {
+  color: #9a3340;
+}
+.voice-preferences-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.2rem;
+}
+.voice-preferences-actions .button {
+  min-height: 46px;
+  margin: 0;
+}
+.voice-engine-indicator {
+  display: inline-flex;
+  margin-top: 0.65rem;
+  padding: 0.28rem 0.62rem;
+  border: 1px solid #d6e4f8;
+  border-radius: 999px;
+  color: #2e5fa0;
+  background: #f5f9ff;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+.voice-settings-action {
+  margin-left: auto;
+}
+.voice-preferences-dialog button:focus-visible {
+  outline: 3px solid #eab308;
+  outline-offset: 3px;
+}
+@media (max-width: 520px) {
+  .voice-preferences-content {
+    padding: 1.25rem 1rem;
+    border-radius: 21px;
+  }
+  .voice-preference-option {
+    grid-template-columns: 1px 36px minmax(0, 1fr) 15px;
+    gap: 0.65rem;
+    min-height: 82px;
+    padding: 0.75rem;
+  }
+  .voice-preference-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .voice-preferences-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+  .voice-preferences-actions .button {
+    width: 100%;
+  }
+  .voice-settings-action {
+    margin-left: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .swal2-popup,
   .swal2-icon,
   .swal2-icon * {
     animation: none !important;
     transition: none !important;
+  }
+  .voice-preference-option {
+    transition: none;
   }
 }

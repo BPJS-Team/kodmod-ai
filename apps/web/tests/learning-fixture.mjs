@@ -96,7 +96,10 @@ export function createLearningFixture() {
     created_at: m.created_at,
   });
   return (req, url, body, user, send) => {
-    if (url.pathname.startsWith("/admin")) {
+    if (
+      url.pathname === "/admin/insights/overview" ||
+      url.pathname === "/admin/activity"
+    ) {
       if (user.role !== "admin") {
         send(403, {});
         return true;

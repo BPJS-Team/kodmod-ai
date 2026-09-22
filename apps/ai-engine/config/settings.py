@@ -160,7 +160,7 @@ class Settings(BaseSettings):
     STT_LANGUAGE: str = "id"
     DEEPGRAM_API_KEY: str | None = None
 
-    TTS_BACKEND: Literal["piper", "azure", "elevenlabs", "coqui"] = "piper"
+    TTS_BACKEND: Literal["piper", "azure", "elevenlabs", "coqui"] = "elevenlabs"
     TTS_VOICE: str = "id-ID-ArdiNeural"
     TTS_RATE: float = 1.0
     AZURE_TTS_KEY: str | None = None

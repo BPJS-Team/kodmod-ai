@@ -1,7 +1,7 @@
 # Integrasi ElevenLabs KODMOD
 
 Tanggal: 2026-09-22  
-Status: backend dan UI siap diuji secara terisolasi; belum ada panggilan live tanpa key deployment.
+Status: backend, proxy, pilihan suara browser, dan cache lokal tersedia untuk diuji; belum ada panggilan live tanpa key deployment.
 
 ## Yang sudah dikerjakan
 
@@ -18,6 +18,8 @@ Status: backend dan UI siap diuji secara terisolasi; belum ada panggilan live ta
 - WebSocket `/ws/voice` memakai kontrak `StreamingSTT` yang benar dan mengirim frame TTS sebagai binary.
 - Next.js server proxy meneruskan sesi ke FastAPI di `/api/voice/tts` dan `/api/voice/stt`; secret tidak pernah masuk browser.
 - Reader siswa memiliki kontrol manual Dengarkan, jeda/putar lagi, rekam, berhenti, dan review transkrip. Tidak ada autoplay atau pengiriman jawaban otomatis.
+- Browser menampilkan pilihan suara pada kunjungan pertama. Suara KODMOD menjadi pilihan awal; suara bawaan perangkat tersedia di browser yang mendukung Web Speech API. Pilihan tersimpan di browser dan bisa diubah dari panel suara.
+- Audio TTS server yang sama dipakai ulang dari IndexedDB, maksimal 50 audio/64 MB selama 30 hari. Cache berisi Blob audio dan hash teks; siswa dapat menghapusnya dengan konfirmasi.
 - Dashboard admin menampilkan apakah ElevenLabs sedang dipilih sebagai backend,
   apakah key/voice ID sudah lengkap, serta backend fallback yang aktif. Nilai
   ini boolean dan tidak pernah mengembalikan secret.
@@ -37,9 +39,10 @@ ELEVENLABS_TTS_MODEL=eleven_multilingual_v2
 ELEVENLABS_STT_MODEL=scribe_v2
 ```
 
-Untuk menjalankan UI tanpa akun ElevenLabs, biarkan backend memakai
-`faster-whisper`/`piper`; tombol suara akan memberi pesan fallback dan teks
-tetap dapat dipakai.
+Default `TTS_BACKEND` pada kode dan `.env.example` kini `elevenlabs`, sesuai
+pilihan browser “Suara KODMOD”. Server tetap memerlukan API key dan voice ID.
+Untuk pengembangan tanpa akun, set `TTS_BACKEND=piper` secara eksplisit;
+pilihan suara perangkat dan jalur teks juga tetap tersedia.
 
 ## Verifikasi yang sudah tersedia
 
@@ -48,6 +51,9 @@ tetap dapat dipakai.
 - Static wiring memastikan router voice terdaftar di FastAPI.
 - `npm run lint --workspace @kodmod/web` dan
   `npm run typecheck --workspace @kodmod/web` lulus.
+- Tes browser lokal pilihan/cache: `node --test tests/speech-preferences.test.mjs`
+  (lima kasus helper). Ini belum membuktikan penyimpanan IndexedDB di perangkat
+  nyata atau pemanggilan API ElevenLabs langsung.
 
 ## Release checklist sebelum pilot
 

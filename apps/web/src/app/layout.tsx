@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { RedirectFeedback } from "@/components/action-feedback";
+import { VoicePreferencesProvider } from "@/components/voice-preferences-provider";
 import "../styles/index.css";
 import "../styles/product.css";
 import "sweetalert2/dist/sweetalert2.min.css";
@@ -20,10 +21,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="id">
       <body>
         <SkipLink />
-        {children}
-        <Suspense fallback={null}>
-          <RedirectFeedback />
-        </Suspense>
+        <VoicePreferencesProvider>
+          {children}
+          <Suspense fallback={null}>
+            <RedirectFeedback />
+          </Suspense>
+        </VoicePreferencesProvider>
       </body>
     </html>
   );

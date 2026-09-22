@@ -5,11 +5,11 @@ KODMOD AI - Text-to-Speech Pipeline
 Final node before the response leaves the graph. Reads `state["accessible_response"]`
 (or falls back to `generated_response`) and synthesizes audio.
 
-Backends (selected via KODMOD_TTS_BACKEND)
+Backends (selected via TTS_BACKEND)
 ------------------------------------------
-* `piper`     - fully offline, low-latency, surprisingly natural. Default.
-* `azure`     - neural voices, SSML support, multilingual. Recommended for prod.
-* `elevenlabs`- most natural, emotion-aware. Premium tier.
+* `elevenlabs`- natural, emotion-aware voice. Default for the app.
+* `piper`     - fully offline, low-latency option for development/fallback.
+* `azure`     - neural voices, SSML support, multilingual.
 * `coqui`     - open-source, voice cloning capable.
 
 Streaming

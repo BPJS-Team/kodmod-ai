@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Headphones, Mic, Pause, Play, Square, Volume2 } from "lucide-react";
+import { Headphones, Mic, Pause, Play, Settings2, Square, Volume2 } from "lucide-react";
+import { getSpeechAudio } from "@/lib/speech-audio-cache";
+import { useVoicePreferences } from "@/components/voice-preferences-provider";
 
 type VoiceStatus =
   | "idle"
@@ -33,8 +35,10 @@ export function VoiceControls({
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [message, setMessage] = useState("Siap membantu membacakan atau menuliskan jawabanmu.");
   const [transcript, setTranscript] = useState("");
+  const { engine, openVoicePreferences } = useVoicePreferences();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -53,15 +57,36 @@ export function VoiceControls({
     streamRef.current = null;
   };
 
+  const stopDeviceSpeech = () => {
+    if (!utteranceRef.current) return;
+    utteranceRef.current = null;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
   useEffect(() => {
     return () => {
       releaseAudio();
+      stopDeviceSpeech();
       stopRecording();
     };
   }, []);
 
   async function listen() {
     if (!text.trim()) return;
+    if (status === "playing" && engine === "device" && utteranceRef.current) {
+      window.speechSynthesis.pause();
+      setStatus("paused");
+      setMessage("Pembacaan dijeda. Tekan Putar lagi untuk melanjutkan.");
+      return;
+    }
+    if (status === "paused" && engine === "device" && utteranceRef.current) {
+      window.speechSynthesis.resume();
+      setStatus("playing");
+      setMessage("Sedang membacakan materi dari perangkat.");
+      return;
+    }
     if (status === "playing" && audioRef.current) {
       audioRef.current.pause();
       setStatus("paused");
@@ -75,18 +100,56 @@ export function VoiceControls({
       return;
     }
 
+    stopDeviceSpeech();
     stopRecording();
     releaseAudio();
     setStatus("loading");
-    setMessage("Menyiapkan audio…");
+    setMessage(engine === "device" ? "Memulai suara perangkat…" : "Menyiapkan audio…");
+
+    if (engine === "device") {
+      const supportsDeviceSpeech =
+        "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
+      if (supportsDeviceSpeech) {
+        try {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text.trim());
+          utterance.lang = "id-ID";
+          utterance.onstart = () => {
+            if (utteranceRef.current !== utterance) return;
+            setStatus("playing");
+            setMessage("Sedang membacakan materi dengan suara perangkat.");
+          };
+          utterance.onend = () => {
+            if (utteranceRef.current !== utterance) return;
+            utteranceRef.current = null;
+            setStatus("idle");
+            setMessage("Pembacaan selesai.");
+          };
+          utterance.onerror = (event) => {
+            if (utteranceRef.current !== utterance) return;
+            utteranceRef.current = null;
+            if (event.error === "canceled" || event.error === "interrupted") return;
+            setMessage("Suara perangkat tidak tersedia. Menyiapkan suara KODMOD.");
+            void playAppSpeech();
+          };
+          utteranceRef.current = utterance;
+          window.speechSynthesis.speak(utterance);
+          return;
+        } catch {
+          setMessage("Suara perangkat tidak tersedia. Menyiapkan suara KODMOD.");
+        }
+      } else {
+        setMessage("Peramban ini tidak menyediakan suara perangkat. Menyiapkan suara KODMOD.");
+      }
+    }
+
+    await playAppSpeech();
+  }
+
+  async function playAppSpeech() {
     try {
-      const response = await fetch("/api/voice/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) throw new Error(await errorMessage(response, "Audio belum dapat dibuat."));
-      const url = URL.createObjectURL(await response.blob());
+      const result = await getSpeechAudio(text);
+      const url = URL.createObjectURL(result.blob);
       const audio = new Audio(url);
       objectUrlRef.current = url;
       audioRef.current = audio;
@@ -99,7 +162,11 @@ export function VoiceControls({
       };
       await audio.play();
       setStatus("playing");
-      setMessage("Sedang membacakan materi.");
+      setMessage(
+        result.cached
+          ? "Memutar audio tersimpan di perangkat ini."
+          : "Sedang membacakan materi.",
+      );
     } catch (error) {
       releaseAudio();
       setStatus("error");
@@ -194,6 +261,9 @@ export function VoiceControls({
           </span>
           <h2>Dengarkan atau jawab dengan suara</h2>
           <p>Kontrol tetap manual. Tidak ada audio yang diputar atau dikirim tanpa tindakanmu.</p>
+          <span className="voice-engine-indicator">
+            {engine === "app" ? "Suara KODMOD" : "Suara bawaan perangkat"}
+          </span>
         </div>
         <Headphones className="voice-panel-icon" size={30} aria-hidden="true" />
       </div>
@@ -220,6 +290,14 @@ export function VoiceControls({
             {status === "recording" ? "Berhenti" : status === "transcribing" ? "Membaca…" : "Jawab dengan suara"}
           </button>
         )}
+        <button
+          type="button"
+          className="button secondary voice-settings-action"
+          onClick={openVoicePreferences}
+        >
+          <Settings2 size={18} aria-hidden="true" />
+          Pengaturan suara
+        </button>
       </div>
       <p className={`voice-status ${status === "error" ? "voice-status-error" : ""}`} role="status" aria-live="polite">
         {message}
