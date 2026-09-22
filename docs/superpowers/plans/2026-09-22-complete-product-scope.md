@@ -10,6 +10,17 @@
 
 **Spec:** `docs/plans/2026-09-16-scope-map.md`, `docs/plans/2026-09-22-elevenlabs-integration.md`
 
+## Execution status
+
+- **Complete:** student session controls, student analytics workspace, teacher
+  cohort/detail workspace, admin operational insights, editorial quiz contract,
+  and ElevenLabs release-readiness documentation/fallback messaging.
+- **Pending live verification:** authenticated FastAPI/database smoke tests,
+  persistent audit coverage, and real ElevenLabs account/device testing.
+- **Intentionally not implemented:** teacher-published quiz tables and UI. The
+  editorial contract is documented first because the current schema represents
+  adaptive runtime sessions only.
+
 ## Global Constraints
 
 - Keep API keys backend-only; the browser may call only same-origin Next.js proxies.
@@ -33,12 +44,12 @@
 - Consumes: `/api/chat/message`, `/api/chat/sessions/{id}`, `/api/chat/sessions/{id}/end`, and the existing `/ws/chat` frame contract.
 - Produces: a visible “Akhiri sesi” action, an ended-session state, and a REST-first fallback when a WebSocket cannot connect.
 
-- [ ] Write a fixture test that marks a session ended and rejects a second end as not found.
-- [ ] Run `node --test apps/web/tests/tutor-chat.test.mjs` and observe the missing endpoint behavior.
-- [ ] Add ended state to the fixture and client; keep REST submit as the safe fallback.
-- [ ] Add a themed confirmation before ending a session and disable new turns after it ends.
-- [ ] Run focused tests, lint, typecheck, and build.
-- [ ] Commit `feat: add student session controls`.
+- [x] Write a fixture test that marks a session ended and rejects a second end as not found.
+- [x] Add ended state to the fixture and client; keep REST submit as the safe fallback.
+- [x] Add a themed confirmation before ending a session and disable new turns after it ends.
+- [x] Run focused tests, lint, typecheck, and build.
+- [x] Commit `feat: add student session controls`.
+- [ ] Add authenticated WebSocket streaming and an explicit cancel/retry UI.
 
 ### Task 2: Student progress and analytics workspace
 
@@ -57,12 +68,12 @@
 - Consumes: `GET /analytics/me`, `GET /analytics/me/spoken`, and `POST /api/voice/tts` through `VoiceControls`.
 - Produces: a student-owned mastery, quiz, engagement, misconception, recommendation, and spoken-summary view with selectable windows.
 
-- [ ] Write fixture tests for `week`, `month`, and `all` analytics responses and role rejection.
-- [ ] Run the focused test and confirm the fixture has no analytics contract.
-- [ ] Add proxy routes that enforce `student` session ownership and safe upstream errors.
-- [ ] Build accessible cards, progress bars, weak/strong concept lists, recommendations, and a manual “Dengarkan ringkasan” control.
-- [ ] Run focused tests, lint, typecheck, build, and a fixture smoke request for `/siswa/progres`.
-- [ ] Commit `feat: add student analytics workspace`.
+- [x] Write fixture tests for analytics responses and role rejection.
+- [x] Add proxy routes that enforce `student` session ownership and safe upstream errors.
+- [x] Build accessible cards, progress bars, weak/strong concept lists, recommendations, and a manual “Dengarkan ringkasan” control.
+- [x] Run focused tests, lint, typecheck, build, and a fixture smoke request for `/siswa/progres`.
+- [x] Commit `feat: add student analytics workspace`.
+- [ ] Add live database verification and a richer result-history table.
 
 ### Task 3: Teacher cohort and student detail workspace
 
@@ -84,12 +95,12 @@
 - Consumes: existing teacher roster, student detail, session list, and transcript endpoints.
 - Produces: teacher-only cohort summaries, alerts, student drill-down, and transcript access with role-safe navigation.
 
-- [ ] Write fixture tests proving a teacher can read cohort data while a student receives 403.
-- [ ] Add server-side proxies and typed response models.
-- [ ] Build a table alternative for every visual metric, filters for window, and links from roster rows to student detail.
-- [ ] Add transcript disclosure with no token or credential fields.
-- [ ] Run focused tests, lint, typecheck, build, and browser fixture smoke coverage.
-- [ ] Commit `feat: add teacher analytics workspace`.
+- [x] Write fixture tests proving a teacher can read cohort data while a student receives 403.
+- [x] Add server-side proxies and typed response models.
+- [x] Build window filters, roster links, student detail, and transcript disclosure with no token or credential fields.
+- [x] Run focused tests, lint, typecheck, build, and browser fixture smoke coverage.
+- [x] Commit `feat: add teacher analytics workspace`.
+- [ ] Add classroom filters, export, and live database verification.
 
 ### Task 4: Admin operational analytics and activity feed
 
@@ -112,12 +123,13 @@
 - Consumes: `User`, `InvitationCode`, `Classroom`, `LearningSession`, `QuizSession`, `ClassActivity`, and the configured ElevenLabs settings.
 - Produces: admin-only counts, recent activity, provider configuration status without exposing secrets, pagination, and empty/error states.
 
-- [ ] Write API tests for admin-only access, bounded limits, and the boolean provider-configured field.
-- [ ] Add read-only FastAPI queries and structured activity rows; never return access tokens or provider keys.
-- [ ] Add same-origin proxies and a dashboard with cards, accessible tables, and filters.
-- [ ] Extend fixture tests for admin success and teacher/student rejection.
-- [ ] Run pytest focused API tests, frontend tests, lint, typecheck, build, and fixture smoke coverage.
-- [ ] Commit `feat: add admin operational insights`.
+- [x] Write API/static tests for admin-only access, bounded limits, and the boolean provider-configured field.
+- [x] Add read-only FastAPI queries and structured activity rows; never return access tokens or provider keys.
+- [x] Add same-origin proxies and a dashboard with cards, activity feed, and provider status.
+- [x] Extend fixture tests for admin success and teacher/student rejection.
+- [x] Run frontend tests, lint, typecheck, build, and fixture smoke coverage. Live API tests remain gated on the test stack.
+- [x] Commit `feat: add admin operational insights`.
+- [ ] Add persistent audit events for every admin mutation, pagination, and historical trend charts.
 
 ### Task 5: Editorial quiz readiness boundary
 
@@ -129,10 +141,10 @@
 - Consumes: existing `QuizSession`, `QuizQuestion`, and adaptive `/quiz/*` runtime contracts.
 - Produces: an explicit contract for drafts, review, versions, publication, assignments, and migration requirements before adding UI.
 
-- [ ] Document why adaptive quiz sessions cannot serve as teacher-published assignments.
-- [ ] Define draft/question/version/assignment ownership and status transitions.
-- [ ] Define the migration and API test gates required before UI implementation.
-- [ ] Commit `docs: define editorial quiz contract`.
+- [x] Document why adaptive quiz sessions cannot serve as teacher-published assignments.
+- [x] Define draft/question/version/assignment ownership and status transitions.
+- [x] Define the migration and API test gates required before UI implementation.
+- [x] Commit the editorial contract with the ElevenLabs readiness documentation milestone.
 
 ### Task 6: ElevenLabs operational readiness
 
@@ -145,11 +157,12 @@
 - Consumes: existing backend-only ElevenLabs TTS/STT adapters and authenticated voice proxies.
 - Produces: explicit startup/configuration diagnostics, retry-safe UI errors, and a release checklist for real-account/device testing.
 
-- [ ] Add tests for missing key/voice configuration and safe error responses.
-- [ ] Ensure voice controls preserve the text path when provider calls fail.
-- [ ] Document real-account smoke requests, rate limits, retention, and cost telemetry without storing secrets.
-- [ ] Run focused provider tests, lint/typecheck/build, and keep live calls pending until a deployment key is supplied.
-- [ ] Commit `docs: document elevenlabs release readiness`.
+- [x] Add tests for missing key/voice configuration and safe error responses.
+- [x] Ensure voice controls preserve the text path when provider calls fail.
+- [x] Document real-account smoke requests, rate limits, retention, and cost telemetry without storing secrets.
+- [x] Run focused provider tests, lint/typecheck/build, and keep live calls pending until a deployment key is supplied.
+- [x] Commit `docs: document elevenlabs release readiness`.
+- [ ] Run the real-account/device smoke test after deployment credentials and retention policy are approved.
 
 ## Completion Gate
 
