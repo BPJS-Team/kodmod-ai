@@ -74,6 +74,19 @@ export function createLearningFixture() {
     /pecahan/i.test(text)
       ? "Pecahan menunjukkan bagian dari satu keseluruhan. Misalnya, satu roti dibagi menjadi empat bagian sama besar. Satu bagian disebut satu per empat."
       : "Mari kita uraikan pertanyaanmu langkah demi langkah. Bagian mana yang ingin kamu pahami lebih dulu?";
+  const quizSessions = new Map();
+  let quizSerial = 1;
+  const quizQuestion = (sessionId, index, difficulty) => ({
+    question_id: `${sessionId}-q-${index + 1}`,
+    order_index: index,
+    question:
+      index === 0
+        ? "Jika satu roti dibagi menjadi empat bagian sama besar, satu bagian disebut apa?"
+        : "Berapa nilai dua per empat jika disederhanakan?",
+    question_type: "mcq",
+    options: index === 0 ? ["Satu per empat", "Satu per dua"] : ["Satu per empat", "Satu per dua"],
+    difficulty,
+  });
   const metadata = (m) => ({
     id: m.id,
     class_id: m.class_id,
@@ -82,6 +95,60 @@ export function createLearningFixture() {
     created_at: m.created_at,
   });
   return (req, url, body, user, send) => {
+    if (url.pathname.startsWith("/quiz")) {
+      if (user.role !== "student") {
+        send(403, {});
+        return true;
+      }
+      if (url.pathname === "/quiz/start" && req.method === "POST") {
+        const count = Number(body.n_questions ?? 5);
+        if (!Number.isInteger(count) || count < 1 || count > 20) {
+          send(422, {});
+          return true;
+        }
+        const id = `40000000-0000-4000-8000-${String(quizSerial++).padStart(12, "0")}`;
+        const difficulty = ["easy", "medium", "hard"].includes(body.difficulty)
+          ? body.difficulty
+          : "medium";
+        const questions = Array.from({ length: count }, (_, index) =>
+          quizQuestion(id, index, difficulty),
+        );
+        quizSessions.set(id, { questions, current: 0, correct: 0 });
+        send(200, {
+          quiz_session_id: id,
+          first_question: questions[0],
+          total_questions: questions.length,
+        });
+      } else if (url.pathname === "/quiz/submit" && req.method === "POST") {
+        const quiz = quizSessions.get(body.quiz_session_id);
+        if (!quiz) {
+          send(404, {});
+          return true;
+        }
+        const current = quiz.questions[quiz.current];
+        if (!current || body.question_id !== current.question_id) {
+          send(409, {});
+          return true;
+        }
+        const isCorrect = String(body.student_answer || "").trim().toLowerCase() === "a" ||
+          String(body.student_answer || "").trim().toLowerCase() === "satu per empat";
+        if (isCorrect) quiz.correct += 1;
+        quiz.current += 1;
+        const complete = quiz.current >= quiz.questions.length;
+        send(200, {
+          score: isCorrect ? 1 : 0,
+          is_correct: isCorrect,
+          feedback: isCorrect ? "Jawabanmu tepat." : "Coba periksa kembali pembilang dan penyebutnya.",
+          cumulative_score: quiz.correct / quiz.current,
+          quiz_complete: complete,
+          final_summary: complete ? `Kuis selesai. Skor kamu ${Math.round((quiz.correct / quiz.current) * 100)}%.` : null,
+          next_question: complete ? null : quiz.questions[quiz.current],
+        });
+      } else {
+        send(404, {});
+      }
+      return true;
+    }
     if (url.pathname.startsWith("/chat")) {
       if (user.role !== "student") {
         send(403, {});

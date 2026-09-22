@@ -1,7 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Library, BookOpen, MessageCircle } from "lucide-react";
+import {
+  LayoutDashboard,
+  Library,
+  BookOpen,
+  ListChecks,
+  MessageCircle,
+} from "lucide-react";
 export function LearningNav({ base }: { base: string }) {
   const path = usePathname();
   return (
@@ -13,6 +19,7 @@ export function LearningNav({ base }: { base: string }) {
           ? [
               { href: "/siswa/materi", title: "Pustaka materi", icon: BookOpen },
               { href: "/siswa/tutor", title: "Tutor AI", icon: MessageCircle },
+              { href: "/siswa/latihan", title: "Latihan", icon: ListChecks },
             ]
           : []),
       ].map(({ href, title, icon: Icon }) => {
