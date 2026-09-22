@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BookOpen } from "lucide-react";
+import { ArrowUpRight, BookOpen, MessageCircle } from "lucide-react";
 import { classroomData } from "@/lib/classrooms";
 import type { StudentMaterial } from "@/lib/class-types";
 export async function StudentOverview() {
@@ -40,6 +40,10 @@ export async function StudentOverview() {
         )}
         <Link className="button secondary" href="/siswa/materi">
           Buka pustaka materi
+        </Link>
+        <Link className="button secondary" href="/siswa/tutor">
+          <MessageCircle size={18} aria-hidden="true" />
+          Tanya tutor AI
         </Link>
       </div>
     </section>

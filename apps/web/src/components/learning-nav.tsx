@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Library, BookOpen } from "lucide-react";
+import { LayoutDashboard, Library, BookOpen, MessageCircle } from "lucide-react";
 export function LearningNav({ base }: { base: string }) {
   const path = usePathname();
   return (
@@ -10,7 +10,10 @@ export function LearningNav({ base }: { base: string }) {
         { href: base, title: "Dashboard", icon: LayoutDashboard },
         { href: `${base}/kelas`, title: "Kelas saya", icon: Library },
         ...(base === "/siswa"
-          ? [{ href: "/siswa/materi", title: "Pustaka materi", icon: BookOpen }]
+          ? [
+              { href: "/siswa/materi", title: "Pustaka materi", icon: BookOpen },
+              { href: "/siswa/tutor", title: "Tutor AI", icon: MessageCircle },
+            ]
           : []),
       ].map(({ href, title, icon: Icon }) => {
         const active = href === base ? path === href : path.startsWith(href);

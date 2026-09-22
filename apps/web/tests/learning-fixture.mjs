@@ -53,6 +53,27 @@ export function createLearningFixture() {
     completed_at: null,
   });
   const state = (user, id) => progress.get(`${user.id}:${id}`) || empty();
+  const chatSessions = new Map();
+  let chatSerial = 1;
+  const sessionsFor = (user) => {
+    let sessions = chatSessions.get(user.id);
+    if (!sessions) {
+      sessions = new Map();
+      chatSessions.set(user.id, sessions);
+    }
+    return sessions;
+  };
+  const sessionSummary = (session) => ({
+    id: session.id,
+    title: session.title,
+    subject_id: session.subject_id,
+    subject_name: session.subject_id ? "Matematika" : null,
+    started_at: session.started_at,
+  });
+  const tutorReply = (text) =>
+    /pecahan/i.test(text)
+      ? "Pecahan menunjukkan bagian dari satu keseluruhan. Misalnya, satu roti dibagi menjadi empat bagian sama besar. Satu bagian disebut satu per empat."
+      : "Mari kita uraikan pertanyaanmu langkah demi langkah. Bagian mana yang ingin kamu pahami lebih dulu?";
   const metadata = (m) => ({
     id: m.id,
     class_id: m.class_id,
@@ -61,6 +82,90 @@ export function createLearningFixture() {
     created_at: m.created_at,
   });
   return (req, url, body, user, send) => {
+    if (url.pathname.startsWith("/chat")) {
+      if (user.role !== "student") {
+        send(403, {});
+        return true;
+      }
+      const sessions = sessionsFor(user);
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (url.pathname === "/chat/sessions" && req.method === "GET") {
+        send(
+          200,
+          [...sessions.values()]
+            .sort((a, b) => b.started_at.localeCompare(a.started_at))
+            .map(sessionSummary),
+        );
+      } else if (url.pathname === "/chat/message" && req.method === "POST") {
+        const text = typeof body.text === "string" ? body.text.trim() : "";
+        if (!text || text.length > 4_000) {
+          send(422, {});
+        } else {
+          let session = body.session_id ? sessions.get(body.session_id) : undefined;
+          if (body.session_id && !session) {
+            send(404, {});
+          } else {
+            if (!session) {
+              const now = new Date().toISOString();
+              session = {
+                id: `30000000-0000-4000-8000-${String(chatSerial++).padStart(12, "0")}`,
+                title: text.slice(0, 64),
+                subject_id: body.subject_id || null,
+                started_at: now,
+                turns: [],
+                ended: false,
+              };
+              sessions.set(session.id, session);
+            }
+            const now = new Date().toISOString();
+            const reply = tutorReply(text);
+            session.turns.push({ role: "student", text, intent: "unknown", timestamp: now });
+            session.turns.push({ role: "tutor", text: reply, intent: "tutoring", timestamp: new Date().toISOString() });
+            send(200, {
+              session_id: session.id,
+              text: reply,
+              intent: "tutoring",
+              next_action: "respond",
+              sources: [],
+              latency_ms: 42,
+              quiz_progress: null,
+            });
+          }
+        }
+      } else if (
+        parts[1] === "sessions" &&
+        parts[2] &&
+        parts.length === 3 &&
+        req.method === "GET"
+      ) {
+        const session = sessions.get(parts[2]);
+        if (!session) send(404, {});
+        else send(200, { ...sessionSummary(session), turns: session.turns });
+      } else if (
+        parts[1] === "sessions" &&
+        parts[2] &&
+        parts.length === 3 &&
+        req.method === "DELETE"
+      ) {
+        if (!sessions.delete(parts[2])) send(404, {});
+        else send(204);
+      } else if (
+        parts[1] === "sessions" &&
+        parts[2] &&
+        parts[3] === "end" &&
+        req.method === "POST"
+      ) {
+        const session = sessions.get(parts[2]);
+        if (!session) send(404, {});
+        else {
+          session.ended = true;
+          send(204);
+        }
+      } else {
+        send(404, {});
+      }
+      return true;
+    }
     if (!url.pathname.startsWith("/classes")) return false;
     // Only the seeded teacher/student are members in this read/learn fixture.
     const member = user.id === "test-student" || user.id === "test-teacher";
