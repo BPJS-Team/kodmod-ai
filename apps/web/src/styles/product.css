@@ -144,6 +144,10 @@
   color: #a46518;
   background: #fff8ec;
 }
+.admin-provider-status > div.idle {
+  color: #5e789e;
+  background: #f2f6fb;
+}
 .admin-provider-status > div > div {
   display: grid;
   gap: 3px;

@@ -130,7 +130,7 @@ export function AdminInsights({
             <Sparkles size={20} aria-hidden="true" />
           </div>
           <div className="admin-provider-status">
-            <div className={provider.configured ? "ready" : "attention"}>
+            <div className={provider.enabled ? (provider.configured ? "ready" : "attention") : "idle"}>
               {provider.enabled && provider.configured ? <CheckCircle2 size={21} aria-hidden="true" /> : <CircleAlert size={21} aria-hidden="true" />}
               <div><strong>ElevenLabs</strong><span>{!provider.enabled ? "Belum dipilih; fallback lokal tetap aktif" : provider.configured ? "TTS dan STT siap digunakan" : "API key atau voice ID belum lengkap"}</span></div>
             </div>
