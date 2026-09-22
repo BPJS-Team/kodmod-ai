@@ -19,6 +19,10 @@ function errorMessage(response: Response, fallback: string) {
     .catch(() => fallback);
 }
 
+function withTextFallback(message: string) {
+  return `${message} Kamu tetap bisa menggunakan jalur teks.`;
+}
+
 export function VoiceControls({
   text,
   onTranscript,
@@ -99,7 +103,9 @@ export function VoiceControls({
     } catch (error) {
       releaseAudio();
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Audio belum dapat dibuat. Coba lagi.");
+      setMessage(
+        withTextFallback(error instanceof Error ? error.message : "Audio belum dapat dibuat. Coba lagi."),
+      );
     }
   }
 
@@ -159,7 +165,9 @@ export function VoiceControls({
           );
         } catch (error) {
           setStatus("error");
-          setMessage(error instanceof Error ? error.message : "Suara belum dapat dibaca.");
+          setMessage(
+            withTextFallback(error instanceof Error ? error.message : "Suara belum dapat dibaca."),
+          );
         }
       };
       recorder.start();

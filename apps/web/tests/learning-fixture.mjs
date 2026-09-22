@@ -108,7 +108,7 @@ export function createLearningFixture() {
           learning: { classrooms: 4, sessions: 22, open_sessions: 3, quiz_sessions: 17 },
           invitations: { active: 5 },
           providers: {
-            elevenlabs: { configured: false, tts_backend: "piper", stt_backend: "faster-whisper" },
+            elevenlabs: { enabled: false, configured: true, tts_backend: "piper", stt_backend: "faster-whisper" },
           },
         });
       } else if (url.pathname === "/admin/activity" && req.method === "GET") {

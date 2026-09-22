@@ -25,6 +25,7 @@ test("admin insights returns operational overview and redacted activity", () => 
   const overview = request("/admin/insights/overview");
   assert.equal(overview.status, 200);
   assert.equal(overview.data.users.total, 12);
+  assert.equal(overview.data.providers.elevenlabs.enabled, false);
   assert.equal(typeof overview.data.providers.elevenlabs.configured, "boolean");
 
   const activity = request("/admin/activity?limit=10");

@@ -96,7 +96,7 @@ export function AdminInsights({
         <article className="panel admin-insight-card">
           <span className="admin-insight-icon green"><ShieldCheck size={19} aria-hidden="true" /></span>
           <span>Kesiapan suara</span>
-          <strong>{provider.configured ? "Siap" : "Perlu setup"}</strong>
+            <strong>{!provider.enabled ? "Fallback aktif" : provider.configured ? "Siap" : "Perlu setup"}</strong>
           <small>{provider.tts_backend} · {provider.stt_backend}</small>
         </article>
       </div>
@@ -131,8 +131,8 @@ export function AdminInsights({
           </div>
           <div className="admin-provider-status">
             <div className={provider.configured ? "ready" : "attention"}>
-              {provider.configured ? <CheckCircle2 size={21} aria-hidden="true" /> : <CircleAlert size={21} aria-hidden="true" />}
-              <div><strong>ElevenLabs</strong><span>{provider.configured ? "TTS dan STT siap digunakan" : "API key dan voice ID belum lengkap"}</span></div>
+              {provider.enabled && provider.configured ? <CheckCircle2 size={21} aria-hidden="true" /> : <CircleAlert size={21} aria-hidden="true" />}
+              <div><strong>ElevenLabs</strong><span>{!provider.enabled ? "Belum dipilih; fallback lokal tetap aktif" : provider.configured ? "TTS dan STT siap digunakan" : "API key atau voice ID belum lengkap"}</span></div>
             </div>
             <dl>
               <div><dt>Text to speech</dt><dd>{provider.tts_backend}</dd></div>

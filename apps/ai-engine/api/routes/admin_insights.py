@@ -51,6 +51,11 @@ async def overview(session: AsyncSession = Depends(db_session)) -> dict:
     learning_sessions = await _count(session, LearningSession)
     open_sessions = await _count(session, LearningSession, LearningSession.ended_at.is_(None))
     quiz_sessions = await _count(session, QuizSession)
+    voice_enabled = settings.TTS_BACKEND == "elevenlabs" or settings.STT_BACKEND == "elevenlabs"
+    voice_configured = (
+        (settings.TTS_BACKEND != "elevenlabs" or bool(settings.ELEVENLABS_API_KEY and settings.ELEVENLABS_TTS_VOICE_ID))
+        and (settings.STT_BACKEND != "elevenlabs" or bool(settings.ELEVENLABS_API_KEY))
+    )
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
@@ -70,7 +75,8 @@ async def overview(session: AsyncSession = Depends(db_session)) -> dict:
         "invitations": {"active": active_invitations},
         "providers": {
             "elevenlabs": {
-                "configured": bool(settings.ELEVENLABS_API_KEY and settings.ELEVENLABS_TTS_VOICE_ID),
+                "enabled": voice_enabled,
+                "configured": voice_configured,
                 "tts_backend": settings.TTS_BACKEND,
                 "stt_backend": settings.STT_BACKEND,
             }

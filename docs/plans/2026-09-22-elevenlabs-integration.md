@@ -18,6 +18,11 @@ Status: backend dan UI siap diuji secara terisolasi; belum ada panggilan live ta
 - WebSocket `/ws/voice` memakai kontrak `StreamingSTT` yang benar dan mengirim frame TTS sebagai binary.
 - Next.js server proxy meneruskan sesi ke FastAPI di `/api/voice/tts` dan `/api/voice/stt`; secret tidak pernah masuk browser.
 - Reader siswa memiliki kontrol manual Dengarkan, jeda/putar lagi, rekam, berhenti, dan review transkrip. Tidak ada autoplay atau pengiriman jawaban otomatis.
+- Dashboard admin menampilkan apakah ElevenLabs sedang dipilih sebagai backend,
+  apakah key/voice ID sudah lengkap, serta backend fallback yang aktif. Nilai
+  ini boolean dan tidak pernah mengembalikan secret.
+- Jika TTS atau STT gagal, kontrol suara menyebutkan bahwa jalur teks tetap
+  tersedia. Siswa dapat mengulangi permintaan suara tanpa kehilangan draft.
 
 ## Konfigurasi lokal
 
@@ -44,14 +49,24 @@ tetap dapat dipakai.
 - `npm run lint --workspace @kodmod/web` dan
   `npm run typecheck --workspace @kodmod/web` lulus.
 
-## Yang masih harus dilakukan sebelum pilot
+## Release checklist sebelum pilot
 
 1. Jalankan satu smoke test dengan key dan voice ID non-produksi, tanpa
-   menyimpan key di repository atau browser.
+   menyimpan key di repository, log, browser, atau screenshot. Uji TTS batch,
+   STT multipart, dan `/ws/voice` bila streaming diaktifkan.
 2. Uji perangkat NVDA/Windows dan TalkBack/Android: izin mikrofon, stop audio
-   saat pindah halaman, pembacaan status, dan hasil transkripsi Bahasa Indonesia.
-3. Tetapkan retensi transkrip, rate limit per siswa, dan metrik biaya
-   ElevenLabs sebelum membuka fitur untuk seluruh sekolah. Artefak audio graph
-   lama tetap perlu kebijakan rotasi terpisah.
-4. Tambahkan fixture voice ke `apps/web/tests/api-fixture.mjs` bila alur browser
+   saat pindah halaman, pembacaan status, retry setelah HTTP 502/503, dan hasil
+   transkripsi Bahasa Indonesia.
+3. Tetapkan batas rate per siswa (TTS, STT, dan voice chat), batas karakter,
+   timeout, dan retry policy. Retry hanya untuk kegagalan jaringan/5xx dan
+   tidak boleh menggandakan pengiriman jawaban.
+4. Tetapkan retensi audio dan transkrip. Audio sementara harus dihapus setelah
+   dipakai; transcript yang masuk ke log belajar mengikuti kebijakan sekolah.
+5. Catat metrik tanpa isi sensitif: provider, operation, status code, latency,
+   karakter TTS, durasi audio STT, dan request id yang sudah direduksi. Jangan
+   mencatat API key, audio bytes, atau body error provider.
+6. Pantau pemakaian kredit dan biaya per operation dari dashboard provider atau
+   metrik server. Fitur tetap menyediakan input teks saat saldo habis atau
+   provider tidak tersedia.
+7. Tambahkan fixture voice ke `apps/web/tests/api-fixture.mjs` bila alur browser
    terisolasi akan dijadikan gate CI.

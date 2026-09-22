@@ -16,6 +16,7 @@ export type AdminOverview = {
   invitations: { active: number };
   providers: {
     elevenlabs: {
+      enabled: boolean;
       configured: boolean;
       tts_backend: string;
       stt_backend: string;
