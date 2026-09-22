@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from config.settings import Settings
 from voice import elevenlabs
 
 
@@ -69,11 +70,12 @@ def configured_settings(monkeypatch):
             ELEVENLABS_API_KEY="test-eleven-key",
             ELEVENLABS_TTS_MODEL="eleven_multilingual_v2",
             ELEVENLABS_TTS_OUTPUT_FORMAT="mp3_44100_128",
-            ELEVENLABS_TTS_VOICE_ID="voice-id",
+            ELEVENLABS_TTS_VOICE_ID="1k39YpzqXZn52BgyLyGO",
             ELEVENLABS_TTS_STABILITY=0.5,
             ELEVENLABS_TTS_SIMILARITY_BOOST=0.75,
             ELEVENLABS_TTS_STYLE=0.0,
-            ELEVENLABS_TTS_SPEAKER_BOOST=True,
+            ELEVENLABS_TTS_SPEED=1.0,
+            ELEVENLABS_TTS_SPEAKER_BOOST=False,
             ELEVENLABS_STT_MODEL="scribe_v2",
             ELEVENLABS_STT_NO_VERBATIM=True,
             ELEVENLABS_TIMEOUT_SECONDS=30.0,
@@ -84,15 +86,23 @@ def configured_settings(monkeypatch):
 def test_synthesise_uses_official_stream_request(configured_settings):
     _Client.calls.clear()
     with patch.object(elevenlabs.httpx, "AsyncClient", _Client):
-        audio = asyncio.run(elevenlabs.synthesise("Halo <break time=\"1s\"/> dunia"))
+        audio = asyncio.run(elevenlabs.synthesise('Halo <break time="1s"/> dunia'))
 
     assert audio == b"mp3-bytes"
     call = _Client.calls[-1]
-    assert call["url"].endswith("/v1/text-to-speech/voice-id/stream")
+    assert call["url"].endswith("/v1/text-to-speech/1k39YpzqXZn52BgyLyGO/stream")
     assert call["headers"]["xi-api-key"] == "test-eleven-key"
     assert call["params"] == {"output_format": "mp3_44100_128"}
-    assert call["json"]["text"] == "Halo <break time=\"1s\"/> dunia"
+    assert call["json"]["text"] == 'Halo <break time="1s"/> dunia'
     assert call["json"]["model_id"] == "eleven_multilingual_v2"
+    assert call["json"]["voice_settings"] == {
+        "stability": 0.5,
+        "similarity_boost": 0.75,
+        "style": 0.0,
+        "speed": 1.0,
+        "use_speaker_boost": False,
+    }
+    assert "language_code" not in call["json"]
 
 
 def test_transcribe_sends_scribe_multipart(configured_settings):
@@ -123,10 +133,40 @@ def test_stream_speech_yields_provider_chunks(configured_settings):
 
     assert chunks == [b"chunk-one", b"chunk-two"]
     assert _StreamingClient.calls[-1]["method"] == "POST"
+    assert _StreamingClient.calls[-1]["json"]["voice_settings"]["speed"] == 1.0
+    assert _StreamingClient.calls[-1]["json"]["voice_settings"]["use_speaker_boost"] is False
 
 
 async def _collect(iterator):
     return [chunk async for chunk in iterator]
+
+
+def test_default_tts_profile_matches_requested_voice_and_settings(monkeypatch):
+    setting_names = (
+        "TTS_BACKEND",
+        "ELEVENLABS_TTS_MODEL",
+        "ELEVENLABS_TTS_OUTPUT_FORMAT",
+        "ELEVENLABS_TTS_VOICE_ID",
+        "ELEVENLABS_TTS_STABILITY",
+        "ELEVENLABS_TTS_SIMILARITY_BOOST",
+        "ELEVENLABS_TTS_STYLE",
+        "ELEVENLABS_TTS_SPEED",
+        "ELEVENLABS_TTS_SPEAKER_BOOST",
+    )
+    for name in setting_names:
+        monkeypatch.delenv(name, raising=False)
+
+    profile = Settings(_env_file=None)
+
+    assert profile.TTS_BACKEND == "elevenlabs"
+    assert profile.ELEVENLABS_TTS_MODEL == "eleven_multilingual_v2"
+    assert profile.ELEVENLABS_TTS_OUTPUT_FORMAT == "mp3_44100_128"
+    assert profile.ELEVENLABS_TTS_VOICE_ID == "1k39YpzqXZn52BgyLyGO"
+    assert profile.ELEVENLABS_TTS_STABILITY == 0.5
+    assert profile.ELEVENLABS_TTS_SIMILARITY_BOOST == 0.75
+    assert profile.ELEVENLABS_TTS_STYLE == 0.0
+    assert profile.ELEVENLABS_TTS_SPEED == 1.0
+    assert profile.ELEVENLABS_TTS_SPEAKER_BOOST is False
 
 
 def test_missing_key_fails_before_network(monkeypatch):

@@ -1,12 +1,15 @@
 # Integrasi ElevenLabs KODMOD
 
-Tanggal: 2026-09-22  
-Status: backend, proxy, pilihan suara browser, dan cache lokal tersedia untuk diuji; belum ada panggilan live tanpa key deployment.
+Tanggal diperbarui: 2026-09-23
+
+Status: backend, proxy, pilihan suara browser, dan cache lokal tersedia; preset Bian sudah disamakan dengan tangkapan layar. Panggilan live tetap perlu API key backend.
 
 ## Yang sudah dikerjakan
 
 - Adapter HTTP bersama di `apps/ai-engine/voice/elevenlabs.py`:
   - TTS batch dan streaming memakai `eleven_multilingual_v2` serta format `mp3_44100_128`.
+  - Preset suara Bian (`1k39YpzqXZn52BgyLyGO`) berbahasa Indonesia: stability `0.5`, similarity `0.75`, speed `1.0`, style `0.0`, speaker boost `false`.
+  - Language override tidak dikirim; Multilingual v2 mendeteksi bahasa dari teks dan voice.
   - STT batch memakai ElevenLabs Scribe `scribe_v2`.
   - error provider diringkas dan tidak mengembalikan body provider atau API key.
 - Semua pilihan provider masuk `config/settings.py`; tidak ada key ElevenLabs di frontend.
@@ -20,6 +23,7 @@ Status: backend, proxy, pilihan suara browser, dan cache lokal tersedia untuk di
 - Reader siswa memiliki kontrol manual Dengarkan, jeda/putar lagi, rekam, berhenti, dan review transkrip. Tidak ada autoplay atau pengiriman jawaban otomatis.
 - Browser menampilkan pilihan suara pada kunjungan pertama. Suara KODMOD menjadi pilihan awal; suara bawaan perangkat tersedia di browser yang mendukung Web Speech API. Pilihan tersimpan di browser dan bisa diubah dari panel suara.
 - Audio TTS server yang sama dipakai ulang dari IndexedDB, maksimal 50 audio/64 MB selama 30 hari. Cache berisi Blob audio dan hash teks; siswa dapat menghapusnya dengan konfirmasi.
+- Versi kunci cache dinaikkan saat preset suara berubah agar audio yang dibuat dengan konfigurasi lama tidak digunakan kembali.
 - Dashboard admin menampilkan apakah ElevenLabs sedang dipilih sebagai backend,
   apakah key/voice ID sudah lengkap, serta backend fallback yang aktif. Nilai
   ini boolean dan tidak pernah mengembalikan secret.
@@ -34,8 +38,14 @@ Salin bagian voice dari `apps/ai-engine/.env.example` ke `.env` backend, lalu is
 STT_BACKEND=elevenlabs
 TTS_BACKEND=elevenlabs
 ELEVENLABS_API_KEY=isi_di_backend_saja
-ELEVENLABS_TTS_VOICE_ID=voice_id_dari_akun_elevenlabs
+ELEVENLABS_TTS_VOICE_ID=1k39YpzqXZn52BgyLyGO
 ELEVENLABS_TTS_MODEL=eleven_multilingual_v2
+ELEVENLABS_TTS_OUTPUT_FORMAT=mp3_44100_128
+ELEVENLABS_TTS_STABILITY=0.5
+ELEVENLABS_TTS_SIMILARITY_BOOST=0.75
+ELEVENLABS_TTS_SPEED=1.0
+ELEVENLABS_TTS_STYLE=0.0
+ELEVENLABS_TTS_SPEAKER_BOOST=false
 ELEVENLABS_STT_MODEL=scribe_v2
 ```
 

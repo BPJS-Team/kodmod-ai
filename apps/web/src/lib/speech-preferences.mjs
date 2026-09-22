@@ -1,7 +1,7 @@
 export const SPEECH_ENGINE_PREFERENCE_KEY = "kodmod.speech-engine.v1";
 export const SPEECH_AUDIO_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-const AUDIO_CACHE_VERSION = "kodmod-elevenlabs-v1";
+const AUDIO_CACHE_VERSION = "kodmod-elevenlabs-v2";
 const inFlightAudio = new Map();
 let inMemoryPreference = null;
 let cacheGeneration = 0;

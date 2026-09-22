@@ -5,6 +5,7 @@ the vendor SDK.  This keeps the API process lightweight, gives batch and
 streaming TTS the same error handling, and keeps the provider key inside the
 backend process.
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -29,7 +30,9 @@ class ElevenLabsConfigurationError(RuntimeError):
 class ElevenLabsError(RuntimeError):
     """Safe provider error that never includes the response body."""
 
-    def __init__(self, message: str, *, status_code: int | None = None, request_id: str | None = None):
+    def __init__(
+        self, message: str, *, status_code: int | None = None, request_id: str | None = None
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.request_id = request_id
@@ -45,10 +48,7 @@ def _api_key() -> str:
 
 
 def _voice_id(voice_id: str | None) -> str:
-    value = (
-        voice_id
-        or getattr(settings, "ELEVENLABS_TTS_VOICE_ID", None)
-    )
+    value = voice_id or getattr(settings, "ELEVENLABS_TTS_VOICE_ID", None)
     if not value or not value.strip():
         raise ElevenLabsConfigurationError(
             "ElevenLabs is not configured: set ELEVENLABS_TTS_VOICE_ID on the backend"
@@ -82,7 +82,8 @@ def _tts_payload(text: str) -> dict[str, Any]:
         "stability": getattr(settings, "ELEVENLABS_TTS_STABILITY", 0.5),
         "similarity_boost": getattr(settings, "ELEVENLABS_TTS_SIMILARITY_BOOST", 0.75),
         "style": getattr(settings, "ELEVENLABS_TTS_STYLE", 0.0),
-        "use_speaker_boost": getattr(settings, "ELEVENLABS_TTS_SPEAKER_BOOST", True),
+        "speed": getattr(settings, "ELEVENLABS_TTS_SPEED", 1.0),
+        "use_speaker_boost": getattr(settings, "ELEVENLABS_TTS_SPEAKER_BOOST", False),
     }
     payload["voice_settings"] = voice_settings
     return payload
@@ -189,7 +190,9 @@ async def transcribe(
     if getattr(settings, "ELEVENLABS_STT_NO_VERBATIM", True):
         data["no_verbatim"] = "true"
 
-    files = {"file": (filename or "audio.webm", audio_bytes, content_type or "application/octet-stream")}
+    files = {
+        "file": (filename or "audio.webm", audio_bytes, content_type or "application/octet-stream")
+    }
     try:
         async with httpx.AsyncClient(timeout=_timeout(), follow_redirects=False) as client:
             response = await client.post(

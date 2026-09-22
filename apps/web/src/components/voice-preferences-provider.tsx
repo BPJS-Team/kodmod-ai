@@ -209,7 +209,7 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
               </span>
               <span className="voice-preference-copy">
                 <strong>Suara KODMOD</strong>
-                <small>Default memakai ElevenLabs melalui server KODMOD; admin perlu mengisi API key dan voice ID.</small>
+                <small>ElevenLabs Multilingual v2 dengan suara Bian. API key disimpan di server KODMOD.</small>
               </span>
               <span className="voice-preference-choice" aria-hidden="true" />
             </label>

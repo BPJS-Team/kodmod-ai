@@ -151,9 +151,9 @@ class Settings(BaseSettings):
     # Voice is optional at runtime. When ElevenLabs is selected, the provider
     # key and voice id stay in this backend-only settings object; the browser
     # only receives audio bytes and redacted transcription errors.
-    STT_BACKEND: Literal[
-        "faster-whisper", "openai-whisper", "deepgram", "elevenlabs"
-    ] = "faster-whisper"
+    STT_BACKEND: Literal["faster-whisper", "openai-whisper", "deepgram", "elevenlabs"] = (
+        "faster-whisper"
+    )
     STT_MODEL: str = "large-v3"
     STT_DEVICE: Literal["cuda", "cpu", "auto"] = "auto"
     STT_COMPUTE_TYPE: str = "float16"
@@ -168,11 +168,12 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: str | None = None
     ELEVENLABS_TTS_MODEL: str = "eleven_multilingual_v2"
     ELEVENLABS_TTS_OUTPUT_FORMAT: str = "mp3_44100_128"
-    ELEVENLABS_TTS_VOICE_ID: str | None = None
+    ELEVENLABS_TTS_VOICE_ID: str = "1k39YpzqXZn52BgyLyGO"
     ELEVENLABS_TTS_STABILITY: float = 0.5
     ELEVENLABS_TTS_SIMILARITY_BOOST: float = 0.75
     ELEVENLABS_TTS_STYLE: float = 0.0
-    ELEVENLABS_TTS_SPEAKER_BOOST: bool = True
+    ELEVENLABS_TTS_SPEED: float = 1.0
+    ELEVENLABS_TTS_SPEAKER_BOOST: bool = False
     ELEVENLABS_STT_MODEL: str = "scribe_v2"
     ELEVENLABS_STT_NO_VERBATIM: bool = True
     ELEVENLABS_TIMEOUT_SECONDS: float = 60.0

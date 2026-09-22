@@ -5,6 +5,7 @@ import {
   createSpeechAudioLoader,
   invalidateSpeechAudioCache,
   readSpeechEnginePreference,
+  speechAudioCacheKey,
   writeSpeechEnginePreference,
 } from "../src/lib/speech-preferences.mjs";
 
@@ -28,6 +29,12 @@ test("speech engine preference defaults to unset and persists either choice", ()
   assert.equal(readSpeechEnginePreference(storage), "device");
   writeSpeechEnginePreference(storage, "app");
   assert.equal(readSpeechEnginePreference(storage), "app");
+});
+
+test("changing the ElevenLabs voice profile invalidates previous cached audio", async () => {
+  const key = await speechAudioCacheKey("Halo dunia!");
+
+  assert.match(key, /^kodmod-elevenlabs-v2:/);
 });
 
 test("speech audio loader reuses unexpired audio without calling TTS again", async () => {
