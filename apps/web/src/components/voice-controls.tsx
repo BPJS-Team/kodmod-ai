@@ -208,16 +208,18 @@ export function VoiceControls({
           {status === "playing" ? <Pause size={18} aria-hidden="true" /> : status === "paused" ? <Play size={18} aria-hidden="true" /> : <Headphones size={18} aria-hidden="true" />}
           {status === "loading" ? "Menyiapkan…" : status === "playing" ? "Jeda" : status === "paused" ? "Putar lagi" : "Dengarkan"}
         </button>
-        <button
-          type="button"
-          className={`button ${status === "recording" ? "danger" : "secondary"}`}
-          onClick={record}
-          disabled={listening || recording}
-          aria-pressed={status === "recording"}
-        >
-          {status === "recording" ? <Square size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
-          {status === "recording" ? "Berhenti" : status === "transcribing" ? "Membaca…" : "Jawab dengan suara"}
-        </button>
+        {onTranscript && (
+          <button
+            type="button"
+            className={`button ${status === "recording" ? "danger" : "secondary"}`}
+            onClick={record}
+            disabled={listening || recording}
+            aria-pressed={status === "recording"}
+          >
+            {status === "recording" ? <Square size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
+            {status === "recording" ? "Berhenti" : status === "transcribing" ? "Membaca…" : "Jawab dengan suara"}
+          </button>
+        )}
       </div>
       <p className={`voice-status ${status === "error" ? "voice-status-error" : ""}`} role="status" aria-live="polite">
         {message}

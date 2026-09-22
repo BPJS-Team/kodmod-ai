@@ -269,7 +269,7 @@ export function StudentAnalytics({
             </div>
           </div>
           <p className="analytics-spoken">{spoken}</p>
-          <VoiceControls text={spoken} onTranscript={() => undefined} />
+          <VoiceControls text={spoken} />
         </article>
       </div>
     </section>
