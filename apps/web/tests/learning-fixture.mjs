@@ -96,6 +96,92 @@ export function createLearningFixture() {
     created_at: m.created_at,
   });
   return (req, url, body, user, send) => {
+    if (url.pathname.startsWith("/teacher")) {
+      if (user.role !== "teacher") {
+        send(403, {});
+        return true;
+      }
+      const window = url.searchParams.get("window") || "week";
+      const analyticsFor = (studentId, studentName, selectedWindow) => ({
+        student_id: studentId,
+        student_name: studentName,
+        window: selectedWindow,
+        n_sessions: 3,
+        total_minutes: 54,
+        interaction_count: 11,
+        n_quiz_attempts: 4,
+        quiz_accuracy: studentId === "student-1" ? 0.58 : 0.86,
+        avg_quiz_score: studentId === "student-1" ? 0.52 : 0.82,
+        overall_mastery: studentId === "student-1" ? 0.47 : 0.81,
+        weak_concepts: [
+          { concept_id: "concept-pecahan", concept_name: "Pecahan", mastery: 0.35, n_attempts: 3 },
+        ],
+        strong_concepts: [],
+        open_misconceptions: [],
+        engagement_index: studentId === "student-1" ? 0.32 : 0.72,
+        active_recommendations: [],
+        generated_at: "2026-09-22T00:00:00Z",
+      });
+      const students = [
+        { id: "student-1", name: "Alya Pratama" },
+        { id: "student-2", name: "Bima Santoso" },
+      ];
+      const session = {
+        id: "teacher-session-1",
+        title: "Memahami pecahan",
+        subject_name: "Matematika",
+        mode: "tutoring",
+        started_at: "2026-09-21T10:00:00Z",
+        ended_at: "2026-09-21T10:12:00Z",
+      };
+      if (url.pathname === "/teacher/students" && req.method === "GET") {
+        send(200, {
+          window,
+          n_students: students.length,
+          avg_mastery: 0.64,
+          avg_quiz_accuracy: 0.72,
+          avg_engagement_index: 0.52,
+          cohort_weak_concepts: [
+            { concept_name: "Pecahan", avg_mastery: 0.43, n_students: 1 },
+          ],
+          students: students.map((item) => {
+            const analytics = analyticsFor(item.id, item.name, window);
+            return {
+              student_id: item.id,
+              student_name: item.name,
+              overall_mastery: analytics.overall_mastery,
+              quiz_accuracy: analytics.quiz_accuracy,
+              engagement_index: analytics.engagement_index,
+              n_sessions: analytics.n_sessions,
+              open_misconceptions: 0,
+            };
+          }),
+          generated_at: "2026-09-22T00:00:00Z",
+        });
+      } else if (url.pathname === "/teacher/students/student-1" && req.method === "GET") {
+        send(200, {
+          account: { id: "student-1", username: "alya", full_name: "Alya Pratama", role: "student", is_active: true },
+          analytics: analyticsFor("student-1", "Alya Pratama", window),
+          teacher_summary: "Alya perlu perhatian pada konsep pecahan dan ritme latihan.",
+        });
+      } else if (url.pathname === "/teacher/students/student-1/sessions" && req.method === "GET") {
+        send(200, [session]);
+      } else if (url.pathname === "/teacher/sessions/teacher-session-1" && req.method === "GET") {
+        send(200, {
+          id: session.id,
+          student_id: "student-1",
+          title: session.title,
+          started_at: session.started_at,
+          turns: [
+            { role: "student", text: "Apa itu pecahan?", intent: "tutoring", timestamp: session.started_at },
+            { role: "assistant", text: "Pecahan adalah bagian dari keseluruhan.", intent: "tutoring", timestamp: "2026-09-21T10:01:00Z" },
+          ],
+        });
+      } else {
+        send(404, {});
+      }
+      return true;
+    }
     if (url.pathname.startsWith("/analytics")) {
       if (user.role !== "student") {
         send(403, {});

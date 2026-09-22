@@ -15,7 +15,10 @@ export function LearningNav({ base }: { base: string }) {
     <nav className="admin-nav" aria-label="Menu ruang belajar">
       {[
         { href: base, title: "Dashboard", icon: LayoutDashboard },
-        { href: `${base}/kelas`, title: "Kelas saya", icon: Library },
+      { href: `${base}/kelas`, title: "Kelas saya", icon: Library },
+        ...(base === "/guru"
+          ? [{ href: "/guru/analitik", title: "Analitik siswa", icon: LineChart }]
+          : []),
         ...(base === "/siswa"
           ? [
               { href: "/siswa/materi", title: "Pustaka materi", icon: BookOpen },
