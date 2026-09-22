@@ -148,11 +148,12 @@ class Settings(BaseSettings):
     RAG_RERANK_TOP_K: int = 4
 
     # ----------------------------------------------------------------- voice
-    # NOTE: the active chat flow is text-first (see api/routes/chat.py); the
-    # voice/* modules and these settings are currently unwired but kept
-    # working (api/routes/voice.py, api/websockets/voice_stream.py still
-    # import them) so re-enabling voice doesn't require touching config.
-    STT_BACKEND: Literal["faster-whisper", "openai-whisper", "deepgram"] = "faster-whisper"
+    # Voice is optional at runtime. When ElevenLabs is selected, the provider
+    # key and voice id stay in this backend-only settings object; the browser
+    # only receives audio bytes and redacted transcription errors.
+    STT_BACKEND: Literal[
+        "faster-whisper", "openai-whisper", "deepgram", "elevenlabs"
+    ] = "faster-whisper"
     STT_MODEL: str = "large-v3"
     STT_DEVICE: Literal["cuda", "cpu", "auto"] = "auto"
     STT_COMPUTE_TYPE: str = "float16"
@@ -165,6 +166,16 @@ class Settings(BaseSettings):
     AZURE_TTS_KEY: str | None = None
     AZURE_TTS_REGION: str | None = None
     ELEVENLABS_API_KEY: str | None = None
+    ELEVENLABS_TTS_MODEL: str = "eleven_multilingual_v2"
+    ELEVENLABS_TTS_OUTPUT_FORMAT: str = "mp3_44100_128"
+    ELEVENLABS_TTS_VOICE_ID: str | None = None
+    ELEVENLABS_TTS_STABILITY: float = 0.5
+    ELEVENLABS_TTS_SIMILARITY_BOOST: float = 0.75
+    ELEVENLABS_TTS_STYLE: float = 0.0
+    ELEVENLABS_TTS_SPEAKER_BOOST: bool = True
+    ELEVENLABS_STT_MODEL: str = "scribe_v2"
+    ELEVENLABS_STT_NO_VERBATIM: bool = True
+    ELEVENLABS_TIMEOUT_SECONDS: float = 60.0
 
     AUDIO_DIR: Path = Path("/var/lib/kodmod/audio")
     MAX_AUDIO_SECONDS: int = 120

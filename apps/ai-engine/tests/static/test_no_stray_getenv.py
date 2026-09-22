@@ -62,17 +62,17 @@ def test_km_static_no_stray_env_reads() -> None:
     )
 
 
-def test_km_static_settings_has_no_dead_provider_knobs() -> None:
-    """Settings must not advertise providers the code cannot actually use."""
+def test_km_static_settings_has_active_voice_provider_knobs() -> None:
+    """Voice providers are configured centrally and are backed by adapters."""
     source = (ROOT / "config" / "settings.py").read_text(encoding="utf-8")
-    for removed in (
-        "ANTHROPIC_API_KEY",
-        "OLLAMA_BASE_URL",
-        "VLLM_BASE_URL",
-        "QDRANT_URL",
+    for active in (
         "STT_BACKEND",
         "TTS_BACKEND",
         "DEEPGRAM_API_KEY",
         "ELEVENLABS_API_KEY",
+        "ELEVENLABS_TTS_MODEL",
+        "ELEVENLABS_STT_MODEL",
     ):
+        assert active in source, f"{active} must be declared in the settings entry point"
+    for removed in ("OLLAMA_BASE_URL", "VLLM_BASE_URL"):
         assert removed not in source, f"{removed} is still declared but unusable"
