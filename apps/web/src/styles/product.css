@@ -9,6 +9,96 @@
   color: var(--ink);
   background: var(--canvas);
 }
+
+.voice-panel {
+  margin: 1rem 0 1.5rem;
+  padding: 1.35rem 1.5rem;
+  border: 1px solid #c9dcf5;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0, #e3efff, transparent 50%),
+    linear-gradient(135deg, #fafdff, #f0f6ff);
+  box-shadow: 0 8px 24px #1b4c8c0a;
+}
+.voice-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.voice-panel-heading h2 {
+  margin: 0.35rem 0 0.45rem;
+  color: #123968;
+  font-size: 1.1rem;
+}
+.voice-panel-heading p {
+  max-width: 660px;
+  margin: 0;
+  color: #5d7391;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.voice-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #2362bd;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.voice-panel-icon {
+  flex-shrink: 0;
+  color: #3c80dc;
+  opacity: 0.8;
+}
+.voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+.voice-actions .button {
+  min-height: 44px;
+}
+.voice-actions .button.danger {
+  color: #9e353d;
+  background: #fff;
+  border-color: #e9b8be;
+}
+.voice-actions .button.danger:hover:not(:disabled) {
+  background: #fff1f2;
+}
+.voice-status {
+  min-height: 1.5rem;
+  margin: 0.8rem 0 0;
+  color: #536b89;
+  font-size: 0.88rem;
+}
+.voice-status-error {
+  color: #9a3340;
+}
+.voice-transcript {
+  margin-top: 0.85rem;
+  padding: 0.9rem 1rem;
+  border-left: 3px solid #4a86df;
+  border-radius: 0 10px 10px 0;
+  background: #fff;
+}
+.voice-transcript strong {
+  display: block;
+  color: #244c80;
+  font-size: 0.9rem;
+}
+.voice-transcript p {
+  margin: 0.35rem 0;
+  color: #18375f;
+  white-space: pre-wrap;
+}
+.voice-transcript small {
+  color: #667d99;
+}
 .register-card {
   max-width: 650px;
   margin: 2rem auto 4rem !important;

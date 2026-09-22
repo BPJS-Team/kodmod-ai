@@ -50,8 +50,8 @@ Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 |---|---|
 | Orkestrasi | LangGraph + LangChain |
 | LLM | Claude (bisa diganti ke OpenAI, Ollama, atau vLLM) |
-| STT | faster-whisper, Deepgram |
-| TTS | Piper, Azure, ElevenLabs |
+| STT | ElevenLabs Scribe (`scribe_v2`) atau faster-whisper/Deepgram fallback |
+| TTS | ElevenLabs (`eleven_multilingual_v2`) atau Piper/Azure fallback |
 | Embedding | BGE-M3 (multilingual) |
 | Basis data | PostgreSQL 16 + pgvector, Redis |
 | API | FastAPI + WebSocket |

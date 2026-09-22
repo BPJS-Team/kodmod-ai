@@ -22,12 +22,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
+import mimetypes
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from graphs.state import KODMODState
 from config.settings import settings
+from graphs.state import KODMODState
+from voice import elevenlabs
 
 log = logging.getLogger(__name__)
 
@@ -39,9 +41,16 @@ log = logging.getLogger(__name__)
 @lru_cache(maxsize=1)
 def _faster_whisper_model():
     from faster_whisper import WhisperModel
-    size = os.getenv("KODMOD_WHISPER_SIZE", "large-v3")
-    device = os.getenv("KODMOD_WHISPER_DEVICE", "cuda")
-    compute = os.getenv("KODMOD_WHISPER_COMPUTE", "float16")
+    size = settings.STT_MODEL
+    device = settings.STT_DEVICE
+    if device == "auto":
+        try:
+            import torch  # type: ignore
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            device = "cpu"
+    compute = settings.STT_COMPUTE_TYPE
     log.info("Loading faster-whisper %s on %s/%s", size, device, compute)
     return WhisperModel(size, device=device, compute_type=compute)
 
@@ -63,11 +72,13 @@ async def stt_node(state: KODMODState) -> dict[str, Any]:
             "last_node": "stt",
         }
 
-    backend = os.getenv("KODMOD_STT_BACKEND", "faster-whisper")
-    if backend == "openai":
+    backend = settings.STT_BACKEND
+    if backend in {"openai", "openai-whisper"}:
         text, lang = await _openai_stt(path)
     elif backend == "deepgram":
         text, lang = await _deepgram_stt(path)
+    elif backend == "elevenlabs":
+        text, lang = await _elevenlabs_stt(path)
     else:
         text, lang = await _fw_stt(path)
 
@@ -115,7 +126,7 @@ async def _openai_stt(path: str) -> tuple[str, str]:
 async def _deepgram_stt(path: str) -> tuple[str, str]:
     """Used mostly via the streaming path, but also exposed here for batch."""
     from deepgram import DeepgramClient, PrerecordedOptions
-    dg = DeepgramClient(os.getenv("DEEPGRAM_API_KEY"))
+    dg = DeepgramClient(settings.DEEPGRAM_API_KEY)
     local_path = _ensure_local(path)
     with open(local_path, "rb") as f:
         payload = {"buffer": f.read()}
@@ -126,6 +137,19 @@ async def _deepgram_stt(path: str) -> tuple[str, str]:
     transcript = resp["results"]["channels"][0]["alternatives"][0]["transcript"]
     detected = resp["results"]["channels"][0]["detected_language"]
     return transcript, detected
+
+
+async def _elevenlabs_stt(path: str, *, language: str | None = None) -> tuple[str, str]:
+    """Transcribe a local audio file through ElevenLabs Scribe."""
+    local_path = _ensure_local(path)
+    file_path = Path(local_path)
+    result = await elevenlabs.transcribe(
+        file_path.read_bytes(),
+        filename=file_path.name,
+        content_type=mimetypes.guess_type(file_path.name)[0] or "application/octet-stream",
+        language=language or settings.STT_LANGUAGE,
+    )
+    return result["text"], result.get("language_code") or language or settings.STT_LANGUAGE
 
 
 # ---------------------------------------------------------------------------
@@ -151,10 +175,12 @@ async def transcribe_path(path, *, language: str | None = None) -> str:
     backend = settings.STT_BACKEND
     if backend == "faster-whisper":
         text, _lang = await _fw_stt(p)
-    elif backend == "openai-whisper":
+    elif backend in {"openai", "openai-whisper"}:
         text, _lang = await _openai_stt(p)
     elif backend == "deepgram":
         text, _lang = await _deepgram_stt(p)
+    elif backend == "elevenlabs":
+        text, _lang = await _elevenlabs_stt(p, language=language)
     else:  # pragma: no cover
         raise ValueError(f"Unknown STT_BACKEND: {backend}")
     return text
@@ -175,6 +201,6 @@ async def transcribe_bytes(audio_bytes: bytes, *, language: str | None = None) -
         return await transcribe_path(tmp_path, language=language)
     finally:
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink(missing_ok=True)
         except OSError:
             pass

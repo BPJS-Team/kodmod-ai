@@ -23,7 +23,6 @@ Per-student rate limit enforced via Redis token bucket - see
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from uuid import uuid4
@@ -32,7 +31,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from api.dependencies import authenticate_ws
 from graphs.main_graph import run_turn
-from graphs.state import initial_state
+from graphs.state import build_learning_profile, initial_state
 from voice.streaming import StreamingSTT, stream_tts
 
 log = logging.getLogger(__name__)
@@ -50,7 +49,7 @@ async def voice_ws(websocket: WebSocket):
     log.info("WS opened for student=%s", student.id)
 
     session_id = str(uuid4())
-    stt = StreamingSTT(language=student.language or "id")
+    stt = StreamingSTT(language=student.preferred_language or "id")
 
     try:
         while True:
@@ -64,11 +63,10 @@ async def voice_ws(websocket: WebSocket):
             state = initial_state(
                 session_id=session_id,
                 student_id=student.id,
-                audio_input_path="",  # we already transcribed
+                user_input=transcript,
             )
             state["transcribed_text"] = transcript
-            state["user_input"] = transcript
-            state["learning_profile"] = student.profile
+            state["learning_profile"] = build_learning_profile(student)
 
             graph = websocket.app.state.graph
             config = {"configurable": {"thread_id": session_id}}
@@ -90,7 +88,8 @@ async def voice_ws(websocket: WebSocket):
                 elif kind == "on_chain_end" and event["name"] == "accessibility":
                     # Start streaming TTS as soon as accessibility node completes
                     final_text = event["data"]["output"].get("accessible_response", "")
-                    await stream_tts(websocket, final_text)
+                    async for frame in stream_tts(final_text):
+                        await websocket.send_bytes(frame)
 
                 elif kind == "on_chain_end" and event["name"] == "tts":
                     audio_uri = event["data"]["output"].get("audio_response_path", "")
@@ -119,14 +118,16 @@ async def _collect_utterance(ws: WebSocket, stt: StreamingSTT) -> str | None:
         msg = await ws.receive()
         if msg.get("type") == "websocket.disconnect":
             return None
-        if "bytes" in msg and msg["bytes"]:
-            partial, is_final = await stt.feed(msg["bytes"])
+        if msg.get("bytes"):
+            result = await stt.feed(msg["bytes"])
+            partial = result.get("partial")
             if partial:
                 transcript = partial
                 await ws.send_json({"type": "partial_transcript", "text": partial})
-            if is_final:
-                return transcript
-        elif "text" in msg and msg["text"]:
+            if result.get("final"):
+                return result["final"]
+        elif msg.get("text"):
             data = json.loads(msg["text"])
             if data.get("event") == "end_of_speech":
-                return transcript or ""
+                final = await stt.flush_segment()
+                return final or transcript or ""

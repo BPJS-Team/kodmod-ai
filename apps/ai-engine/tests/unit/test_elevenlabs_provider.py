@@ -39,6 +39,27 @@ class _Client:
         return self.response
 
 
+class _StreamResponse(_Response):
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return None
+
+    async def aiter_bytes(self, *, chunk_size):
+        del chunk_size
+        yield b"chunk-one"
+        yield b"chunk-two"
+
+
+class _StreamingClient(_Client):
+    response: ClassVar[_StreamResponse] = _StreamResponse()
+
+    def stream(self, method, url, **kwargs):
+        self.calls.append({"method": method, "url": url, **kwargs})
+        return self.response
+
+
 @pytest.fixture
 def configured_settings(monkeypatch):
     monkeypatch.setattr(
@@ -93,6 +114,19 @@ def test_transcribe_sends_scribe_multipart(configured_settings):
         "no_verbatim": "true",
     }
     assert call["files"]["file"][:2] == ("answer.webm", b"webm-audio")
+
+
+def test_stream_speech_yields_provider_chunks(configured_settings):
+    _StreamingClient.calls.clear()
+    with patch.object(elevenlabs.httpx, "AsyncClient", _StreamingClient):
+        chunks = asyncio.run(_collect(elevenlabs.stream_speech("halo")))
+
+    assert chunks == [b"chunk-one", b"chunk-two"]
+    assert _StreamingClient.calls[-1]["method"] == "POST"
+
+
+async def _collect(iterator):
+    return [chunk async for chunk in iterator]
 
 
 def test_missing_key_fails_before_network(monkeypatch):

@@ -51,8 +51,9 @@ from api.routes import (
     student,
     subjects,
     teacher,
+    voice,
 )
-from api.websockets import chat_stream
+from api.websockets import chat_stream, voice_stream
 from config.logging import configure_logging
 from config.settings import settings
 from database.session import close_db, init_db
@@ -133,7 +134,9 @@ app.include_router(subjects.documents_router, prefix="/documents")
 app.include_router(analytics.router, prefix="/analytics")
 app.include_router(exercise.router, prefix="/exercise", tags=["exercise"])
 app.include_router(content.router, prefix="/content", tags=["content"])
+app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(chat_stream.router, prefix="/ws", tags=["websocket"])
+app.include_router(voice_stream.router, prefix="/ws", tags=["websocket", "voice"])
 
 
 # ---- Prometheus -----------------------------------------------------------

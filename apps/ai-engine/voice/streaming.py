@@ -22,19 +22,19 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-import os
 import uuid
 from collections import deque
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import AsyncIterator, Deque, Optional
 
 from config.settings import settings
+from voice import elevenlabs
 
 logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------- file --
-async def save_upload(upload_file, dest_dir: Optional[Path] = None) -> Path:
+async def save_upload(upload_file, dest_dir: Path | None = None) -> Path:
     """
     Save a Starlette/FastAPI UploadFile to disk and return the path.
     Uses streaming reads to avoid materialising large files in memory.
@@ -95,13 +95,13 @@ class StreamingSTT:
     def __init__(
         self,
         sample_rate: int = 16_000,
-        language: Optional[str] = None,
-        model_size: Optional[str] = None,
+        language: str | None = None,
+        model_size: str | None = None,
     ) -> None:
         self.sample_rate = sample_rate
         self.language = language or settings.STT_LANGUAGE
         self.model_size = model_size or settings.STT_MODEL
-        self._buffer: Deque[bytes] = deque()
+        self._buffer: deque[bytes] = deque()
         self._buffered_bytes = 0
         self._max_buffer_bytes = sample_rate * 2 * 6  # 6 s of 16-bit mono
         self._lock = asyncio.Lock()
@@ -175,7 +175,7 @@ class StreamingSTT:
         partial = await self._transcribe(audio_bytes, partial=True)
         return {"partial": partial, "final": None, "is_speaking": True}
 
-    async def flush_segment(self) -> Optional[str]:
+    async def flush_segment(self) -> str | None:
         """
         Mark current buffer as a finalized utterance. Drains the buffer.
         Called by the WS handler when client signals end-of-utterance
@@ -193,12 +193,12 @@ class StreamingSTT:
             self._final_segments.append(text)
         return text
 
-    async def close(self) -> Optional[str]:
+    async def close(self) -> str | None:
         """Final flush and tear down."""
         self._closed = True
         return await self.flush_segment()
 
-    async def _transcribe(self, audio_bytes: bytes, partial: bool) -> Optional[str]:
+    async def _transcribe(self, audio_bytes: bytes, partial: bool) -> str | None:
         await self._ensure_model()
         if self._model is None or self._model == "external":
             # Defer to non-streaming path
@@ -234,7 +234,7 @@ class StreamingSTT:
 
 
 # ------------------------------------------------------------- streaming TTS --
-async def stream_tts(text: str, voice: Optional[str] = None) -> AsyncIterator[bytes]:
+async def stream_tts(text: str, voice: str | None = None) -> AsyncIterator[bytes]:
     """
     Async-generate audio frames for the given text.
     Frames are small (≈40 ms) MP3/Opus chunks suitable for direct WS forwarding.
@@ -244,8 +244,10 @@ async def stream_tts(text: str, voice: Optional[str] = None) -> AsyncIterator[by
       - azure: native streaming via SDK
       - piper / coqui: synthesise to WAV then chunk
     """
-    voice = voice or settings.TTS_VOICE
     backend = settings.TTS_BACKEND
+    voice = voice or (
+        settings.ELEVENLABS_TTS_VOICE_ID if backend == "elevenlabs" else settings.TTS_VOICE
+    )
 
     if backend == "elevenlabs":
         async for frame in _stream_elevenlabs(text, voice):
@@ -271,23 +273,8 @@ async def stream_tts(text: str, voice: Optional[str] = None) -> AsyncIterator[by
 
 
 async def _stream_elevenlabs(text: str, voice: str) -> AsyncIterator[bytes]:
-    api_key = settings.ELEVENLABS_API_KEY
-    if not api_key:
-        raise RuntimeError("ELEVENLABS_API_KEY not set")
-    import httpx
-
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice}/stream"
-    headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
-    payload = {
-        "text": text,
-        "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
-    }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream("POST", url, headers=headers, json=payload) as r:
-            r.raise_for_status()
-            async for chunk in r.aiter_bytes(chunk_size=4096):
-                yield chunk
+    async for chunk in elevenlabs.stream_speech(text, voice_id=voice):
+        yield chunk
 
 
 async def _stream_azure(text: str, voice: str) -> AsyncIterator[bytes]:

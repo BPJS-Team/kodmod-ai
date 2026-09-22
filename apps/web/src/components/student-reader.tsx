@@ -11,6 +11,7 @@ import {
   type ReadingPreferences,
 } from "@/lib/reading-preferences";
 import type { Material } from "@/lib/class-types";
+import { VoiceControls } from "./voice-controls";
 
 function ProgressButton({
   classId,
@@ -158,6 +159,7 @@ export function StudentReader({
           : "Belum ditandai selesai"}
         {material.progress?.bookmarked ? " · Tersimpan di bookmark" : ""}
       </div>
+      <VoiceControls text={material.content ?? ""} />
       <article
         className={`panel material-reader ${contrast ? "reader-high-contrast" : ""}`}
         aria-label="Isi materi"
