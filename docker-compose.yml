@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: kodmod
       POSTGRES_DB: kodmod
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - kodmod-pgdata:/var/lib/postgresql/data
       - ./apps/ai-engine/database/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
@@ -57,10 +57,13 @@ services:
     env_file:
       - ./apps/ai-engine/.env
     environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
       DB_HOST: postgres
+      DB_PORT: 5432
       REDIS_HOST: redis
     ports:
-      - "8000:8000"
+      - "8109:8000"
     volumes:
       - kodmod-audio:/var/lib/kodmod/audio
       - kodmod-uploads:/var/lib/kodmod/uploads

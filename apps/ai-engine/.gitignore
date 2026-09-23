@@ -47,6 +47,8 @@ htmlcov/
 # --- KODMOD-specific
 /var/lib/kodmod/
 /data/curriculum/*.cached/
+/data/uploads/
+/data/audio/
 /audio_cache/
 
 # --- Test artifacts (baselines under docs/testplan/baselines/ ARE tracked)

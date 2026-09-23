@@ -14,8 +14,8 @@ install: ## Pasang dependensi ai-engine dan web
 	cd $(ENGINE) && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 	npm install
 
-api: ## Jalankan ai-engine (port 8000)
-	cd $(ENGINE) && uvicorn api.main:app --reload --port 8000
+api: ## Jalankan ai-engine memakai host dan port dari .env
+	cd $(ENGINE) && $(MAKE) dev
 
 web: ## Jalankan frontend Next.js (port 3100)
 	npm run dev:web

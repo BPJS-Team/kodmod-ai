@@ -36,13 +36,13 @@ Routing memakai App Router bawaan Next.js. Tambahkan halaman lewat folder `src/a
 ## Koneksi backend
 
 `API_ORIGIN` adalah alamat FastAPI untuk server Next.js, default
-`http://127.0.0.1:8000`. Rewrite mengubah `/api/auth/me` menjadi
-`http://127.0.0.1:8000/auth/me`; prefiks `/api` tidak diteruskan ke backend.
+`http://127.0.0.1:8109`. Rewrite mengubah `/api/auth/me` menjadi
+`http://127.0.0.1:8109/auth/me`; prefiks `/api` tidak diteruskan ke backend.
 `NEXT_PUBLIC_API_BASE` mengatur basis URL di browser, default `/api`.
 Variabel `NEXT_PUBLIC_*` masuk ke bundle browser: jangan isi dengan rahasia.
 
 Klien WebSocket belum dibuat. Saat diintegrasikan, gunakan koneksi langsung ke
-FastAPI (`ws://127.0.0.1:8000/ws/chat` saat lokal), atau reverse proxy yang mendukung
+FastAPI (`ws://127.0.0.1:8109/ws/chat` saat lokal), atau reverse proxy yang mendukung
 WebSocket di produksi. Contoh `NEXT_PUBLIC_WS_URL` disiapkan di `.env.example`;
 variabel ini belum digunakan. Untuk koneksi langsung, tambahkan
 `http://localhost:3100` ke `CORS_ALLOW_ORIGINS` backend.

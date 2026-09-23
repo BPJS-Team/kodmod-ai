@@ -62,11 +62,31 @@ Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 ```bash
 make infra-up     # nyalain Postgres (pgvector) + Redis
 make install      # pasang dependensi ai-engine dan web
-make api          # jalanin ai-engine  -> http://localhost:8000
+make api          # jalanin ai-engine  -> http://localhost:8109
 make web          # jalanin antarmuka  -> http://localhost:3100
 ```
 
+Infrastruktur lokal memakai PostgreSQL di port host `5433` (port `5432` di
+container) agar tidak berbenturan dengan PostgreSQL Laragon yang mungkin sudah
+aktif. `make api` membaca host dan port backend dari `apps/ai-engine/.env`.
+
 Ketik `make help` buat lihat semua perintah yang tersedia.
+
+### Menjalankan di Windows PowerShell
+
+Siapkan dependensi backend sekali dari folder `apps/ai-engine`:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+```
+
+Setelah Docker Desktop aktif, jalankan `docker compose up -d postgres redis`
+dari root repository. Infrastruktur KODMOD memakai port host PostgreSQL `5433`
+dan Redis `6379`. Di terminal backend jalankan `python -m scripts.dev_server`
+dari `apps/ai-engine`; di terminal lain dari root jalankan `npm run dev:web`.
+Buka `http://localhost:3100`.
 
 ### Frontend Next.js
 
@@ -79,7 +99,7 @@ npm run dev:web
 
 Buka `http://localhost:3100`. Untuk port lain: `npm run dev:web -- --port 3110`.
 Salin `apps/web/.env.example` ke `apps/web/.env.local` jika alamat FastAPI perlu diubah.
-`API_ORIGIN` dibaca pada server Next.js; default `http://127.0.0.1:8000`.
+`API_ORIGIN` dibaca pada server Next.js; default lokal `http://127.0.0.1:8109`.
 
 Fitur frontend saat ini:
 

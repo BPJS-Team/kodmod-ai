@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { session } from "@/lib/session";
 
 function apiOrigin() {
-  return (process.env.API_ORIGIN ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+  return (process.env.API_ORIGIN ?? "http://127.0.0.1:8109").replace(/\/$/, "");
 }
 
 function messageFor(status: number) {

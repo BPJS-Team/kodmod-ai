@@ -4,7 +4,7 @@ import { session } from "@/lib/session";
 export const runtime = "nodejs";
 
 function apiOrigin() {
-  return (process.env.API_ORIGIN ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+  return (process.env.API_ORIGIN ?? "http://127.0.0.1:8109").replace(/\/$/, "");
 }
 
 export async function POST(request: Request) {
