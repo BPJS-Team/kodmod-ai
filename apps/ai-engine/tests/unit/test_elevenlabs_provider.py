@@ -63,6 +63,9 @@ class _StreamingClient(_Client):
 
 @pytest.fixture
 def configured_settings(monkeypatch):
+    # Other tests replace this class-level response; reset it so randomized
+    # test order cannot leak a JSON response into the TTS test.
+    _Client.response = _Response(content=b"mp3-bytes")
     monkeypatch.setattr(
         elevenlabs,
         "settings",
