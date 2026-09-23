@@ -69,6 +69,10 @@ def _chat(model: str, **kwargs: Any):
         "max_tokens": kwargs.get("max_tokens", 1024),
         "streaming": kwargs.get("streaming", True),
     }
+    if model.startswith("gpt-6-"):
+        # GPT-6 Chat Completions only supports function/tool calls with
+        # reasoning disabled; LangGraph agents depend on that path.
+        opts["reasoning_effort"] = "none"
     if settings.OPENAI_API_KEY:
         opts["api_key"] = settings.OPENAI_API_KEY
     if settings.OPENAI_BASE_URL:
