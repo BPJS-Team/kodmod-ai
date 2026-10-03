@@ -2,6 +2,8 @@
 
 16 September 2026. Kelanjutan tahap 1 pada peta scope.
 
+> **Catatan historis:** isi milestone ini mencatat hasil 16 September. Pada 4 Oktober, impor PDF berbasis teks/DOCX/TXT/Markdown, RAG materi kelas dengan isolasi dan versi, konteks/sumber Tutor, serta batas roster/transkrip guru sudah diimplementasikan. Lihat [hasil terbaru](2026-10-04-learning-flow-milestone.md) dan [pemetaan teknis berikutnya](../superpowers/plans/2026-10-04-technical-priorities.md). OCR, hubungan Concept, dan kuis editorial/penugasan masih terbuka. Klaim “belum terhubung” di bagian historis di bawah tidak mewakili source terbaru.
+
 ## Implementasi
 
 - Dashboard guru dan siswa menggantikan halaman sambutan sementara. Jumlah kelas, materi, dan keanggotaan berasal dari API. Keanggotaan bukan jumlah siswa unik lintas kelas; materi guru termasuk draft.
