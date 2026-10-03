@@ -1,5 +1,6 @@
 // Disposable, local-only learning data. No production imports or database writes.
-export function createLearningFixture() {
+import { validateMaterialFile } from "../src/lib/material-flow.mjs";
+export function createLearningFixture({ legacyPending = false } = {}) {
   const classes = [
     {
       id: "10000000-0000-4000-8000-000000000001",
@@ -45,7 +46,9 @@ export function createLearningFixture() {
       content:
         "Gagasan utama adalah inti yang dibahas dalam sebuah paragraf. Kalimat lain membantu menjelaskan inti tersebut.\n\nBaca sebuah paragraf, lalu tanyakan: paragraf ini terutama membahas apa? Cobalah merangkumnya dalam satu kalimat.",
     },
-  ].map((m) => ({ ...m, published: true, created_at: "2026-09-16T00:00:00Z" }));
+  ].map((m) => ({ ...m, published: true, source_filename: null, rag_status: "ready", rag_error: null, n_chunks: 2, content_version: 1, indexed_version: 1, created_at: "2026-09-16T00:00:00Z" }));
+  if (legacyPending) Object.assign(materials[0], { rag_status: "pending", indexed_version: 0, n_chunks: 0 });
+  let materialSerial = 4;
   const progress = new Map();
   const empty = () => ({
     completed: false,
@@ -70,6 +73,7 @@ export function createLearningFixture() {
     subject_name: session.subject_id ? "Matematika" : null,
     started_at: session.started_at,
     ended_at: session.ended_at || null,
+    context: session.context || null,
   });
   const tutorReply = (text) =>
     /pecahan/i.test(text)
@@ -94,6 +98,12 @@ export function createLearningFixture() {
     title: m.title,
     published: m.published,
     created_at: m.created_at,
+    source_filename: m.source_filename,
+    rag_status: m.rag_status,
+    rag_error: m.rag_error,
+    n_chunks: m.n_chunks,
+    content_version: m.content_version,
+    indexed_version: m.indexed_version,
   });
   return (req, url, body, user, send) => {
     if (
@@ -343,6 +353,17 @@ export function createLearningFixture() {
           send(422, {});
         } else {
           let session = body.session_id ? sessions.get(body.session_id) : undefined;
+          let context = session?.context || null;
+          const hasContext = body.class_id || body.material_id;
+          if (hasContext) {
+            const material = materials.find((item) => item.id === body.material_id && item.class_id === body.class_id && item.published);
+            const room = classes.find((item) => item.id === body.class_id && !item.is_archived);
+            if (!material || !room || user.id !== "test-student") { send(404, {}); return true; }
+            if (material.rag_status !== "ready") { send(409, {}); return true; }
+            if (session && (context?.class_id !== body.class_id || context?.material_id !== body.material_id)) { send(409, {}); return true; }
+            context = { class_id: room.id, material_id: material.id, subject_name: room.subject, material_title: material.title };
+          }
+          if (context && !materials.some((item) => item.id === context.material_id && item.class_id === context.class_id && item.published)) { send(404, {}); return true; }
           if (body.session_id && !session) {
             send(404, {});
           } else {
@@ -357,19 +378,22 @@ export function createLearningFixture() {
                 turns: [],
                 ended: false,
                 ended_at: null,
+                context,
               };
               sessions.set(session.id, session);
             }
             const now = new Date().toISOString();
             const reply = tutorReply(text);
+            const sources = context ? [{ source: context.material_title, title: context.material_title, class_id: context.class_id, material_id: context.material_id, section_title: "Materi kelas" }] : [];
             session.turns.push({ role: "student", text, intent: "unknown", timestamp: now });
-            session.turns.push({ role: "tutor", text: reply, intent: "tutoring", timestamp: new Date().toISOString() });
+            session.turns.push({ role: "tutor", text: reply, intent: "tutoring", timestamp: new Date().toISOString(), sources });
             send(200, {
               session_id: session.id,
               text: reply,
               intent: "tutoring",
               next_action: "respond",
-              sources: [],
+              sources,
+              context,
               latency_ms: 42,
               quiz_progress: null,
             });
@@ -428,7 +452,7 @@ export function createLearningFixture() {
           ? {}
           : !member
             ? []
-            : materials.map((m) => ({
+            : materials.filter((m) => m.published).map((m) => ({
                 ...metadata(m),
                 class_name: classes.find((c) => c.id === m.class_id).name,
                 subject: classes.find((c) => c.id === m.class_id).subject,
@@ -444,18 +468,40 @@ export function createLearningFixture() {
         (m) => m.id === parts[3] && m.class_id === room?.id,
       );
       if (!member || !room) send(404, {});
+      else if (parts[2] === "materials" && parts[3] === "import" && req.method === "POST") {
+        if (user.role !== "teacher") send(403, {});
+        else if (validateMaterialFile(body.file)) send(422, { detail: validateMaterialFile(body.file) });
+        else send(200, { filename: body.file.name, title: body.file.name.replace(/\.[^.]+$/, ""), content: body.file.content || "Materi contoh fixture. Pecahan adalah bagian dari keseluruhan.", warnings: ["Pratinjau ini memakai data uji lokal."] });
+      }
+      else if (parts.length === 3 && parts[2] === "materials" && req.method === "POST") {
+        if (user.role !== "teacher") send(403, {});
+        else {
+          const next = { id: `20000000-0000-4000-8000-${String(materialSerial++).padStart(12, "0")}`, class_id: room.id, title: body.title, content: body.content, published: Boolean(body.published), source_filename: body.source_filename || null, rag_status: "ready", rag_error: null, n_chunks: 1, content_version: 1, indexed_version: 1, created_at: new Date().toISOString() };
+          materials.push(next);
+          send(201, metadata(next));
+        }
+      }
+      else if (parts.length === 4 && parts[2] === "materials" && material && req.method === "PUT") {
+        if (user.role !== "teacher") send(403, {});
+        else { Object.assign(material, body); material.content_version += 1; material.indexed_version = material.content_version; send(200, metadata(material)); }
+      }
+      else if (parts.length === 5 && parts[4] === "index" && material && req.method === "POST") {
+        if (user.role !== "teacher") send(403, {});
+        else if (!material.published) send(409, { detail: "Terbitkan materi terlebih dahulu." });
+        else { Object.assign(material, { rag_status: "ready", indexed_version: material.content_version, n_chunks: 2 }); send(202, metadata(material)); }
+      }
       else if (parts.length === 2 && req.method === "GET")
         send(200, {
           ...detail(room),
           materials: materials
-            .filter((m) => m.class_id === room.id)
+            .filter((m) => m.class_id === room.id && (user.role === "teacher" || m.published))
             .map(metadata),
           members: [],
         });
       else if (
         parts.length === 4 &&
         parts[2] === "materials" &&
-        material &&
+        material && (user.role === "teacher" || material.published) &&
         req.method === "GET"
       )
         send(200, { ...material, progress: state(user, material.id) });

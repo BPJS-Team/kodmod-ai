@@ -1,9 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { FileText, LoaderCircle, RefreshCw, UploadCloud } from "lucide-react";
 import { createClass, changeClass, saveMaterial } from "@/app/class-actions";
 import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 import type { Material } from "@/lib/class-types";
-import { notifyResult } from "@/lib/dialogs";
+import { confirmAction, notifyResult } from "@/lib/dialogs";
+import { materialTutorStatus, validateMaterialFile } from "@/lib/material-flow.mjs";
 
 export function ClassForm() {
   const [values, setValues] = useState({
@@ -145,6 +148,12 @@ export function MaterialForm({
   const [content, setContent] = useState(material?.content || "");
   const [published, setPublished] = useState(material?.published || false);
   const [importing, setImporting] = useState(false);
+  const [sourceFilename, setSourceFilename] = useState(material?.source_filename || "");
+  const [importNotice, setImportNotice] = useState("");
+  const [importError, setImportError] = useState("");
+  const [indexing, setIndexing] = useState(false);
+  const tutorStatus = material ? materialTutorStatus(material) : null;
+  const router = useRouter();
   const [state, action, pending] = useConfirmedAction(
     saveMaterial.bind(null, classId, material?.id || null),
     {
@@ -157,6 +166,51 @@ export function MaterialForm({
       confirmText: "Ya, simpan materi",
     },
   );
+
+  async function importFile(file: File) {
+    const validation = validateMaterialFile(file);
+    if (validation) {
+      setImportError(validation);
+      await notifyResult(validation, true);
+      return;
+    }
+    if (!(await confirmAction({ title: "Baca isi dokumen ini?", text: "Dokumen akan dibaca untuk pratinjau. Setelah itu, Anda dapat meninjau dan mengubah teks sebelum menyimpan materi.", confirmText: "Ya, baca dokumen" }))) return;
+    setImporting(true);
+    setImportError("");
+    setImportNotice("");
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      const response = await fetch(`/api/classes/${encodeURIComponent(classId)}/materials/import`, { method: "POST", body });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Dokumen belum dapat dibaca.");
+      if (typeof result.content !== "string" || !result.content.trim() || result.content.length > 100000) throw new Error("Teks dokumen harus berisi 1 sampai 100.000 karakter.");
+      if (content.trim() && !(await confirmAction({ title: "Ganti isi editor dengan dokumen?", text: "Isi editor saat ini akan diganti dengan hasil pembacaan dokumen. Perubahan baru tersimpan setelah Anda menekan Simpan materi.", confirmText: "Ya, gunakan dokumen" }))) return;
+      setContent(result.content);
+      if (!title.trim()) setTitle(typeof result.title === "string" ? result.title.slice(0, 200) : file.name.replace(/\.[^.]+$/, ""));
+      setSourceFilename(typeof result.filename === "string" ? result.filename : file.name);
+      const warnings = Array.isArray(result.warnings) ? result.warnings.filter((item: unknown) => typeof item === "string").join(" ") : "";
+      setImportNotice(`Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.${warnings ? ` ${warnings}` : ""}`);
+      await notifyResult("Dokumen siap ditinjau di editor.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Dokumen belum dapat dibaca.";
+      setImportError(message);
+      await notifyResult(message, true);
+    } finally { setImporting(false); }
+  }
+
+  async function retryIndex() {
+    if (!material?.published || !(await confirmAction({ title: "Siapkan materi untuk Tutor?", text: "Tutor akan memakai isi materi yang terakhir disimpan. Perubahan di editor perlu disimpan terlebih dahulu.", confirmText: "Ya, siapkan materi" }))) return;
+    setIndexing(true);
+    try {
+      const response = await fetch(`/api/classes/${classId}/materials/${material.id}/index`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Materi belum dapat disiapkan.");
+      await notifyResult("Materi sedang disiapkan untuk Tutor. Perbarui status untuk melihat hasilnya.");
+      router.refresh();
+    } catch (error) { await notifyResult(error instanceof Error ? error.message : "Materi belum dapat disiapkan.", true); }
+    finally { setIndexing(false); }
+  }
   return (
     <form
       action={action}
@@ -164,6 +218,19 @@ export function MaterialForm({
       className="panel form-panel form-stack"
     >
       <ActionFeedback state={state} />
+      <input type="hidden" name="source_filename" value={sourceFilename} />
+      {material && tutorStatus && (
+        <section className={`material-ai-status ${material.rag_status === "failed" ? "failed" : ""}`} aria-label="Kesiapan materi untuk Tutor">
+          <div>
+            <strong>{tutorStatus.heading}</strong>
+            <p>{tutorStatus.description}</p>
+          </div>
+          <div className="material-status-actions">
+            <button type="button" className="button secondary" onClick={() => router.refresh()} disabled={pending || importing || indexing}><RefreshCw size={16} aria-hidden="true" /> Perbarui status</button>
+            {tutorStatus.actionLabel && <button type="button" className="button primary" onClick={() => void retryIndex()} disabled={pending || importing || indexing}>{indexing ? "Menyiapkan…" : tutorStatus.actionLabel}</button>}
+          </div>
+        </section>
+      )}
       <label className="field">
         Judul materi
         <input
@@ -175,54 +242,30 @@ export function MaterialForm({
           placeholder="Contoh: Mengenal persamaan linear"
         />
       </label>
-      <label className="field">
-        Impor teks (opsional)
+      <section className="material-import" aria-label="Impor dokumen materi">
+        <div className="material-import-heading">
+          <span className="material-import-icon" aria-hidden="true"><UploadCloud size={24} /></span>
+          <div><h2>Mulai dari dokumen Anda</h2><p>Unggah dokumen, tinjau teksnya, lalu simpan sebagai materi kelas.</p></div>
+        </div>
+        <label className="field">
+        Pilih dokumen materi (opsional)
         <input
           type="file"
-          accept=".txt,text/plain"
+          accept=".pdf,.docx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
           disabled={pending || importing}
-          onChange={async (e) => {
+          onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            if (!file) return;
-            setImporting(true);
-            try {
-              if (
-                !file.name.toLowerCase().endsWith(".txt") ||
-                file.size > 400000
-              )
-                throw new Error("Gunakan berkas .txt UTF-8, maksimal 400 KB.");
-              const text = new TextDecoder("utf-8", { fatal: true }).decode(
-                await file.arrayBuffer(),
-              );
-              if (!text.trim() || text.length > 100000 || text.includes("\0"))
-                throw new Error(
-                  "Isi berkas harus berupa teks, maksimal 100.000 karakter.",
-                );
-              const { confirmAction } = await import("@/lib/dialogs");
-              if (
-                await confirmAction({
-                  title: "Gunakan isi berkas?",
-                  text: "Isi materi di editor akan diganti dengan teks dari berkas ini. Perubahan baru tersimpan setelah Anda menekan Simpan materi.",
-                })
-              )
-                setContent(text);
-            } catch (error) {
-              await notifyResult(
-                error instanceof Error
-                  ? error.message
-                  : "Berkas tidak dapat dibaca.",
-                true,
-              );
-            } finally {
-              setImporting(false);
-            }
+            if (file) void importFile(file);
           }}
         />
-        <small>
-          Teks berkas masuk ke editor. PDF dan dokumen lainnya belum didukung.
-        </small>
-      </label>
+        <small>PDF dengan teks, DOCX, Markdown, atau TXT. Maksimal 25 MB. PDF hasil scan perlu diubah menjadi teks terlebih dahulu.</small>
+        </label>
+        {importing && <p className="material-import-progress" role="status"><LoaderCircle className="spin" size={18} aria-hidden="true" /> Membaca dokumen, mohon tunggu…</p>}
+        {sourceFilename && <p className="material-source-file"><FileText size={17} aria-hidden="true" /><span>{sourceFilename}</span></p>}
+        {importNotice && <p className="material-import-notice" role="status">{importNotice}</p>}
+        {importError && <p className="alert error-message" role="alert">{importError}</p>}
+      </section>
       <label className="field">
         Isi materi
         <textarea
@@ -232,12 +275,14 @@ export function MaterialForm({
           name="content"
           rows={18}
           value={content}
+          disabled={importing || pending}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Tulis penjelasan, contoh, dan petunjuk belajar di sini…"
         />
         <small>
           {content.length.toLocaleString("id-ID")} / 100.000 karakter
         </small>
+        <small>Setelah disimpan, isi materi disiapkan untuk Tutor. Hanya materi terbit yang dapat digunakan siswa anggota kelas.</small>
       </label>
       <label className="field">
         Visibilitas

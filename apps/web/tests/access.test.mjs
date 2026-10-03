@@ -1,9 +1,10 @@
 // Start api-fixture.mjs and Next.js on port 3110 with API_ORIGIN=http://127.0.0.1:8109.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-const origin = 'http://127.0.0.1:3110';
+const origin = process.env.WEB_TEST_ORIGIN || 'http://127.0.0.1:3110';
+const apiOrigin = process.env.API_FIXTURE_ORIGIN || 'http://127.0.0.1:8109';
 before(async () => {
-  const response = await fetch('http://127.0.0.1:8109/auth/me', { headers: { Authorization: 'Bearer fixture-test-admin' } });
+  const response = await fetch(apiOrigin + '/auth/me', { headers: { Authorization: 'Bearer fixture-test-admin' } });
   assert.equal((await response.json()).username, 'admin.test', 'This suite requires the isolated fixture.');
 });
 const request = (path, token) => fetch(origin + path, { redirect: 'manual', headers: token ? { Cookie: `kodmod_session=${token}` } : {} });

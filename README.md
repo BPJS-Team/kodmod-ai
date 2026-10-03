@@ -49,10 +49,10 @@ Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | Lapisan | Pilihan |
 |---|---|
 | Orkestrasi | LangGraph + LangChain |
-| LLM | Claude (bisa diganti ke OpenAI, Ollama, atau vLLM) |
+| LLM | OpenAI melalui LangChain; model setiap agen diatur di `.env` backend |
 | STT | ElevenLabs Scribe (`scribe_v2`) atau faster-whisper/Deepgram fallback |
 | TTS | ElevenLabs (`eleven_multilingual_v2`) atau Piper/Azure fallback |
-| Embedding | BGE-M3 (multilingual) |
+| Embedding | OpenAI `text-embedding-3-small` + pgvector; reranker lokal opsional |
 | Basis data | PostgreSQL 16 + pgvector, Redis |
 | API | FastAPI + WebSocket |
 | Antarmuka | Next.js App Router, React 19, Tailwind v4, TypeScript |
@@ -84,7 +84,10 @@ python -m pip install -e ".[dev]"
 
 Setelah Docker Desktop aktif, jalankan `docker compose up -d postgres redis`
 dari root repository. Infrastruktur KODMOD memakai port host PostgreSQL `5433`
-dan Redis `6379`. Di terminal backend jalankan `python -m scripts.dev_server`
+dan Redis `6379`. Setelah PostgreSQL siap, jalankan `python -m alembic upgrade head`
+dari `apps/ai-engine` untuk migrasi sampai `0004_class_material_rag`. Jangan menjalankan
+`database/schema.sql`, karena file tersebut merupakan referensi schema lama.
+Di terminal backend jalankan `python -m scripts.dev_server`
 dari `apps/ai-engine`; di terminal lain dari root jalankan `npm run dev:web`.
 Buka `http://localhost:3100`.
 
@@ -106,8 +109,10 @@ Fitur frontend saat ini:
 - Landing page, login, pendaftaran dengan undangan, dan logout.
 - Sesi cookie HttpOnly; role diverifikasi ke `/auth/me` pada halaman dan tindakan terproteksi.
 - Admin: ringkasan akun/undangan, pencarian pengguna, tambah/edit akun, aktif/nonaktif, buat/salin/cabut undangan.
-- Dashboard guru/siswa, kelas, keanggotaan, serta materi teks draft/terbit. Siswa memiliki pustaka materi, pencarian/filter, bookmark, penanda selesai, pengaturan ukuran teks dan kontras pembaca, serta ruang Tutor KODMOD dengan riwayat percakapan.
-- Tutor REST dan latihan mini-kuis sudah tersambung ke backend, dengan kontrol ElevenLabs di ruang siswa. Streaming WebSocket, tugas kuis guru, analytics hasil belajar, dan layar audit log masih tahap berikutnya.
+- Dashboard guru/siswa, kelas, keanggotaan, serta materi draft/terbit. Guru dapat mengimpor PDF berbasis teks, DOCX, TXT, atau Markdown (maksimum 25 MB), meninjau hasilnya, lalu menyimpan. Editor menampilkan kesiapan Tutor dan tindakan menyiapkan ulang materi.
+- Siswa memiliki pustaka materi, pencarian/filter, bookmark, penanda selesai, pengaturan ukuran teks dan kontras pembaca. Reader dapat membuka Tutor yang memakai materi tersebut; konteks dan sumber jawaban tersimpan bersama riwayat percakapan.
+- Tutor REST dan latihan mini-kuis sudah tersambung ke backend, dengan kontrol ElevenLabs di ruang siswa. Mini-kuis menunggu jawaban siswa sebelum dinilai. Analitik guru dibatasi pada siswa anggota kelas aktif miliknya; dashboard admin menyediakan ringkasan operasional dan aktivitas.
+- UI streaming/cancel, kuis editorial guru (review, publikasi, penugasan), OCR PDF scan, dan pemetaan konsep materi masih tahap berikutnya. Planner Agent belum ditambahkan; LangChain dan LangGraph tetap dipakai.
 - Logo dan font disajikan lokal; tampilan menyesuaikan desktop maupun ponsel.
 
 Login membutuhkan FastAPI serta akun yang sudah tersedia. Buat admin awal menggunakan panduan backend/script `apps/ai-engine/scripts/create_admin.py`; tidak ada akun demo bawaan pada frontend. Production harus menggunakan HTTPS karena cookie sesi menggunakan `Secure`. Logout menghapus sesi browser, tetapi backend belum menyediakan pencabutan token JWT individual.
@@ -129,7 +134,7 @@ Pada `http://127.0.0.1:3110/masuk`, akun fixture adalah `admin.test`, `guru.test
 
 Fixture siswa sudah menyediakan dua kelas, tiga materi contoh, kontrak Tutor REST sederhana, dan latihan mini-kuis deterministik. Login sebagai `siswa.test` untuk mencoba pustaka, filter, pembaca, bookmark, tanda selesai, `/siswa/tutor`, dan `/siswa/latihan`. Jika fixture sudah berjalan saat kode diperbarui, hentikan lalu mulai ulang agar data/alur terbaru dimuat. Fixture mendukung tampilan kelas guru, tetapi mutasi pengelolaan kelas guru masih memerlukan backend nyata. Tidak ada panggilan AI atau suara berbayar dari fixture.
 
-Backend nyata memerlukan migrasi sampai `0003_material_progress` (`python -m alembic upgrade head` dari `apps/ai-engine`, pada database pengembangan yang dituju). Detail status dan batas pengujian: [scope siswa](docs/plans/2026-09-16-student-learning.md).
+Backend nyata memerlukan migrasi sampai `0004_class_material_rag` (`python -m alembic upgrade head` dari `apps/ai-engine`, pada database pengembangan yang dituju). Materi terbit yang sudah ada akan berstatus `pending`; guru dapat memakai **Siapkan untuk Tutor** tanpa mengubah isi materi. Isi seluruh `LLM_*_MODEL`, `OPENAI_API_KEY`, dan konfigurasi ElevenLabs pada `.env` backend untuk uji provider nyata. Detail tahap ini: [materi kelas dan Tutor](docs/plans/2026-10-04-learning-flow-milestone.md).
 
 ```bash
 node --test apps/web/tests/access.test.mjs

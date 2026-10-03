@@ -43,7 +43,11 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) chunks.push(chunk);
   let body = {};
   try {
-    body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+    if (req.headers["content-type"]?.startsWith("multipart/form-data")) {
+      const data = await new Request("http://fixture", { method: "POST", headers: { "Content-Type": req.headers["content-type"] }, body: Buffer.concat(chunks) }).formData();
+      const file = data.get("file");
+      body = { file: file instanceof File ? { name: file.name, size: file.size, content: /\.(txt|md)$/i.test(file.name) ? await file.text() : "" } : null };
+    } else body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
   } catch {
     return send(400, {});
   }
@@ -162,6 +166,7 @@ const server = createServer(async (req, res) => {
   }
   send(404, {});
 });
-server.listen(8109, "127.0.0.1", () =>
-  console.log("Test-only fixture: http://127.0.0.1:8109"),
+const fixturePort = Number(process.env.FIXTURE_PORT || 8109);
+server.listen(fixturePort, "127.0.0.1", () =>
+  console.log(`Test-only fixture: http://127.0.0.1:${fixturePort}`),
 );

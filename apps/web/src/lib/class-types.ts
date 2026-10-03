@@ -17,6 +17,12 @@ export type Material = {
   published: boolean;
   created_at: string;
   content?: string;
+  source_filename?: string | null;
+  rag_status?: "pending" | "processing" | "ready" | "failed";
+  rag_error?: string | null;
+  n_chunks?: number;
+  content_version?: number;
+  indexed_version?: number;
 };
 export type ReadingProgress = {
   completed: boolean;

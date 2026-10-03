@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import {
   Bot,
+  BookOpen,
   CheckCircle2,
   Clock3,
   LoaderCircle,
@@ -18,7 +20,9 @@ import type {
   ChatSessionDetail,
   ChatSessionSummary,
   ChatTurn,
+  TutorContext,
 } from "@/lib/chat-types";
+import type { StudentMaterial } from "@/lib/class-types";
 import { dateLabel } from "@/lib/types";
 import { VoiceControls } from "./voice-controls";
 
@@ -53,8 +57,12 @@ function turnLabel(role: ChatTurn["role"]) {
 
 export function StudentTutor({
   initialSessions,
+  materials,
+  initialMaterialId,
 }: {
   initialSessions: ChatSessionSummary[];
+  materials: StudentMaterial[];
+  initialMaterialId?: string;
 }) {
   const [sessions, setSessions] = useState(initialSessions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -67,11 +75,20 @@ export function StudentTutor({
   const [endingId, setEndingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const initialMaterial = materials.find((item) => item.id === initialMaterialId);
+  const [context, setContext] = useState<TutorContext | null>(initialMaterial ? {
+    class_id: initialMaterial.class_id, material_id: initialMaterial.id,
+    subject_name: initialMaterial.subject, material_title: initialMaterial.title,
+  } : null);
   const selectionRef = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const selectedSession = sessions.find((item) => item.id === selectedId);
   const sessionEnded = Boolean(selectedSession?.ended_at);
+  const selectedMaterial = materials.find((item) => item.id === context?.material_id && item.class_id === context.class_id);
+  const materialUnavailable = Boolean(context && !selectedMaterial);
+  const materialNotReady = Boolean(selectedMaterial?.rag_status && selectedMaterial.rag_status !== "ready");
+  const busy = pending || loadingSession || Boolean(endingId) || Boolean(deletingId);
   const latestTutorText = [...turns]
     .reverse()
     .find((turn) => turn.role === "assistant" || turn.role === "tutor")?.text ?? "";
@@ -86,7 +103,16 @@ export function StudentTutor({
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
+  async function selectMaterial(materialId: string) {
+    if (busy) return;
+    const material = materials.find((item) => item.id === materialId);
+    if ((selectedId || turns.length || draft.trim()) && !(await confirmAction({ title: "Mulai sesi dengan pilihan materi ini?", text: "Pilihan materi berlaku untuk percakapan baru. Riwayat sesi sebelumnya tetap tersimpan, tetapi pertanyaan yang belum dikirim akan dikosongkan.", confirmText: "Ya, mulai sesi baru" }))) return;
+    startNew();
+    setContext(material ? { class_id: material.class_id, material_id: material.id, subject_name: material.subject, material_title: material.title } : null);
+  }
+
   async function loadSession(id: string) {
+    if (busy) return;
     const requestId = selectionRef.current + 1;
     selectionRef.current = requestId;
     setSelectedId(id);
@@ -101,10 +127,16 @@ export function StudentTutor({
         response,
         "Riwayat percakapan belum dapat dibuka.",
       );
-      if (selectionRef.current === requestId) setTurns(detail.turns);
+      if (selectionRef.current === requestId) {
+        setTurns(detail.turns);
+        setContext(detail.context ?? null);
+        setDraft("");
+      }
     } catch (caught) {
       if (selectionRef.current === requestId) {
         setTurns([]);
+        setSelectedId(null);
+        setContext(null);
         setError(caught instanceof Error ? caught.message : "Riwayat belum dapat dibuka.");
       }
     } finally {
@@ -124,7 +156,7 @@ export function StudentTutor({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
-    if (!text || pending || loadingSession) return;
+    if (!text || busy || materialUnavailable || materialNotReady) return;
     setPending(true);
     setPendingText(text);
     setDraft("");
@@ -134,7 +166,7 @@ export function StudentTutor({
       const response = await fetch("/api/chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ text, ...(selectedId ? { session_id: selectedId } : {}) }),
+        body: JSON.stringify({ text, ...(selectedId ? { session_id: selectedId } : {}), ...(context ? { class_id: context.class_id, material_id: context.material_id } : {}) }),
       });
       const result = await readJson<ChatMessageResponse>(
         response,
@@ -148,9 +180,11 @@ export function StudentTutor({
           text: result.text,
           intent: result.intent,
           timestamp: new Date().toISOString(),
+          sources: result.sources,
         },
       ]);
       setSelectedId(result.session_id);
+      if (result.context !== undefined) setContext(result.context);
       try {
         await refreshSessions();
         setNotice("Jawaban tutor sudah siap. Kamu bisa mendengarkannya dengan kontrol suara.");
@@ -241,13 +275,14 @@ export function StudentTutor({
             type="button"
             className="icon-button tutor-add"
             onClick={startNew}
+            disabled={busy}
             aria-label="Mulai percakapan baru"
             title="Percakapan baru"
           >
             <Plus size={19} aria-hidden="true" />
           </button>
         </div>
-        <button type="button" className="button primary tutor-new" onClick={startNew}>
+        <button type="button" className="button primary tutor-new" onClick={startNew} disabled={busy}>
           <MessageCircle size={17} aria-hidden="true" />
           Mulai pertanyaan baru
         </button>
@@ -263,6 +298,7 @@ export function StudentTutor({
                   type="button"
                   className="tutor-session-select"
                   onClick={() => void loadSession(item.id)}
+                  disabled={busy}
                   aria-current={selectedId === item.id ? "true" : undefined}
                 >
                   <strong>{item.title || "Sesi tanpa judul"}</strong>
@@ -274,7 +310,7 @@ export function StudentTutor({
                   type="button"
                   className="icon-button tutor-delete"
                   onClick={() => void removeSession(item)}
-                  disabled={deletingId === item.id}
+                  disabled={deletingId === item.id || busy}
                   aria-label={`Hapus percakapan ${item.title || "tanpa judul"}`}
                   title="Hapus percakapan"
                 >
@@ -334,6 +370,20 @@ export function StudentTutor({
           </div>
         </header>
 
+        <section className="tutor-material-context" aria-label="Materi untuk percakapan">
+          <div className="tutor-context-copy"><BookOpen size={20} aria-hidden="true" /><div><strong>{context?.material_title || "Belajar topik umum"}</strong><p>{context ? `${context.subject_name} · Jawaban mengacu pada materi kelasmu.` : "Pilih materi dari guru agar penjelasan mengikuti bacaan yang kamu pelajari."}</p></div></div>
+          <label className="field">Materi belajar
+            <select value={selectedMaterial?.id || (context ? "unavailable" : "")} onChange={(event) => void selectMaterial(event.target.value)} disabled={busy}>
+              <option value="">Topik umum</option>
+              {materialUnavailable && <option value="unavailable" disabled>Materi tidak lagi tersedia</option>}
+              {materials.map((item) => <option key={item.id} value={item.id}>{item.subject} · {item.title}</option>)}
+            </select>
+          </label>
+          {selectedMaterial && <Link className="tutor-material-link" href={`/siswa/kelas/${selectedMaterial.class_id}/materi/${selectedMaterial.id}`}>Buka materi</Link>}
+          {materialUnavailable && <p className="tutor-context-warning" role="alert">Akses materi ini sudah tidak tersedia. Pilih materi lain untuk memulai sesi baru.</p>}
+          {materialNotReady && <p className="tutor-context-warning" role="status">Materi belum siap digunakan Tutor. Coba perbarui halaman setelah guru selesai menyiapkannya.</p>}
+        </section>
+
         <div className="tutor-messages" role="log" aria-live="polite" aria-label="Isi percakapan">
           {loadingSession ? (
             <div className="tutor-empty">
@@ -365,6 +415,7 @@ export function StudentTutor({
                   <div className="tutor-message-content">
                     <span className="tutor-message-label">{turnLabel(turn.role)}</span>
                     <p className="tutor-bubble">{turn.text}</p>
+                    {!!turn.sources?.length && <div className="tutor-sources" aria-label="Sumber jawaban"><strong>Sumber materi</strong><ul>{turn.sources.map((source, sourceIndex) => <li key={`${source.material_id || source.source}-${sourceIndex}`}>{source.class_id && source.material_id && materials.some((item) => item.id === source.material_id && item.class_id === source.class_id) ? <Link href={`/siswa/kelas/${source.class_id}/materi/${source.material_id}`}>{source.title || source.source || "Materi kelas"}{source.section_title ? ` · ${source.section_title}` : ""}</Link> : <span>{source.title || source.source || "Materi pembelajaran"}{source.section_title ? ` · ${source.section_title}` : ""}</span>}</li>)}</ul></div>}
                   </div>
                 </article>
               ))}
@@ -401,7 +452,7 @@ export function StudentTutor({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            disabled={pending || loadingSession || sessionEnded}
+            disabled={busy || sessionEnded || materialUnavailable || materialNotReady}
           />
           <div className="tutor-composer-footer">
             <span>
@@ -409,7 +460,7 @@ export function StudentTutor({
                 ? "Sesi selesai · mulai pertanyaan baru untuk melanjutkan"
                 : `${draft.length}/4.000 karakter · Shift + Enter untuk baris baru`}
             </span>
-            <button className="button primary" type="submit" disabled={pending || loadingSession || sessionEnded || !draft.trim()}>
+            <button className="button primary" type="submit" disabled={busy || sessionEnded || materialUnavailable || materialNotReady || !draft.trim()}>
               {pending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}
               {pending ? "Mengirim…" : "Kirim pertanyaan"}
             </button>

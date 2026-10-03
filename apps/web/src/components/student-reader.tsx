@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Bookmark, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Bookmark, CheckCircle2, MessageCircle } from "lucide-react";
 import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 import {
   saveReadingProgress,
@@ -167,6 +168,14 @@ export function StudentReader({
       >
         {material.content}
       </article>
+      <section className="panel reader-tutor" aria-label="Belajar bersama Tutor">
+        <div>
+          <h2>Ada bagian yang ingin kamu pahami?</h2>
+          <p>Bawa materi ini ke Tutor. Kamu bisa meminta penjelasan, contoh, atau latihan singkat berdasarkan bacaan.</p>
+          {material.rag_status && material.rag_status !== "ready" && <p role="status">Materi masih disiapkan untuk Tutor. Kamu tetap bisa membaca atau mendengarkannya di sini.</p>}
+        </div>
+        <Link className="button primary" href={`/siswa/tutor?class_id=${encodeURIComponent(classId)}&material_id=${encodeURIComponent(material.id)}`}><MessageCircle size={18} aria-hidden="true" /> Tanya Tutor tentang materi ini</Link>
+      </section>
       <section className="panel reader-finish" aria-label="Progres bacaan">
         <div>
           <h2>Satu materi, satu langkah baru.</h2>

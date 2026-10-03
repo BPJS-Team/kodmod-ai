@@ -20,7 +20,7 @@ export default async function Page({
       </Link>
       <Heading
         title="Bagikan pengetahuan baru."
-        description="Tulis materi atau impor teks, lalu tentukan kapan siswa dapat membacanya."
+        description="Tulis materi atau unggah dokumen, tinjau isinya, lalu tentukan kapan siswa dapat membacanya."
       />
       {row.is_archived ? (
         <p className="info-note">

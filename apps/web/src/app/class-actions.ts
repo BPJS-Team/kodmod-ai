@@ -112,6 +112,7 @@ export async function saveMaterial(
           title: value(data, "title"),
           content: value(data, "content"),
           published: value(data, "published") === "yes",
+          source_filename: value(data, "source_filename") || null,
         }),
       },
     );

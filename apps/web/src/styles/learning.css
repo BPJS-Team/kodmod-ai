@@ -603,6 +603,197 @@
   align-items: stretch;
   min-height: 650px;
 }
+
+/* Document review and material-grounded tutoring share the classroom palette. */
+.material-import {
+  padding: 22px;
+  margin: 0 0 24px;
+  border: 1px solid #c9dbf5;
+  border-radius: 14px;
+  background: #f4f8ff;
+}
+.material-import-heading,
+.tutor-context-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.material-import-heading {
+  margin-bottom: 18px;
+}
+.material-import-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  background: #e4eeff;
+  color: #2565e9;
+  border-radius: 12px;
+}
+.material-import h2,
+.reader-tutor h2 {
+  color: #17345e;
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+.material-import-heading p,
+.material-ai-status p,
+.reader-tutor p,
+.tutor-context-copy p {
+  margin: 7px 0 0;
+  color: #596f8e;
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 68ch;
+}
+.material-import .field {
+  margin: 0;
+}
+.material-import input[type="file"] {
+  max-width: 100%;
+}
+.material-import input::file-selector-button {
+  padding: 8px 12px;
+  margin-right: 12px;
+  border: 1px solid #c5d6f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #24466f;
+  font: inherit;
+  cursor: pointer;
+}
+.material-import-progress,
+.material-source-file {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #244e85;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.material-source-file svg {
+  flex-shrink: 0;
+}
+.material-import-notice {
+  color: #285e4b;
+  font-size: 14px;
+  margin-bottom: 0;
+}
+.material-ai-status {
+  padding: 18px;
+  margin-bottom: 24px;
+  background: #eff7f4;
+  border: 1px solid #c8e2d8;
+  border-radius: 12px;
+  color: #244f44;
+}
+.material-ai-status.failed {
+  background: #fff8ee;
+  border-color: #eddbbc;
+  color: #755318;
+}
+.material-status-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.reader-tutor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  border-color: #c7d9f7;
+  background: #f5f9ff;
+}
+.reader-tutor .button {
+  flex-shrink: 0;
+  white-space: normal;
+  text-align: center;
+}
+.tutor-material-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.8fr);
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e9eef5;
+}
+.tutor-context-copy svg {
+  flex-shrink: 0;
+  color: #3265b9;
+  margin-top: 3px;
+}
+.tutor-context-copy strong {
+  color: #24466f;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.tutor-context-copy p {
+  font-size: 13px;
+}
+.tutor-material-context .field {
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+}
+.tutor-material-context select {
+  width: 100%;
+}
+.tutor-material-link {
+  grid-column: 1 / -1;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  color: #215dbd;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tutor-context-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid #c38a25;
+  background: #fff8ec;
+  color: #76571e;
+  font-size: 13px;
+}
+.tutor-sources {
+  margin-top: 10px;
+  color: #566f94;
+  font-size: 13px;
+}
+.tutor-sources strong {
+  font-size: 12px;
+  color: #49668f;
+}
+.tutor-sources ul {
+  padding-left: 18px;
+  margin: 3px 0 0;
+}
+.tutor-sources a {
+  display: inline-flex;
+  align-items: center;
+  color: #215dbd;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .reader-tutor {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .tutor-material-context {
+    grid-template-columns: 1fr;
+  }
+  .material-import {
+    padding: 16px;
+  }
+}
 .tutor-sidebar {
   min-width: 0;
   padding: 20px;

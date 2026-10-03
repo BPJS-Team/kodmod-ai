@@ -5,6 +5,23 @@ export type ChatSessionSummary = {
   subject_name: string | null;
   started_at: string | null;
   ended_at: string | null;
+  context?: TutorContext | null;
+};
+
+export type TutorContext = {
+  class_id: string;
+  material_id: string;
+  subject_name: string;
+  material_title: string;
+};
+
+export type TutorSource = {
+  source?: string;
+  section_title?: string | null;
+  score?: number;
+  class_id?: string;
+  material_id?: string;
+  title?: string;
 };
 
 export type ChatTurn = {
@@ -12,6 +29,7 @@ export type ChatTurn = {
   text: string;
   intent?: string | null;
   timestamp?: string | null;
+  sources?: TutorSource[];
 };
 
 export type ChatSessionDetail = ChatSessionSummary & {
@@ -23,11 +41,8 @@ export type ChatMessageResponse = {
   text: string;
   intent: string;
   next_action: string;
-  sources: Array<{
-    source?: string;
-    section_title?: string | null;
-    score?: number;
-  }>;
+  sources: TutorSource[];
+  context?: TutorContext | null;
   latency_ms: number;
   quiz_progress: { index: number; total: number } | null;
 };
