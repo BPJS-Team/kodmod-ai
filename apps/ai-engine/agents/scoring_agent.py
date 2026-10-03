@@ -99,9 +99,7 @@ async def scoring_node(state: KODMODState) -> dict[str, Any]:
 _MCQ_LEADING_LETTER = re.compile(r"^\s*([a-dA-D])\b")
 
 
-def _score_mcq(
-    student_answer: str, expected: str, options: list[str]
-) -> tuple[float | None, str]:
+def _score_mcq(student_answer: str, expected: str, options: list[str]) -> tuple[float | None, str]:
     """Grade an MCQ answer. Returns ``(None, "")`` when the answer's shape is
     genuinely ambiguous, so the caller can fall back to LLM rubric grading
     instead of defaulting to wrong.
@@ -299,6 +297,7 @@ async def _persist_progress(
                 "current_question_attempts": question_attempts,
                 "quiz_question": state.get("quiz_question", {}),
                 "quiz_attempts": attempts,
+                "mastery_applied_attempts": state.get("mastery_applied_attempts", 0),
                 "cumulative_quiz_score": cumulative,
             },
         )

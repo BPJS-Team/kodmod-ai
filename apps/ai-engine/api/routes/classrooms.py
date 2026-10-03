@@ -1,19 +1,20 @@
-"""Teacher-owned classes with private, accessible text materials.
+"""Teacher-owned classes with private, accessible materials and scoped RAG.
 
-Class content is deliberately separate from the shared curriculum/RAG store.
 Every nested resource repeats the class membership check on the server.
 """
 
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import current_user, db_session, require_student, require_teacher
+from api.material_imports import import_document, safe_filename
+from api.material_service import index_class_material
 from database.models import (
     ClassActivity,
     ClassMaterial,
@@ -50,6 +51,12 @@ class MaterialWrite(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1, max_length=100000)
     published: bool = False
+    source_filename: str | None = Field(default=None, max_length=300)
+
+    @field_validator("source_filename")
+    @classmethod
+    def normalize_filename(cls, value):
+        return safe_filename(value) if value else None
 
 
 async def accessible(session: AsyncSession, class_id: uuid.UUID, user: User, *, write=False):
@@ -107,6 +114,12 @@ def material_info(row):
         "id": str(row.id),
         "title": row.title,
         "published": row.published,
+        "source_filename": row.source_filename,
+        "rag_status": row.rag_status,
+        "rag_error": row.rag_error,
+        "n_chunks": row.n_chunks,
+        "content_version": row.content_version,
+        "indexed_version": row.indexed_version,
         "created_at": row.created_at.isoformat(),
     }
 
@@ -115,6 +128,7 @@ def material_info(row):
 async def list_classes(
     user: User = Depends(current_user), session: AsyncSession = Depends(db_session)
 ):
+    """List only the teacher's classes or the student's active enrolled classes."""
     stmt = select(Classroom).order_by(Classroom.created_at.desc())
     if user.role == "teacher":
         stmt = stmt.where(Classroom.teacher_id == user.id)
@@ -134,6 +148,7 @@ async def create_class(
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Create a teacher-owned classroom with its subject label."""
     row = Classroom(teacher_id=user.id, **body.model_dump())
     session.add(row)
     await session.flush()
@@ -153,6 +168,7 @@ def progress_info(row):
 async def student_materials(
     user: User = Depends(require_student), session: AsyncSession = Depends(db_session)
 ):
+    """List published materials from the student's active classes and private progress."""
     rows = (
         await session.execute(
             select(ClassMaterial, Classroom, MaterialProgress)
@@ -188,6 +204,7 @@ async def detail(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ):
+    """Read an accessible classroom, its visible materials, and teacher-only roster."""
     row = await accessible(session, class_id, user)
     result = await summary(session, row, user)
     query = (
@@ -227,6 +244,7 @@ async def update_class(
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Update or archive the teacher's own classroom."""
     row = await accessible(session, class_id, user)
     for key, value in body.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(row, key, value)
@@ -242,6 +260,7 @@ async def add_member(
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Enroll an active student in the teacher's own classroom."""
     row = await accessible(session, class_id, user, write=True)
     student = await session.scalar(
         select(User).where(
@@ -269,6 +288,7 @@ async def remove_member(
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Remove an enrollment from the teacher's own classroom."""
     row = await accessible(session, class_id, user, write=True)
     member = await session.get(Enrollment, (class_id, student_id))
     if member is None:
@@ -281,15 +301,32 @@ async def remove_member(
 async def create_material(
     class_id: uuid.UUID,
     body: MaterialWrite,
+    background: BackgroundTasks,
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Save reviewed text and queue an AI index when the material is published."""
     row = await accessible(session, class_id, user, write=True)
     material = ClassMaterial(class_id=class_id, **body.model_dump())
     session.add(material)
     await session.flush()
     record(session, row, user, "material.created", material.id)
+    await session.commit()
+    if material.published:
+        background.add_task(index_class_material, material.id, material.content_version)
     return material_info(material)
+
+
+@router.post("/{class_id}/materials/import")
+async def preview_material_import(
+    class_id: uuid.UUID,
+    file: UploadFile,
+    user: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Extract a document for review; importing does not save or publish it."""
+    await accessible(session, class_id, user, write=True)
+    return await import_document(file)
 
 
 @router.get("/{class_id}/materials/{material_id}")
@@ -299,6 +336,7 @@ async def read_material(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ):
+    """Read material after verifying class access, publication, and private progress."""
     await accessible(session, class_id, user)
     row = await session.get(ClassMaterial, material_id)
     if row is None or row.class_id != class_id or (user.role == "student" and not row.published):
@@ -325,6 +363,7 @@ async def update_progress(
     user: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Update only the signed-in student's bookmark or reading completion."""
     await accessible(session, class_id, user)
     # Serialize first-time progress creation and publication changes in PostgreSQL.
     material = await session.scalar(
@@ -359,15 +398,61 @@ async def edit_material(
     class_id: uuid.UUID,
     material_id: uuid.UUID,
     body: MaterialWrite,
+    background: BackgroundTasks,
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Save a new reviewed revision and rebuild its AI index if published."""
     classroom = await accessible(session, class_id, user, write=True)
-    row = await session.get(ClassMaterial, material_id)
+    row = await session.scalar(
+        select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
+    )
     if row is None or row.class_id != class_id:
         raise HTTPException(404, "Materi tidak ditemukan.")
+    changed = row.content != body.content or row.source_filename != body.source_filename
+    if changed:
+        row.content_version += 1
+        row.n_chunks = 0
+        row.rag_status = "pending"
+        row.rag_error = None
     for key, value in body.model_dump().items():
         setattr(row, key, value)
+    if not row.published:
+        row.rag_status = "pending"
+    elif row.indexed_version == row.content_version and row.n_chunks > 0:
+        row.rag_status = "ready"
     record(session, classroom, user, "material.updated", row.id)
     await session.flush()
+    await session.commit()
+    if row.published and row.rag_status != "ready":
+        background.add_task(index_class_material, row.id, row.content_version)
+    return material_info(row)
+
+
+@router.post("/{class_id}/materials/{material_id}/index", status_code=202)
+async def retry_material_index(
+    class_id: uuid.UUID,
+    material_id: uuid.UUID,
+    background: BackgroundTasks,
+    user: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Retry indexing a published material owned by this teacher."""
+    classroom = await accessible(session, class_id, user, write=True)
+    row = await session.scalar(
+        select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
+    )
+    if row is None or row.class_id != class_id:
+        raise HTTPException(404, "Materi tidak ditemukan.")
+    if not row.published:
+        raise HTTPException(
+            409, "Terbitkan materi terlebih dahulu agar dapat diproses untuk Tutor AI."
+        )
+    if row.rag_status == "ready" and row.indexed_version == row.content_version:
+        return material_info(row)
+    row.rag_status = "pending"
+    row.rag_error = None
+    record(session, classroom, user, "material.index-requested", row.id)
+    await session.commit()
+    background.add_task(index_class_material, row.id, row.content_version)
     return material_info(row)

@@ -2,24 +2,21 @@
 KODMOD AI - pgvector Store
 ==========================
 
-Backs the RAG retrieval against the `curriculum_chunks` table created in
-`schema.sql` (with HNSW index on a 1024-d vector column).
-
-Design choices:
-- We hand-write SQL (asyncpg via SQLAlchemy connection) because pgvector
-  ORM support isn't worth the dependency surface for two simple queries.
-- All embeddings are normalised (BGE-M3 outputs are already unit-norm)
-  so the operator `<=>` (cosine distance) is the right similarity metric.
-- Filters: optional concept_id, source, language.
+Backs curriculum retrieval and versioned classroom material retrieval against
+the Alembic-managed curriculum_chunks table. Classroom chunks always require
+current enrollment, publication, active class, and the current indexed revision.
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import PurePosixPath
 
-from sqlalchemy import text
+from sqlalchemy import delete, func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from database.models import ClassMaterial, Classroom, CurriculumChunk, Enrollment
 from database.session import async_session
 
 logger = logging.getLogger(__name__)
@@ -76,6 +73,30 @@ async def upsert_chunks(records: list[dict]) -> int:
     return n
 
 
+async def replace_material_chunks(
+    session: AsyncSession, material_id: uuid.UUID, version: int, records: list[dict]
+) -> None:
+    """Replace a material's chunks inside the caller's locked transaction."""
+    await session.execute(delete(CurriculumChunk).where(CurriculumChunk.material_id == material_id))
+    session.add_all(
+        [
+            CurriculumChunk(
+                material_id=material_id,
+                material_version=version,
+                content=record["text"],
+                embedding=record["embedding"],
+                source=record["source"],
+                language=record.get("language", "id"),
+                chunk_index=record["chunk_index"],
+                section_title=record.get("section_title"),
+                accessibility_metadata=record.get("accessibility_metadata", {}),
+            )
+            for record in records
+        ]
+    )
+    await session.flush()
+
+
 async def query(
     embedding: list[float],
     *,
@@ -83,41 +104,70 @@ async def query(
     concept_id: uuid.UUID | None = None,
     subject_id: uuid.UUID | None = None,
     language: str | None = None,
+    student_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
+    material_id: uuid.UUID | None = None,
 ) -> list[dict]:
-    """
-    Cosine-similarity search.
-    Returns dicts with: id, text, source, section_title, score,
-    accessibility_metadata.
-    """
-    where_clauses = []
-    params = {"emb": _vec_literal(embedding), "k": top_k}
-
-    if concept_id:
-        where_clauses.append("concept_id = CAST(:concept_id AS uuid)")
-        params["concept_id"] = str(concept_id)
-    if subject_id:
-        where_clauses.append("subject_id = CAST(:subject_id AS uuid)")
-        params["subject_id"] = str(subject_id)
+    """Cosine search; shared curriculum queries never include class materials."""
+    if (class_id and not student_id) or (material_id and not class_id):
+        return []
+    distance = CurriculumChunk.embedding.cosine_distance(embedding)
+    source = (
+        func.coalesce(ClassMaterial.source_filename, ClassMaterial.title)
+        if class_id
+        else CurriculumChunk.source
+    )
+    stmt = select(
+        CurriculumChunk.id,
+        CurriculumChunk.content.label("text"),
+        source.label("source"),
+        CurriculumChunk.section_title,
+        CurriculumChunk.accessibility_metadata,
+        CurriculumChunk.concept_id,
+        CurriculumChunk.material_id,
+        (1 - distance).label("score"),
+    )
+    if class_id:
+        stmt = (
+            stmt.add_columns(
+                Classroom.id.label("class_id"), ClassMaterial.title.label("material_title")
+            )
+            .join(ClassMaterial, CurriculumChunk.material_id == ClassMaterial.id)
+            .join(Classroom, ClassMaterial.class_id == Classroom.id)
+            .join(Enrollment, Enrollment.class_id == Classroom.id)
+            .where(
+                Classroom.id == class_id,
+                Classroom.is_archived.is_(False),
+                Enrollment.student_id == student_id,
+                ClassMaterial.published.is_(True),
+                ClassMaterial.rag_status == "ready",
+                ClassMaterial.indexed_version == ClassMaterial.content_version,
+                CurriculumChunk.material_version == ClassMaterial.content_version,
+            )
+        )
+        if material_id:
+            stmt = stmt.where(ClassMaterial.id == material_id)
+    else:
+        stmt = stmt.where(CurriculumChunk.material_id.is_(None))
+        if concept_id:
+            stmt = stmt.where(CurriculumChunk.concept_id == concept_id)
+        if subject_id:
+            stmt = stmt.where(CurriculumChunk.subject_id == subject_id)
     if language:
-        where_clauses.append("language = :language")
-        params["language"] = language
-
-    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-    sql = text(f"""
-        SELECT id::text AS id,
-               content AS text,
-               source,
-               section_title,
-               accessibility_metadata,
-               1 - (embedding <=> CAST(:emb AS vector)) AS score
-        FROM curriculum_chunks
-        {where_sql}
-        ORDER BY embedding <=> CAST(:emb AS vector)
-        LIMIT :k;
-    """)
+        stmt = stmt.where(CurriculumChunk.language == language)
+    stmt = stmt.order_by(distance).limit(top_k)
     async with async_session() as session:
-        rows = (await session.execute(sql, params)).mappings().all()
-    return [dict(r) for r in rows]
+        rows = (await session.execute(stmt)).mappings().all()
+    docs = []
+    for row in rows:
+        doc = dict(row)
+        for key in ("id", "concept_id", "class_id", "material_id"):
+            if key in doc and doc[key] is not None:
+                doc[key] = str(doc[key])
+        doc["source"] = PurePosixPath((doc.get("source") or "Materi").replace("\\", "/")).name
+        doc["concept_ids"] = [doc["concept_id"]] if doc.get("concept_id") else []
+        docs.append(doc)
+    return docs
 
 
 async def delete_by_source(source: str) -> int:
@@ -150,12 +200,22 @@ class PgVectorStore:
         filters: dict | None = None,
     ) -> list[dict]:
         filters = filters or {}
+        class_id = _coerce_uuid(filters.get("class_id"))
+        material_id = _coerce_uuid(filters.get("material_id"))
+        student_id = _coerce_uuid(filters.get("student_id"))
+        if (filters.get("class_id") or filters.get("material_id")) and (
+            not class_id or not student_id or (filters.get("material_id") and not material_id)
+        ):
+            return []
         return await query(
             embedding,
             top_k=top_k,
             concept_id=_coerce_uuid(filters.get("concept_id")),
             subject_id=_coerce_uuid(filters.get("subject_id")),
             language=filters.get("language"),
+            student_id=student_id,
+            class_id=class_id,
+            material_id=material_id,
         )
 
     async def upsert_chunks(self, records: list[dict]) -> int:

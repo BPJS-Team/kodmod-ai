@@ -52,6 +52,21 @@ async def _embed_batch(texts: list[str]) -> list[list[float]]:
     return await embed_text(texts)
 
 
+async def build_material_records(content: str, *, source: str, language: str = "id") -> list[dict]:
+    """Embed reviewed material text without storing a partial new revision."""
+    payloads = chunks_to_payloads(chunk_document(content, source=source))
+    vectors = await _embed_batch([payload["text"] for payload in payloads])
+    return [
+        {
+            **payload,
+            "embedding": vector,
+            "language": language,
+            "accessibility_metadata": {"referenced_figures": payload.get("referenced_figures", [])},
+        }
+        for payload, vector in zip(payloads, vectors, strict=True)
+    ]
+
+
 async def ingest_paths(
     paths: Iterable[Path],
     *,

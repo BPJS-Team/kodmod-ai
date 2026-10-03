@@ -4,21 +4,30 @@ The browser talks to these endpoints through the Next.js server proxy. The
 ElevenLabs key is read only by the API and audio is returned as bytes, so it
 never enters a client bundle or a JSON response.
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from uuid import uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import require_student
+from api.chat_service import (
+    log_turn,
+    prepare_chat_turn,
+    reply_text,
+    resolve_chat_context,
+    sources,
+    update_session_mode,
+)
+from api.dependencies import db_session, require_student
 from config.settings import settings
 from database.models import User
-from graphs.state import build_learning_profile, initial_state
 from voice import elevenlabs
 from voice.streaming import save_upload
 from voice.stt import transcribe_path
@@ -131,8 +140,11 @@ async def speech_to_text(
 async def voice_chat(
     request: Request,
     audio: UploadFile = File(...),
-    session_id: str | None = Form(None),
+    session_id: UUID | None = Form(None),
+    class_id: UUID | None = Form(None),
+    material_id: UUID | None = Form(None),
     student: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
 ):
     """Transcribe, run one graph turn, and return text for an accessible client.
 
@@ -143,29 +155,56 @@ async def voice_chat(
     if not audio.content_type or not audio.content_type.startswith("audio/"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File audio diperlukan.")
 
-    sid = session_id or str(uuid4())
+    # Check scope before paying for transcription; prepare_chat_turn rechecks
+    # it immediately before graph execution as well.
+    await resolve_chat_context(
+        session,
+        student=student,
+        session_id=session_id,
+        class_id=class_id,
+        material_id=material_id,
+    )
     audio_path = await save_upload(audio)
     try:
         transcript = await transcribe_path(audio_path, language=student.preferred_language)
-        state = initial_state(session_id=sid, student_id=str(student.id), user_input=transcript)
+        sid, state, context = await prepare_chat_turn(
+            session,
+            student=student,
+            text=transcript,
+            session_id=session_id,
+            class_id=class_id,
+            material_id=material_id,
+        )
         state["transcribed_text"] = transcript
-        state["learning_profile"] = build_learning_profile(student)
         graph = request.app.state.graph
-        final_state = await graph.ainvoke(state, config={"configurable": {"thread_id": sid}})
+        final_state = await graph.ainvoke(state, config={"configurable": {"thread_id": str(sid)}})
     except (elevenlabs.ElevenLabsConfigurationError, elevenlabs.ElevenLabsError) as exc:
         raise _provider_error(exc, operation="voice chat") from exc
     finally:
         Path(audio_path).unlink(missing_ok=True)
 
-    log.info("Voice chat turn complete (session=%s, last_node=%s)", sid, final_state.get("last_node"))
+    answer = reply_text(final_state)
+    await log_turn(sid, role="student", text=transcript, intent=final_state.get("intent"))
+    await log_turn(
+        sid,
+        role="assistant",
+        text=answer,
+        intent=final_state.get("intent"),
+        source_refs=sources(final_state),
+    )
+    await update_session_mode(sid, final_state.get("intent"))
+    log.info(
+        "Voice chat turn complete (session=%s, last_node=%s)", sid, final_state.get("last_node")
+    )
     return {
         "session_id": sid,
         "transcript": transcript,
         "intent": final_state.get("intent"),
-        "response_text": final_state.get("accessible_response")
-        or final_state.get("generated_response"),
+        "response_text": answer,
         "audio_available": bool(final_state.get("audio_response_path")),
         "next_action": final_state.get("next_action"),
+        "context": context,
+        "sources": sources(final_state),
     }
 
 
@@ -173,18 +212,37 @@ async def voice_chat(
 async def voice_text(
     request: Request,
     text: str = Form(..., min_length=1, max_length=5_000),
-    session_id: str | None = Form(None),
+    session_id: UUID | None = Form(None),
+    class_id: UUID | None = Form(None),
+    material_id: UUID | None = Form(None),
     student: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
 ):
-    sid = session_id or str(uuid4())
-    state = initial_state(session_id=sid, student_id=str(student.id), user_input=text)
+    sid, state, context = await prepare_chat_turn(
+        session,
+        student=student,
+        text=text,
+        session_id=session_id,
+        class_id=class_id,
+        material_id=material_id,
+    )
     state["transcribed_text"] = text
-    state["learning_profile"] = build_learning_profile(student)
     graph = request.app.state.graph
-    final_state = await graph.ainvoke(state, config={"configurable": {"thread_id": sid}})
+    final_state = await graph.ainvoke(state, config={"configurable": {"thread_id": str(sid)}})
+    answer = reply_text(final_state)
+    await log_turn(sid, role="student", text=text, intent=final_state.get("intent"))
+    await log_turn(
+        sid,
+        role="assistant",
+        text=answer,
+        intent=final_state.get("intent"),
+        source_refs=sources(final_state),
+    )
+    await update_session_mode(sid, final_state.get("intent"))
     return {
         "session_id": sid,
-        "response_text": final_state.get("accessible_response")
-        or final_state.get("generated_response"),
+        "response_text": answer,
         "audio_available": bool(final_state.get("audio_response_path")),
+        "context": context,
+        "sources": sources(final_state),
     }

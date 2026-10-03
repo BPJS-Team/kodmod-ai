@@ -254,6 +254,16 @@ def test_km_contract_013_no_schema_exposes_audio_fields() -> None:
     assert not offenders, f"audio-era fields still in the API schema: {offenders}"
 
 
+def test_voice_chat_response_reports_playback_availability_without_a_file_url() -> None:
+    from models.session import VoiceChatResponse
+
+    response = VoiceChatResponse(
+        session_id=uuid.uuid4(), intent="tutoring", response_text="Mari belajar pecahan."
+    )
+    assert response.model_dump()["audio_available"] is False
+    assert "response_audio_url" not in response.model_dump()
+
+
 # --------------------------------------------------------------------------- #
 # KM-CONTRACT-014 - every model class serialises its JSON schema
 # --------------------------------------------------------------------------- #

@@ -15,7 +15,8 @@ services:
       - "5433:5432"
     volumes:
       - kodmod-pgdata:/var/lib/postgresql/data
-      - ./apps/ai-engine/database/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+    # Apply the current schema with Alembic after PostgreSQL is ready.
+    # The archived schema.sql predates the users/class-materials schema.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kodmod -d kodmod"]
       interval: 5s

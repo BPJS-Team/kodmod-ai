@@ -154,6 +154,9 @@ class Enrollment(Base):
 
 class ClassMaterial(Base):
     __tablename__ = "class_materials"
+    __table_args__ = (
+        CheckConstraint(_sql_in("rag_status", DOCUMENT_STATUSES), name="ck_materials_rag_status"),
+    )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     class_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="CASCADE"), index=True
@@ -161,6 +164,12 @@ class ClassMaterial(Base):
     title: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
     published: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_filename: Mapped[str | None] = mapped_column(String(300))
+    rag_status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    rag_error: Mapped[str | None] = mapped_column(Text)
+    content_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    indexed_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    n_chunks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
@@ -310,6 +319,10 @@ class CurriculumChunk(Base):
     document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), index=True
     )
+    material_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("class_materials.id", ondelete="CASCADE"), index=True
+    )
+    material_version: Mapped[int | None] = mapped_column(Integer)
     chunk_index: Mapped[int] = mapped_column(Integer, default=0)
     section_title: Mapped[str | None] = mapped_column(String(300))
     accessibility_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -332,6 +345,12 @@ class LearningSession(Base):
     )
     subject_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="SET NULL")
+    )
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="SET NULL")
+    )
+    material_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("class_materials.id", ondelete="SET NULL")
     )
     title: Mapped[str | None] = mapped_column(String(200))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

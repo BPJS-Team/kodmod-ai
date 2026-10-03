@@ -47,6 +47,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import text
 
@@ -241,10 +242,17 @@ async def update_student_model_node(state) -> dict[str, Any]:
 
     model = await StudentModel.load(student_id)
     q_by_id = {q.get("question_id"): q for q in questions}
-    for a in attempts:
+    applied = min(max(int(state.get("mastery_applied_attempts", 0)), 0), len(attempts))
+    for a in attempts[applied:]:
         q = q_by_id.get(a.get("question_id"), {})
         cid = q.get("concept_id")
         if not cid:
+            continue
+        try:
+            cid = str(UUID(str(cid)))
+        except (ValueError, TypeError, AttributeError):
+            # Imported class materials can be assessed before their concepts
+            # are mapped. A topic label such as "general" is never a DB UUID.
             continue
         model.update(cid, float(a.get("score", 0.0)), confidence=float(a.get("confidence", 0.9)))
 
@@ -270,6 +278,7 @@ async def update_student_model_node(state) -> dict[str, Any]:
                         "current_question_attempts": 0,
                         "quiz_question": questions[new_index],
                         "quiz_attempts": attempts,
+                        "mastery_applied_attempts": len(attempts),
                         "cumulative_quiz_score": state.get("cumulative_quiz_score", 0.0),
                     },
                 )
@@ -279,6 +288,7 @@ async def update_student_model_node(state) -> dict[str, Any]:
     return {
         "mastery_scores": await model.mastery_scores(),
         "mastery_confidence": dict(model._confidence),
+        "mastery_applied_attempts": len(attempts),
         "current_question_index": new_index,
         "current_question_attempts": 0,  # reset for the next question
         "next_action": "generate_analytics",

@@ -30,6 +30,7 @@ from typing import Literal, cast
 
 from sqlalchemy import func, select
 
+from api.teacher_access import teacher_roster_query
 from database.models import (
     Concept,
     InteractionLog,
@@ -192,14 +193,18 @@ class StudentAggregator:
 
 @dataclass
 class CohortAggregator:
-    """Rollups across every student. This is what the teacher dashboard shows."""
+    """Student rollups; teacher callers provide their classroom owner id."""
 
-    async def summarise(self, *, window: WindowName = "week") -> dict:
+    async def summarise(
+        self, *, window: WindowName = "week", teacher_id: uuid.UUID | None = None
+    ) -> dict:
         async with async_session() as session:
             roster = list(
                 (
                     await session.execute(
-                        select(User.id).where(User.role == "student", User.is_active.is_(True))
+                        teacher_roster_query(teacher_id)
+                        if teacher_id is not None
+                        else select(User.id).where(User.role == "student", User.is_active.is_(True))
                     )
                 )
                 .scalars()
@@ -221,6 +226,10 @@ class CohortAggregator:
             return {
                 "window": window,
                 "n_students": 0,
+                "avg_mastery": 0.0,
+                "avg_quiz_accuracy": 0.0,
+                "avg_engagement_index": 0.0,
+                "cohort_weak_concepts": [],
                 "students": [],
                 "generated_at": datetime.now(UTC).isoformat(),
             }

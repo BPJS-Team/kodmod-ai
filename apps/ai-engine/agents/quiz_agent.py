@@ -186,12 +186,28 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     }
 
     log.info("Mini-quiz generated: %s", question["text"][:60])
-    return {
+    out = {
         "quiz_question": question,
         "quiz_questions": [question],
         "current_question_index": 0,
+        "current_question_attempts": 0,
+        "quiz_attempts": [],
+        "mastery_applied_attempts": 0,
+        "student_answer": "",
+        "cumulative_quiz_score": 0.0,
         "quiz_session_id": f"mini-{uuid4().hex[:8]}",
-        "generated_response": (f"Cek pemahaman cepat: {question['text']}"),
+        "generated_response": (
+            f"{last_explanation.rstrip()}\n\nCek pemahaman cepat: {question['text']}"
+        ).strip(),
         "next_action": "speak",
         "last_node": "mini_quiz",
     }
+    session_id = state.get("session_id")
+    if session_id:
+        try:
+            from memory.short_term import store_quiz_session
+
+            await store_quiz_session(session_id, out)
+        except Exception:  # pragma: no cover - a checkpoint still retains the question
+            log.warning("Could not store pending mini-quiz", exc_info=True)
+    return out

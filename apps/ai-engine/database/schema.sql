@@ -1,5 +1,6 @@
 -- =====================================================================
--- KODMOD AI - PostgreSQL Schema
+-- KODMOD AI - LEGACY PostgreSQL schema reference, not an installation script.
+-- Current installations use: python -m alembic upgrade head
 -- =====================================================================
 -- Requires:
 --   * PostgreSQL 16+

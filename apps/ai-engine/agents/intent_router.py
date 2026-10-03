@@ -97,6 +97,7 @@ async def intent_router_node(state: KODMODState) -> dict:
     question_index = state.get("current_question_index", 0)
     question_attempts = state.get("current_question_attempts", 0)
     quiz_attempts = state.get("quiz_attempts", [])
+    mastery_applied_attempts = state.get("mastery_applied_attempts", 0)
     cumulative_quiz_score = state.get("cumulative_quiz_score", 0.0)
     rehydrated = False
 
@@ -114,6 +115,7 @@ async def intent_router_node(state: KODMODState) -> dict:
             question_index = sess.get("current_question_index", 0)
             question_attempts = sess.get("current_question_attempts", 0)
             quiz_attempts = sess.get("quiz_attempts", [])
+            mastery_applied_attempts = sess.get("mastery_applied_attempts", 0)
             cumulative_quiz_score = sess.get("cumulative_quiz_score", 0.0)
             rehydrated = True
 
@@ -138,6 +140,7 @@ async def intent_router_node(state: KODMODState) -> dict:
                     "current_question_attempts": question_attempts,
                     "quiz_question": quiz_questions[question_index],
                     "quiz_attempts": quiz_attempts,
+                    "mastery_applied_attempts": mastery_applied_attempts,
                     "cumulative_quiz_score": cumulative_quiz_score,
                 }
             )
@@ -181,6 +184,22 @@ async def intent_router_node(state: KODMODState) -> dict:
         "next_action": "route_intent",
         "last_node": "intent_router",
     }
+    if quiz_session_id and quiz_questions and question_index >= len(quiz_questions):
+        # A completed quiz must not suppress all future tutoring mini-checks.
+        out.update(
+            {
+                "quiz_session_id": "",
+                "quiz_questions": [],
+                "quiz_question": {},
+                "quiz_attempts": [],
+                "mastery_applied_attempts": 0,
+                "current_question_index": 0,
+                "current_question_attempts": 0,
+                "student_answer": "",
+                "quiz_score": 0.0,
+                "cumulative_quiz_score": 0.0,
+            }
+        )
     # Only overwrite the topic already in state when the student actually named
     # a new one - a plain follow-up ("lanjutkan") should not clobber the topic
     # an in-progress tutoring/quiz flow is already tracking.

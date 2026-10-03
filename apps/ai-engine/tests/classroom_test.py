@@ -5,6 +5,7 @@ Uses an in-memory SQLite database only; never connects to the application DB.
 
 import unittest
 import uuid
+from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi import FastAPI
@@ -98,6 +99,11 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.patch(path, json={"completed": True})).status_code, 404)
 
     async def asyncSetUp(self):
+        # Published material indexing calls an external embedding provider. Route
+        # authorization/progress tests stay offline; the job has separate tests.
+        self.index_job = patch.object(classrooms, "index_class_material", AsyncMock())
+        self.index_job.start()
+        self.addCleanup(self.index_job.stop)
         self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
         async with self.engine.begin() as conn:
             await conn.execute(text("PRAGMA foreign_keys=ON"))

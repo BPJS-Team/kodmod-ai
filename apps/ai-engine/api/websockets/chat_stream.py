@@ -31,17 +31,19 @@ import logging
 import time
 import uuid
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
 
 from api.chat_service import (
-    build_turn_state,
     log_turn,
-    open_session,
+    prepare_chat_turn,
     reply_text,
     sources,
     update_session_mode,
 )
 from api.dependencies import authenticate_ws
+from api.routes.chat import ChatMessageRequest
+from database.session import async_session
 from graphs.main_graph import run_turn
 
 log = logging.getLogger(__name__)
@@ -76,15 +78,6 @@ _GRAPH_NODES = frozenset(
 )
 
 
-def _as_uuid(value) -> uuid.UUID | None:
-    if not value:
-        return None
-    try:
-        return uuid.UUID(str(value))
-    except (ValueError, TypeError):
-        return None
-
-
 @router.websocket("/chat")  # mounted under /ws
 async def chat_ws(websocket: WebSocket) -> None:
     student = await authenticate_ws(websocket)  # closes with 1008 on failure
@@ -115,12 +108,25 @@ async def chat_ws(websocket: WebSocket) -> None:
                 )
                 continue
 
+            try:
+                body = ChatMessageRequest.model_validate({**frame, "text": text})
+            except ValidationError:
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "status": 422,
+                        "message": "Pilihan sesi atau materi tidak valid.",
+                    }
+                )
+                continue
             await _run_one_turn(
                 websocket,
                 student,
                 text=text,
-                session_id=_as_uuid(frame.get("session_id")),
-                subject_id=_as_uuid(frame.get("subject_id")),
+                session_id=body.session_id,
+                subject_id=body.subject_id,
+                class_id=body.class_id,
+                material_id=body.material_id,
             )
 
     except WebSocketDisconnect:
@@ -140,19 +146,29 @@ async def _run_one_turn(
     text: str,
     session_id: uuid.UUID | None,
     subject_id: uuid.UUID | None,
+    class_id: uuid.UUID | None = None,
+    material_id: uuid.UUID | None = None,
 ) -> None:
     started = time.perf_counter()
 
-    resolved_id = await open_session(
-        student_id=student.id,
-        session_id=session_id,
-        subject_id=subject_id,
-        first_text=text,
-    )
-    await websocket.send_json({"type": "session", "session_id": str(resolved_id)})
-
-    state = await build_turn_state(
-        student=student, session_id=resolved_id, text=text, subject_id=subject_id
+    try:
+        async with async_session() as session:
+            resolved_id, state, context = await prepare_chat_turn(
+                session,
+                student=student,
+                text=text,
+                session_id=session_id,
+                subject_id=subject_id,
+                class_id=class_id,
+                material_id=material_id,
+            )
+    except HTTPException as exc:
+        await websocket.send_json(
+            {"type": "error", "status": exc.status_code, "message": exc.detail}
+        )
+        return
+    await websocket.send_json(
+        {"type": "session", "session_id": str(resolved_id), "context": context}
     )
     graph = websocket.app.state.graph
     config = {"configurable": {"thread_id": str(resolved_id)}}
@@ -194,6 +210,7 @@ async def _run_one_turn(
         text=answer,
         intent=final.get("intent"),
         latency_ms=latency_ms,
+        source_refs=sources(final),
     )
     await update_session_mode(resolved_id, final.get("intent"))
 
@@ -216,5 +233,6 @@ async def _run_one_turn(
             "sources": sources(final),
             "latency_ms": latency_ms,
             "quiz_progress": quiz_progress,
+            "context": context,
         }
     )

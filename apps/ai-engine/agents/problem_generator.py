@@ -119,6 +119,12 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         filters["concept_id"] = concept_id
     if subject_id:
         filters["subject_id"] = subject_id
+    if state.get("class_id") or state.get("material_id"):
+        filters.update(
+            class_id=state.get("class_id"),
+            material_id=state.get("material_id"),
+            student_id=state.get("student_id"),
+        )
     rag = RAGTool()
     docs = await rag.retrieve(
         query=f"{topic} learning material questions",
@@ -208,6 +214,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
                     "current_question_index": 0,
                     "quiz_question": questions[0],
                     "quiz_attempts": [],
+                    "mastery_applied_attempts": 0,
                     "cumulative_quiz_score": 0.0,
                 },
             )
@@ -220,6 +227,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         "current_question_index": 0,
         "quiz_question": questions[0],
         "quiz_attempts": [],
+        "mastery_applied_attempts": 0,
         "cumulative_quiz_score": 0.0,
         "next_action": "ask_question",
         "last_node": "problem_generator",

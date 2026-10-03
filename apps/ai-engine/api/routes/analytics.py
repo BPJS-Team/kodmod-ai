@@ -4,8 +4,8 @@ KODMOD AI - Analytics Routes
 
 - GET /analytics/me                      -> the signed-in student's own rollup
 - GET /analytics/me/spoken               -> the same, as a short spoken summary
-- GET /analytics/student/{id}            -> one student (self, or any teacher)
-- GET /analytics/cohort                  -> every student (teacher only)
+- GET /analytics/student/{id}            -> self, or a teacher's enrolled student
+- GET /analytics/cohort                  -> active classroom students (teacher only)
 - GET /analytics/cohort/alerts           -> cohort alerts plus per-student rows
 """
 
@@ -15,10 +15,12 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics.aggregator import CohortAggregator, StudentAggregator
 from analytics.insights import generate_cohort_alerts, generate_student_spoken_summary
-from api.dependencies import current_user, require_student, require_teacher
+from api.dependencies import current_user, db_session, require_student, require_teacher
+from api.teacher_access import require_teacher_student
 from database.models import User
 
 router = APIRouter(tags=["analytics"])
@@ -50,27 +52,30 @@ async def student_analytics(
     student_id: uuid.UUID,
     window: Window = Query(default="week"),
     user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
 ) -> dict:
-    """A student may read their own rollup; a teacher may read anyone's."""
+    """A student reads their own rollup; a teacher needs classroom membership."""
     if user.role != "teacher" and user.id != student_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only view your own analytics.")
+    if user.role == "teacher":
+        await require_teacher_student(session, user.id, student_id)
     return await StudentAggregator().summarise(student_id=student_id, window=window)
 
 
 @router.get("/cohort")
 async def cohort_analytics(
     window: Window = Query(default="week"),
-    _: User = Depends(require_teacher),
+    teacher: User = Depends(require_teacher),
 ) -> dict:
-    """Averages and weakest concepts across every student."""
-    return await CohortAggregator().summarise(window=window)
+    """Averages and weakest concepts across this teacher's active classrooms."""
+    return await CohortAggregator().summarise(window=window, teacher_id=teacher.id)
 
 
 @router.get("/cohort/alerts")
 async def cohort_alerts(
     window: Window = Query(default="week"),
-    _: User = Depends(require_teacher),
+    teacher: User = Depends(require_teacher),
 ) -> dict:
     """Cohort-level alerts, plus the rollup they were derived from."""
-    rollup = await CohortAggregator().summarise(window=window)
+    rollup = await CohortAggregator().summarise(window=window, teacher_id=teacher.id)
     return {"alerts": generate_cohort_alerts(rollup), "summary": rollup}

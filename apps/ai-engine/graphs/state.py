@@ -153,6 +153,8 @@ class KODMODState(TypedDict, total=False):
     current_topic: str
     current_concept_id: str
     subject_id: str | None  # scopes RAG retrieval to one subject
+    class_id: str | None  # validated classroom context for material-grounded tutoring
+    material_id: str | None
     current_difficulty: DifficultyLevel
     tutoring_context: list[TutoringTurn]
     retrieved_docs: list[RetrievedDoc]
@@ -168,6 +170,7 @@ class KODMODState(TypedDict, total=False):
     quiz_question: QuizQuestion  # the question currently being asked
     student_answer: str
     quiz_attempts: list[QuizAttempt]
+    mastery_applied_attempts: int  # cursor into quiz_attempts; never apply old evidence twice
     quiz_score: float  # 0.0 – 1.0 for current attempt
     cumulative_quiz_score: float  # session-wide
     misconceptions_detected: list[str]
@@ -221,6 +224,8 @@ def initial_state(
     user_input: str = "",
     subject_id: str | None = None,
     teacher_id: str | None = None,
+    class_id: str | None = None,
+    material_id: str | None = None,
 ) -> KODMODState:
     """Return a clean state object for a new turn."""
     from datetime import datetime
@@ -240,6 +245,8 @@ def initial_state(
         current_topic="",
         current_concept_id="",
         subject_id=subject_id,
+        class_id=class_id,
+        material_id=material_id,
         current_difficulty="medium",
         tutoring_context=[],
         retrieved_docs=[],
@@ -253,6 +260,7 @@ def initial_state(
         quiz_question={},
         student_answer="",
         quiz_attempts=[],
+        mastery_applied_attempts=0,
         quiz_score=0.0,
         cumulative_quiz_score=0.0,
         misconceptions_detected=[],
