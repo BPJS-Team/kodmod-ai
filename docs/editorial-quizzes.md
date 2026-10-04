@@ -32,6 +32,7 @@ Semua endpoint memerlukan Bearer JWT. UI menggunakan proxy Next.js `/api/editori
 | `POST .../{id}/publish` | Pemilik, revisi saat ini yang disetujui |
 | `POST .../{id}/assignments` | Pemilik, versi terbit, kelas aktif sendiri (201) |
 | `GET /student/assignments` | Penugasan kelas yang masih bisa diakses siswa |
+| `GET /student/assignments/{id}` | Ringkasan satu penugasan yang dapat diakses, sebelum memulai |
 | `POST /student/assignments/{id}/start` | Buat percobaan (201) / lanjutkan (200) |
 | `GET .../{id}/attempt` | Soal aman dan jawaban tersimpan, termasuk setelah tenggat untuk membaca |
 | `PUT .../{id}/answers/{question_id}` | Simpan opsi valid dengan `expected_revision`; revisi bertambah |
@@ -69,3 +70,21 @@ python -m pytest tests/test_editorial_postgres.py -q
 ```
 
 Migration `0006_editorial_quizzes` berisi definisi tabel yang dibekukan. Upgrade, downgrade ke 0005, upgrade ulang, dan `alembic check` telah diverifikasi pada database terisolasi. Data aplikasi dan volume Docker dipertahankan.
+
+## Halaman aplikasi
+
+| Peran | Halaman |
+| --- | --- |
+| Guru pemilik | `/guru/kuis`, `/guru/kuis/baru`, `/guru/kuis/{id}` |
+| Guru reviewer | `/guru/review-kuis`, `/guru/review-kuis/{id}` |
+| Admin reviewer | `/admin/review-kuis`, `/admin/review-kuis/{id}` |
+| Guru pemilik kelas | `/guru/penugasan/{id}` untuk hasil dan penutupan |
+| Siswa anggota kelas | `/siswa/tugas`, `/siswa/tugas/{id}` |
+
+Form guru dapat membuat Subject baru, menyusun ulang soal, mengatur narasi alternatif, menentukan kapan pembahasan dirilis, memilih reviewer dan menjadwalkan kelas. Simpan isi lebih dahulu sebelum keputusan review/publikasi. Setiap revisi baru perlu memilih reviewer lagi atau menggunakan antrean admin.
+
+Siswa memilih satu opsi lalu menekan **Simpan & lanjut**. Jawaban tersimpan di server dan dapat dilanjutkan; opsi yang baru dipilih belum tersimpan sampai tombol itu ditekan. Pengiriman akhir memakai konfirmasi dan intent yang dibekukan dalam session storage. Respons 5xx/terputus/malformed tidak menghapus intent; coba ulang mengambil hasil yang sama. ID pengiriman memiliki fallback untuk browser perangkat yang tidak menyediakan `crypto.randomUUID`.
+
+`apps/web/tests/editorial-proxy.test.mjs` menguji alur lintas HTTP Next.js dan PostgreSQL nyata. Jalankan dengan `EDITORIAL_PROXY_TEST=1` hanya setelah `python -m tests.editorial_server` berjalan pada 8118 dan build Next standalone pada 3118 dengan `API_ORIGIN=http://127.0.0.1:8118`. Server fixture memaksa credential dummy, memakai schema `editorial_ui_fixture` pada database test port 5434, dan membersihkan schema saat shutdown normal. Jangan arahkan fixture ke database aplikasi.
+
+Validasi UI produksi pada fixture: draft berhasil dibuat, pesan sukses dan isi tersimpan muncul, label form/kelompok radio dapat diakses, dan viewport 400px tidak mengalami overflow horizontal. Ini pemeriksaan browser desktop dengan viewport kecil, bukan pengujian HP/TalkBack/VoiceOver.

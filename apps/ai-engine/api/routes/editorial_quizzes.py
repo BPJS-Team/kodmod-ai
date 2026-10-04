@@ -434,6 +434,22 @@ async def student_assignments(
     return [await service.assignment_out(session, a, v, c, attempt) for a, v, c, attempt in rows]
 
 
+@router.get("/student/assignments/{assignment_id}", response_model=AssignmentOut)
+async def student_assignment(
+    assignment_id: uuid.UUID,
+    actor: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
+):
+    assignment = await service.accessible_assignment(session, assignment_id, actor)
+    attempt = await session.scalar(
+        select(AssignmentAttempt).where(
+            AssignmentAttempt.assignment_id == assignment.id,
+            AssignmentAttempt.student_id == actor.id,
+        )
+    )
+    return await service.assignment_out(session, assignment, attempt=attempt)
+
+
 @router.post("/student/assignments/{assignment_id}/start", response_model=AttemptOut)
 async def start_assignment(
     assignment_id: uuid.UUID,

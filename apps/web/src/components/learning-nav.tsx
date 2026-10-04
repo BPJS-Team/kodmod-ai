@@ -17,13 +17,18 @@ export function LearningNav({ base }: { base: string }) {
         { href: base, title: "Dashboard", icon: LayoutDashboard },
       { href: `${base}/kelas`, title: "Kelas saya", icon: Library },
         ...(base === "/guru"
-          ? [{ href: "/guru/analitik", title: "Analitik siswa", icon: LineChart }]
+          ? [
+              { href: "/guru/kuis", title: "Kuis & penugasan", icon: ListChecks },
+              { href: "/guru/review-kuis", title: "Review kuis", icon: BookOpen },
+              { href: "/guru/analitik", title: "Analitik siswa", icon: LineChart },
+            ]
           : []),
         ...(base === "/siswa"
           ? [
               { href: "/siswa/materi", title: "Pustaka materi", icon: BookOpen },
               { href: "/siswa/tutor", title: "Tutor AI", icon: MessageCircle },
               { href: "/siswa/latihan", title: "Latihan", icon: ListChecks },
+              { href: "/siswa/tugas", title: "Tugas dari guru", icon: BookOpen },
               { href: "/siswa/progres", title: "Progres saya", icon: LineChart },
             ]
           : []),
