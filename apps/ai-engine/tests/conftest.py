@@ -39,7 +39,7 @@ for _role in ("ROUTER", "TUTOR", "QUIZ", "SCORING", "RECOMMENDATION", "REFLECTIO
     os.environ.setdefault(f"LLM_{_role}_MODEL", f"stub-{_role.lower()}")
 os.environ.setdefault("DB_NAME", "kodmod_test")
 os.environ.setdefault("DB_HOST", os.environ.get("DB_HOST", "localhost"))
-os.environ.setdefault("DB_PORT", os.environ.get("DB_PORT", "5433"))
+os.environ.setdefault("DB_PORT", os.environ.get("DB_PORT", "5434"))
 os.environ.setdefault("REDIS_HOST", os.environ.get("REDIS_HOST", "localhost"))
 os.environ.setdefault("REDIS_PORT", os.environ.get("REDIS_PORT", "6380"))
 os.environ.setdefault("EMBEDDING_DIM", "1536")

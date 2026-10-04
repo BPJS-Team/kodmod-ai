@@ -49,7 +49,7 @@ services:
       POSTGRES_PASSWORD: kodmod
       POSTGRES_DB: ${POSTGRES_DB:-kodmod_test}
     ports:
-      - "${DB_HOST_PORT:-5433}:5432"
+      - "127.0.0.1:${DB_HOST_PORT:-5434}:5432"
     volumes:
       - kodmod-pgtestdata:/var/lib/postgresql/data
     healthcheck:
@@ -63,7 +63,7 @@ services:
     image: redis:7-alpine
     container_name: kodmod-redis-test
     ports:
-      - "${REDIS_HOST_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -83,7 +83,7 @@ services:
     environment:
       KODMOD_STUB_EMBED_DIM: "1024"
     ports:
-      - "${LLM_STUB_HOST_PORT:-8099}:8000"
+      - "127.0.0.1:${LLM_STUB_HOST_PORT:-8099}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 5s

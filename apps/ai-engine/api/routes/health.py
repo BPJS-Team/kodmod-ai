@@ -41,8 +41,8 @@ async def ready() -> dict[str, Any]:
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
         checks["database"] = "ok"
-    except Exception as exc:
-        checks["database"] = f"fail: {exc!s}"
+    except Exception:
+        checks["database"] = "fail"
         overall = False
 
     # Redis
@@ -52,8 +52,8 @@ async def ready() -> dict[str, Any]:
         r = await get_redis()
         await r.ping()
         checks["redis"] = "ok"
-    except Exception as exc:
-        checks["redis"] = f"fail: {exc!s}"
+    except Exception:
+        checks["redis"] = "fail"
         # Redis is non-critical (graph still works without short-term cache)
         # so we don't flip overall.
 

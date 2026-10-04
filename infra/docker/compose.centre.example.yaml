@@ -1,0 +1,29 @@
+# Merge with root docker-compose.yml. Copy to Docker Centre if recreating it.
+# .env contains KODMOD_DOCKER_ROOT=F:/Docker_Centre/kodmod and the source path.
+x-private-data: &private-data
+  - type: bind
+    source: "${KODMOD_DOCKER_ROOT}/data/audio"
+    target: /var/lib/kodmod/audio
+  - type: bind
+    source: "${KODMOD_DOCKER_ROOT}/data/uploads"
+    target: /var/lib/kodmod/uploads
+services:
+  postgres:
+    container_name: null
+    volumes:
+      - type: bind
+        source: "${KODMOD_DOCKER_ROOT}/data/postgres"
+        target: /var/lib/postgresql/data
+  redis:
+    container_name: null
+    volumes:
+      - type: bind
+        source: "${KODMOD_DOCKER_ROOT}/data/redis"
+        target: /data
+  ai-engine:
+    container_name: null
+    volumes: *private-data
+  migrate:
+    volumes: *private-data
+  worker:
+    volumes: *private-data

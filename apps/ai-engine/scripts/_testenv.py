@@ -28,9 +28,9 @@ TEST_ENV: dict[str, str] = {
     "DEBUG": "false",
     "LOG_JSON": "true",
     "LANGCHAIN_TRACING_V2": "false",
-    # Postgres - compose `postgres` service, host port 5433.
+    # Isolated test Postgres. The application's main port is 5433.
     "DB_HOST": "localhost",
-    "DB_PORT": "5433",
+    "DB_PORT": "5434",
     "DB_USER": "kodmod",
     "DB_PASSWORD": "kodmod",
     "DB_NAME": "kodmod_test",
@@ -64,4 +64,6 @@ def apply_test_env() -> None:
     """Pin the test env (idempotent, shell-overridable). Call before importing settings."""
     for key, value in TEST_ENV.items():
         os.environ.setdefault(key, value)
+    if not os.environ.get("DB_NAME", "").startswith("kodmod_test"):
+        raise RuntimeError("Test entrypoints require a kodmod_test database; refusing application data")
     Path(ROOT / ".runtime" / "uploads").mkdir(parents=True, exist_ok=True)

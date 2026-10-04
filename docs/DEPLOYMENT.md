@@ -2,7 +2,7 @@
 
 ## Runtime yang dipakai
 
-Semua proses aplikasi berjalan dalam Docker: **Next.js web → FastAPI/LangGraph → PostgreSQL + pgvector dan Redis**. Service `migrate` menjalankan Alembic sekali sebelum API mulai. OpenAI dan ElevenLabs tetap layanan eksternal yang dipanggil oleh backend. Browser dan screen reader perangkat berjalan di perangkat pengguna.
+Semua proses aplikasi berjalan dalam Docker: **Next.js web → FastAPI/LangGraph → PostgreSQL + pgvector dan Redis**, serta worker terpisah untuk impor/OCR/indeks. Service `migrate` menjalankan Alembic sebelum API dan worker mulai. OpenAI dan ElevenLabs tetap layanan eksternal yang dipanggil oleh backend. Browser dan screen reader perangkat berjalan di perangkat pengguna.
 
 Image default menggunakan OpenAI LLM/embedding dan ElevenLabs STT/TTS. Tidak membutuhkan CUDA, GPU, Whisper lokal, Qdrant, ataupun download model reranker. LangChain dan LangGraph tetap terpasang. Docker lokal menjalankan hasil build, sehingga perubahan source perlu rebuild; ini bukan server hot reload.
 
@@ -20,6 +20,8 @@ Alias dari root repository: `npm run docker:up`, `npm run docker:status`,
 script Docker Centre yang sama, sehingga tidak membuat project/database duplikat.
 
 Script memakai project `kodmod-centre` dan override di `F:\Docker_Centre\kodmod` jika konfigurasi tersebut menunjuk checkout ini. Data PostgreSQL, Redis, audio, dan unggahan tetap di direktori `data` Docker Centre. Script akan menolak checkout yang berbeda agar tidak memakai database proyek lain tanpa sengaja. `F:\Docker_Centre\kodmod\docker.ps1 up` juga memanggil script repository ini.
+
+API, worker, dan migrasi harus memakai mount audio/unggahan yang sama. Template pemulihan konfigurasi: `infra/docker/compose.centre.example.yaml`. Worker memakai lease/heartbeat dan retry SQL; pekerjaan yang berhenti dapat diklaim ulang tanpa memerlukan halaman browser tetap terbuka.
 
 - Web: `http://localhost:3100`.
 - API lokal: `http://127.0.0.1:8109`; probes `/live` dan `/ready`.
@@ -51,7 +53,7 @@ Docker lokal membutuhkan `.env` backend. API key tidak dimasukkan ke image maupu
 
 ### Akun admin pertama
 
-Tidak ada akun dummy bawaan pada database nyata. Jalankan interaktif, lalu buat pengguna/undangan melalui dashboard admin:
+Tidak ada akun dummy bawaan pada database nyata. Jalankan interaktif untuk admin pertama. Siswa dan guru dapat mendaftar langsung; tidak membutuhkan kode undangan:
 
 ```powershell
 npm run docker:admin
@@ -102,7 +104,18 @@ Hanya Caddy yang membuka port host 80/443. Database, Redis, API, dan web memakai
 
 Image frontend memakai Next.js standalone dengan tracing monorepo. `API_ORIGIN=http://ai-engine:8000` sama saat build/runtime karena fallback rewrite dikompilasi saat build. Ganti alamat itu hanya dengan rebuild. Browser tetap memakai URL aplikasi `/api`; tidak memerlukan alamat container atau provider key.
 
-Belum ada deploy VPS nyata pada tahap ini. Domain, DNS, TLS, backup/restore di mesin tujuan, serta kapasitas CPU/RAM perlu diverifikasi ketika VPS tersedia. Mulai dengan satu instance API; ukur memori, latency dan konkurensi sebelum menambah replika. Worker ingestion durable dan observabilitas lengkap masih scope berikutnya.
+Belum ada deploy VPS nyata pada tahap ini. Domain, DNS, TLS, backup/restore di mesin tujuan, serta kapasitas CPU/RAM perlu diverifikasi ketika VPS tersedia. Mulai dengan satu instance API dan satu worker; ukur memori, latency dan konkurensi sebelum menambah replika. Tesseract Indonesia/Inggris tersedia pada image worker. Cache audio dan original dokumen tersimpan dalam volume privat.
+
+Tooling rilis dari root repository di VPS:
+
+```bash
+bash scripts/release.sh check
+# Build, backup terverifikasi, migrasi, lalu tunggu seluruh runtime sehat:
+bash scripts/release.sh deploy TAG_RILIS_UNIK
+bash scripts/release.sh smoke
+```
+
+`check` memvalidasi service, ketergantungan migrasi, mount bersama dan port privat tanpa mencetak env. `backup` dapat dijalankan tersendiri. Atur `KODMOD_BACKUP_DIR` ke direktori backup privat. Tool rilis tidak menjalankan downgrade otomatis atau menimpa `.env`.
 
 ### Backup dan pembaruan
 
@@ -115,7 +128,19 @@ docker compose --env-file .env -f infra/docker/docker-compose.prod.yml exec -T p
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > /secure-backup/kodmod.dump
 ```
 
-Uji restore pada database terpisah sebelum mengandalkan backup. Untuk snapshot audio/unggahan yang konsisten, hentikan web/API sebentar sebelum menyalin volume. `docker compose down` mempertahankan named volumes; penghapusan volume menghapus data.
+Uji restore pada database terpisah sebelum mengandalkan backup. Untuk snapshot audio/unggahan yang konsisten, hentikan web/API/worker sebentar sebelum menyalin volume. `docker compose down` mempertahankan named volumes; penghapusan volume menghapus data.
+
+Pemeriksaan restore lokal menerima arsip dengan manifest SHA256 dari script backup dan hanya boleh memakai container PostgreSQL tes pada port 5434. Database sementara yang dibuat di sana dihapus setelah pemeriksaan; database aplikasi pada 5433 tidak menjadi target restore:
+
+```powershell
+pwsh -NoProfile -File .\scripts\check-backup-restore.ps1 -BackupPath 'F:\Docker_Centre\kodmod\backups\NAMA_BACKUP.dump'
+```
+
+Database tes menggunakan `kodmod_test` dan port 5434, Redis tes 6380, provider stub 8099. Entrypoint tes menolak nama database aplikasi. Isolasi ini tetap diperlukan ketika menguji provider asli.
+
+### Pencatatan penggunaan dan biaya
+
+Panel pemantauan AI mencatat token yang dilaporkan model/embedding, volume suara, cache, latensi dan status. Tidak mencatat isi percakapan atau API key. Tarif opsional di backend `PROVIDER_PRICES_JSON` menghasilkan estimasi USD; nilai yang tidak diketahui tampil sebagai belum tersedia. Pantau `kodmod_provider_usage_dropped_total` untuk kegagalan penyimpanan metadata. Angka lokal bukan pengganti tagihan resmi penyedia.
 
 Sebelum update: backup, review migration, simpan commit/image tag sebelumnya, lalu `git pull --ff-only` dan jalankan `up -d --build --wait` dengan konfigurasi produksi yang sama. Gunakan `KODMOD_TAG` unik untuk menyimpan image rilis; default `vps` akan ditimpa build berikutnya. Jangan menjalankan migrasi downgrade otomatis sebagai rollback pada database siswa.
 
@@ -131,6 +156,8 @@ dari root. Default memakai web 3100/API 8109; untuk host lain atur
 aset, probes dan penolakan akses tanpa login, tanpa membuat akun atau memanggil provider.
 Hasil delivery lokal: [validasi Docker](docker-validation-2026-10-04.md).
 
-Healthcheck membuktikan proses/jaringan dasar, bukan kualitas tutoring. Lakukan login admin→buat guru/siswa→kelas→unggah materi teks→review/terbit→tunggu indeks ready→Tutor dengan sumber→kuis adaptif→riwayat/analitik. Uji Bian TTS, Scribe STT, izin mikrofon, cache suara, retry provider, serta satu suara aktif. Uji NVDA, TalkBack/VoiceOver, keyboard dan low vision pada perangkat nyata. PDF scan belum didukung OCR; kuis resmi guru beserta review/publikasi/penugasan belum tersedia.
+Healthcheck membuktikan proses/jaringan dasar, bukan kualitas tutoring. Acceptance utama: guru→kelas/mata pelajaran→unggah dokumen→review teks/OCR/halaman→review konsep→terbit→indeks ready; siswa→pilih materi→pengajaran→tanya jawab→lanjut atau mini kuis→hasil/progres. Asesmen mandiri dan kuis guru memiliki siklus terpisah. Kuis guru melewati review/publikasi/penugasan; jawaban tersimpan dapat dilanjutkan setelah reload atau keluar sementara. Matikan/restart worker untuk memeriksa recovery pekerjaan pada database tes.
+
+Uji Bian TTS, Scribe STT, bahasa Indonesia/Inggris, izin mikrofon, cache suara, retry provider, serta satu suara aktif. Pemeriksaan klik/visual/NVDA/TalkBack/VoiceOver dan low vision di perangkat nyata dilakukan pengguna. Pengujian otomatis memakai kode/API; keberhasilan build atau fixture bukan bukti acceptance perangkat atau deploy VPS.
 
 Sumber konfigurasi: [Next.js standalone](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [Docker Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/), [Compose production](https://docs.docker.com/compose/how-tos/production/).

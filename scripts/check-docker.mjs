@@ -114,6 +114,9 @@ async function main() {
   }
 
   let failed = 0;
+  const prefix = process.env.DOCKER_API_PREFIX || "";
+  expect(prefix === "" || /^\/[a-zA-Z0-9_-]+$/.test(prefix), "invalid API prefix");
+  const apiJson = (path, status = 200) => json(api, prefix + path, status);
   async function check(name, action) {
     try {
       await action();
@@ -173,9 +176,13 @@ async function main() {
   });
 
   await check("API liveness", async () => {
-    expect((await json(api, "/live"))?.status === "alive", "API is not alive");
+    expect((await apiJson("/live"))?.status === "alive", "API is not alive");
   });
-  await check("API readiness (DB and Redis)", async () => ready(await json(api, "/ready")));
+  await check("API readiness (DB and Redis)", async () => ready(await apiJson("/ready")));
+  await check("guided, reviewed material and admin usage routes", async () => {
+    const spec = await apiJson("/openapi.json");
+    for (const path of ["/learning/start", "/quiz/active", "/teacher/quizzes/propose", "/admin/materials", "/admin/insights/ai-usage", "/classes/{class_id}/imports"]) expect(spec.paths?.[path], `missing ${path}`);
+  });
   await check("web API fallback readiness (DB and Redis)", async () => ready(await json(web, "/api/ready")));
   await check("student page redirects to login", async () => {
     const response = await request(web, "/siswa", "text/html");
@@ -185,7 +192,7 @@ async function main() {
     const destination = new URL(location, web);
     expect(destination.origin === web && destination.pathname === "/masuk", "unexpected redirect destination");
   });
-  await check("API rejects missing authentication", async () => { await json(api, "/auth/me", 401); });
+  await check("API rejects missing authentication", async () => { await apiJson("/auth/me", 401); });
   await check("web API fallback rejects missing authentication", async () => { await json(web, "/api/auth/me", 401); });
 
   process.exitCode = failed ? 1 : 0;
