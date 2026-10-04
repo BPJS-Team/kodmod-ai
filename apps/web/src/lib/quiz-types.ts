@@ -30,3 +30,18 @@ export type QuizSubmitResponse = {
   final_summary: string | null;
   cumulative_score: number;
 };
+
+export type QuizRecoveryResponse = {
+  quiz_session_id: string;
+  kind: "assessment" | "tutor";
+  status: "in_progress" | "completed";
+  class_id: string | null;
+  material_id: string | null;
+  material_title: string | null;
+  language: "id" | "en";
+  total_questions: number;
+  answered_questions: number;
+  current_question: QuizQuestion | null;
+  last_result: QuizSubmitResponse | null;
+  started_at: string;
+};

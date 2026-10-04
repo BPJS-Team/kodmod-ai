@@ -10,7 +10,7 @@ function apiOrigin() {
 function messageFor(status: number) {
   if (status === 401 || status === 403) return "Sesi berakhir. Silakan masuk kembali.";
   if (status === 404) return "Latihan tidak ditemukan. Mulai sesi baru.";
-  if (status === 409) return "Soal sudah berubah. Muat latihan baru untuk melanjutkan.";
+  if (status === 409) return "Sesi telah berubah atau tindakan belum tersedia. Muat ulang sesi untuk melanjutkan.";
   if (status === 422) return "Isian latihan belum sesuai. Periksa jawabanmu.";
   if (status === 429) return "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.";
   if (status === 503) return "Layanan latihan belum dapat dihubungi. Coba lagi beberapa saat.";
@@ -27,6 +27,16 @@ export async function forwardQuiz(path: string, init: RequestInit = {}) {
   }
   if (current.user.role !== "student") {
     return NextResponse.json({ message: "Latihan hanya tersedia untuk siswa." }, { status: 403 });
+  }
+
+  if (typeof init.body === "string" && (path === "/quiz/start" || path.startsWith("/learning/"))) {
+    try {
+      const body = JSON.parse(init.body);
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
+      init = { ...init, body: JSON.stringify({ ...body, language: body.language === "id" || body.language === "en" ? body.language : current.user.preferred_language === "en" ? "en" : "id" }) };
+    } catch {
+      return NextResponse.json({ message: "Pengaturan belajar belum sesuai." }, { status: 400 });
+    }
   }
 
   const headers = new Headers(init.headers);

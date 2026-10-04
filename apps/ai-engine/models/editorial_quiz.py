@@ -13,6 +13,14 @@ class Input(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class ProposalInput(Input):
+    class_id: uuid.UUID
+    material_id: uuid.UUID
+    n_questions: int = Field(default=5, ge=1, le=20)
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    language: Literal["id", "en"] = "id"
+
+
 class Option(Input):
     id: str = Field(min_length=1, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")
     label: str = Field(min_length=1, max_length=1000)

@@ -198,6 +198,17 @@ async def student_materials(
     ]
 
 
+@router.get("/teacher/materials")
+async def teacher_materials(user: User = Depends(require_teacher), session: AsyncSession = Depends(db_session)):
+    rows = (await session.execute(select(ClassMaterial, Classroom)
+                                  .join(Classroom, ClassMaterial.class_id == Classroom.id)
+                                  .where(Classroom.teacher_id == user.id)
+                                  .order_by(ClassMaterial.created_at.desc()).limit(200))).all()
+    return [{**material_info(material), "class_id": str(room.id), "class_name": room.name,
+             "subject": room.subject, "is_archived": room.is_archived}
+            for material, room in rows]
+
+
 @router.get("/{class_id}")
 async def detail(
     class_id: uuid.UUID,

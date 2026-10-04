@@ -3,17 +3,41 @@
 from __future__ import annotations
 
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from api.assessment_service import start_assessment, submit_assessment
+from api.assessment_service import (
+    active_assessments,
+    recover_assessment,
+    start_assessment,
+    submit_assessment,
+)
 from api.dependencies import require_student
 from database.models import User
 from database.session import async_session
-from models.quiz import QuizStartRequest, QuizStartResponse, QuizSubmitRequest, QuizSubmitResponse
+from models.quiz import (
+    QuizRecoveryResponse,
+    QuizStartRequest,
+    QuizStartResponse,
+    QuizSubmitRequest,
+    QuizSubmitResponse,
+)
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["quiz"])
+
+
+@router.get("/active", response_model=list[QuizRecoveryResponse])
+async def active_quizzes(student: User = Depends(require_student)):
+    async with async_session() as session:
+        return await active_assessments(session, student)
+
+
+@router.get("/sessions/{session_id}", response_model=QuizRecoveryResponse)
+async def recover_quiz(session_id: uuid.UUID, student: User = Depends(require_student)):
+    async with async_session() as session:
+        return await recover_assessment(session, student, session_id)
 
 
 @router.post("/start", response_model=QuizStartResponse)

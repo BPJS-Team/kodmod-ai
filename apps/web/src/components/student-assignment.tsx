@@ -28,6 +28,7 @@ import {
   type FinalIntent,
 } from "@/lib/editorial-types";
 import { VoiceControls } from "./voice-controls";
+import { useQuizExitGuard } from "./use-quiz-exit-guard";
 import { Badge } from "./ui";
 import "@/styles/editorial.css";
 
@@ -116,6 +117,7 @@ export function StudentAssignment({
   );
   const saved = attempt && question ? (attempt.answers[question.id] ?? "") : "";
   const dirty = selected !== saved;
+  useQuizExitGuard(Boolean(attempt && !result), dirty);
   const answeredCount = Object.keys(attempt?.answers ?? {}).length;
   const base = `/student/assignments/${assignment.id}`;
 
@@ -477,6 +479,7 @@ export function StudentAssignment({
               </section>
               <VoiceControls
                 key={question.id}
+                autoPlayKey={question.id}
                 text={`${t("Soal {number}", { number: question.order_index })}. ${question.narration || question.prompt}. ${question.options.map((o, i) => `${t("Pilihan {letter}", { letter: String.fromCharCode(65 + i) })}: ${o.label}`).join(". ")}`}
               />
               <section className="panel editorial-section editorial-final-submit">

@@ -41,6 +41,7 @@ from psycopg_pool import AsyncConnectionPool
 from api.routes import (
     admin,
     admin_insights,
+    admin_materials,
     analytics,
     auth,
     chat,
@@ -49,6 +50,7 @@ from api.routes import (
     editorial_quizzes,
     exercise,
     health,
+    learning,
     quiz,
     student,
     subjects,
@@ -128,11 +130,13 @@ app.include_router(auth.router, prefix="/auth")
 app.include_router(chat.router, prefix="/chat")
 app.include_router(classrooms.router, prefix="/classes")
 app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
+app.include_router(learning.router, prefix="/learning")
 app.include_router(student.router, prefix="/student")
 app.include_router(teacher.router, prefix="/teacher")
 app.include_router(editorial_quizzes.router)
 app.include_router(admin.router, prefix="/admin")
 app.include_router(admin_insights.router, prefix="/admin")
+app.include_router(admin_materials.router, prefix="/admin")
 app.include_router(subjects.router, prefix="/subjects")
 app.include_router(subjects.documents_router, prefix="/documents")
 app.include_router(analytics.router, prefix="/analytics")

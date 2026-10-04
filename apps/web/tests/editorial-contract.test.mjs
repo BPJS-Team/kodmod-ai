@@ -36,6 +36,11 @@ test("proxy rejects unknown methods, malformed IDs and traversal", () => {
   }
 });
 
+test("AI question proposals require the teacher role and remain a separate action", () => {
+  assert.deepEqual(editorialRoute("POST", ["teacher", "quizzes", "propose"]).roles, ["teacher"]);
+  assert.equal(editorialRoute("GET", ["teacher", "quizzes", "propose"]), null);
+});
+
 test("final retry freezes both key and expected revision", () => {
   const first = finalIntent(null, 4, "key-1");
   assert.deepEqual(first, { key: "key-1", expected_revision: 4 });

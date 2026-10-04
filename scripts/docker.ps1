@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('up', 'build', 'migrate', 'api', 'infra', 'qdrant', 'down', 'status', 'logs', 'admin')]
+    [ValidateSet('up', 'build', 'migrate', 'api', 'infra', 'qdrant', 'down', 'status', 'logs', 'admin', 'demo-users')]
     [string]$Action = 'up',
     [string]$CentreRoot = 'F:\Docker_Centre\kodmod'
 )
@@ -47,6 +47,12 @@ switch ($Action) {
     'status' { $composeArgs += @('ps', '--all') }
     'logs' { $composeArgs += @('logs', '--tail', '100', '--follow') }
     'admin' { $composeArgs += @('exec', 'ai-engine', 'python', '-m', 'scripts.create_admin', '--username', 'admin') }
+    'demo-users' {
+        & $dockerExe @composeArgs build ai-engine
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $runContainer = "kodmod-demo-users-$PID"
+        $composeArgs += @('run', '--rm', '--no-deps', '--name', $runContainer, 'ai-engine', 'python', '-m', 'scripts.seed_demo_users')
+    }
 }
 & $dockerExe @composeArgs
 exit $LASTEXITCODE

@@ -5,12 +5,14 @@ import { speechOutput } from "@/lib/browser-speech";
 import { useVoicePreferences } from "./voice-preferences-provider";
 import { useI18n } from "./language-provider";
 
-export function VoiceControls({ text, onTranscript, autoPlayKey }: {
+export function VoiceControls({ text, onTranscript, autoPlayKey, language: contentLanguage }: {
   text: string; onTranscript?: (transcript: string) => void; autoPlayKey?: string | null;
+  language?: "id" | "en";
 }) {
   const owner = useId();
   const { engine, tutorEnabled, openVoicePreferences } = useVoicePreferences();
-  const { language, t } = useI18n();
+  const { language: interfaceLanguage, t } = useI18n();
+  const language = contentLanguage ?? interfaceLanguage;
   const output = useSyncExternalStore(speechOutput.subscribe, speechOutput.getState, speechOutput.getState);
   const state = output.owner === owner ? output.status : "idle";
   const [capture, setCapture] = useState<"idle" | "permission" | "recording" | "transcribing">("idle");

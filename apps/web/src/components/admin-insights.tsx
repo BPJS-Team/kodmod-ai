@@ -42,19 +42,29 @@ export function AdminInsights({
   const { t } = useI18n();
   const [overview, setOverview] = useState(initialOverview);
   const [activity, setActivity] = useState(initialActivity);
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  async function fetchActivity(cat: string) {
+    const url =
+      cat === "all"
+        ? "/api/admin/activity?limit=40"
+        : `/api/admin/activity?limit=40&category=${encodeURIComponent(cat)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    return readJson<AdminActivity>(res, "Aktivitas belum dapat dimuat.");
+  }
 
   async function refresh() {
     setLoading(true);
     setError("");
     try {
-      const [overviewResponse, activityResponse] = await Promise.all([
+      const [overviewResponse, newActivity] = await Promise.all([
         fetch("/api/admin/insights/overview", { cache: "no-store" }),
-        fetch("/api/admin/activity?limit=30", { cache: "no-store" }),
+        fetchActivity(selectedCategory),
       ]);
       setOverview(await readJson<AdminOverview>(overviewResponse, "Overview belum dapat dimuat."));
-      setActivity(await readJson<AdminActivity>(activityResponse, "Aktivitas belum dapat dimuat."));
+      setActivity(newActivity);
       await notifyResult("Insight operasional sudah diperbarui.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Insight operasional belum dapat dimuat.");
@@ -62,6 +72,31 @@ export function AdminInsights({
       setLoading(false);
     }
   }
+
+  async function handleFilterChange(cat: string) {
+    if (loading || cat === selectedCategory) return;
+    setSelectedCategory(cat);
+    setLoading(true);
+    setError("");
+    try {
+      const newActivity = await fetchActivity(cat);
+      setActivity(newActivity);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Aktivitas belum dapat dimuat.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const categoryFilters = [
+    { id: "all", label: "Semua" },
+    { id: "account", label: "Akun" },
+    { id: "invitation", label: "Undangan" },
+    { id: "auth", label: "Autentikasi" },
+    { id: "classroom", label: "Kelas & Materi" },
+    { id: "learning", label: "Sesi Belajar" },
+    { id: "quiz", label: "Kuis" },
+  ];
 
   const provider = overview.providers.elevenlabs;
   return (
@@ -101,24 +136,69 @@ export function AdminInsights({
       <div className="admin-insight-columns">
         <article className="panel admin-activity-card">
           <div className="panel-heading">
-            <div><h2><UiText>{"Aktivitas terbaru"}</UiText></h2><p><UiText>{"Metadata operasional tanpa isi percakapan atau kredensial."}</UiText></p></div>
+            <div><h2><UiText>{"Aktivitas terbaru"}</UiText></h2><p><UiText>{"Metadata operasional dan audit log sistem tanpa membocorkan kredensial."}</UiText></p></div>
             <Activity size={20} aria-hidden="true" />
           </div>
+
+          <div
+            className="admin-activity-filter-bar"
+            style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "8px 0 16px" }}
+            role="group"
+            aria-label="Filter kategori aktivitas"
+          >
+            {categoryFilters.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                className={`button ${selectedCategory === filter.id ? "primary" : "secondary"}`}
+                style={{
+                  fontSize: "11px",
+                  padding: "4px 10px",
+                  height: "28px",
+                  borderRadius: "14px",
+                }}
+                onClick={() => void handleFilterChange(filter.id)}
+                disabled={loading}
+              >
+                {t(filter.label)}
+              </button>
+            ))}
+          </div>
+
           {activity.items.length ? (
             <div className="admin-activity-list">
               {activity.items.map((item) => (
                 <div className="admin-activity-item" key={`${item.type}-${item.id}`}>
                   <span className="admin-activity-dot" aria-hidden="true" />
-                  <div>
-                    <strong>{actionLabel(item.action)}</strong>
-                    <p>{item.actor_name} · {item.target_name}</p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <strong>{actionLabel(item.action)}</strong>
+                      {item.category && (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            background: "#edf3fc",
+                            color: "#305d9e",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item.category.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ marginTop: "2px" }}>
+                      {item.actor_name}
+                      {item.actor_role ? ` (${item.actor_role})` : ""} · {item.target_name}
+                    </p>
                     <small><UiDate value={item.occurred_at} time empty="Belum tersedia" /></small>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="admin-insight-empty"><Clock3 size={22} aria-hidden="true" /><p><UiText>{"Belum ada aktivitas terbaru."}</UiText></p></div>
+            <div className="admin-insight-empty"><Clock3 size={22} aria-hidden="true" /><p><UiText>{"Belum ada aktivitas dalam kategori ini."}</UiText></p></div>
           )}
         </article>
         <article className="panel admin-activity-card">

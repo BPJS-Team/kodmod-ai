@@ -138,7 +138,7 @@ Fitur frontend saat ini:
 - UI streaming/cancel, kuis editorial guru (review, publikasi, penugasan), OCR PDF scan, dan pemetaan konsep materi masih tahap berikutnya. Planner Agent belum ditambahkan; LangChain dan LangGraph tetap dipakai.
 - Logo dan font disajikan lokal; tampilan menyesuaikan desktop maupun ponsel.
 
-Login membutuhkan FastAPI serta akun yang sudah tersedia. Buat admin awal menggunakan panduan backend/script `apps/ai-engine/scripts/create_admin.py`; tidak ada akun demo bawaan pada frontend. Production harus menggunakan HTTPS karena cookie sesi menggunakan `Secure`. Logout menghapus sesi browser, tetapi backend belum menyediakan pencabutan token JWT individual.
+Login membutuhkan FastAPI serta akun yang sudah tersedia. Database tidak otomatis berisi akun demo; admin awal dibuat memakai panduan backend/script `apps/ai-engine/scripts/create_admin.py`. Untuk membuat atau mereset akun demo lokal secara eksplisit, ikuti bagian **Akun demo opsional** di `docs/DEPLOYMENT.md`. Production harus menggunakan HTTPS karena cookie sesi menggunakan `Secure`. Logout menghapus sesi browser, tetapi backend belum menyediakan pencabutan token JWT individual.
 
 ### Pengujian frontend tanpa database sekolah
 

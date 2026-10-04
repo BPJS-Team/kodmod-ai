@@ -217,3 +217,34 @@ async def transcribe(
     if isinstance(body.get("words"), list):
         result["words"] = body["words"]
     return result
+
+
+async def get_subscription_info() -> dict[str, Any]:
+    """Fetch live ElevenLabs subscription quota and usage details."""
+    try:
+        api_key = _api_key()
+    except ElevenLabsConfigurationError:
+        return {"configured": False, "available": False}
+
+    url = "https://api.elevenlabs.io/v1/user/subscription"
+    headers = {"xi-api-key": api_key}
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "configured": True,
+                    "available": True,
+                    "character_count": data.get("character_count", 0),
+                    "character_limit": data.get("character_limit", 0),
+                    "tier": data.get("tier", "standard"),
+                    "status": data.get("status", "active"),
+                    "next_reset_unix": data.get("next_character_count_reset_unix"),
+                }
+            return {
+                "configured": True,
+                "available": False,
+            }
+    except Exception:
+        return {"configured": True, "available": False}

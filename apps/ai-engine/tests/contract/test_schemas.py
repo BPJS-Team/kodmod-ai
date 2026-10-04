@@ -110,16 +110,18 @@ def test_km_contract_005_quiz_start_request_bounds() -> None:
     from models.quiz import QuizStartRequest
 
     sid = uuid.uuid4()
-    ok = QuizStartRequest(student_id=sid, n_questions=1, difficulty="easy")
+    ok = QuizStartRequest(n_questions=1, difficulty="easy")
     assert ok.n_questions == 1
-    assert QuizStartRequest(student_id=sid, n_questions=20).n_questions == 20
+    assert QuizStartRequest(n_questions=20).n_questions == 20
+    with pytest.raises(ValidationError):
+        QuizStartRequest(student_id=sid)
 
     for bad in (0, 21, -1):
         with pytest.raises(ValidationError):
-            QuizStartRequest(student_id=sid, n_questions=bad)
+            QuizStartRequest(n_questions=bad)
 
     with pytest.raises(ValidationError):
-        QuizStartRequest(student_id=sid, difficulty="trivial")
+        QuizStartRequest(difficulty="trivial")
 
 
 def test_km_contract_006_quiz_start_response_shape() -> None:

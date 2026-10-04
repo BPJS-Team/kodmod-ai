@@ -2,10 +2,12 @@
 import { UiText, useI18n } from "@/components/language-provider";
 
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, Lightbulb, LoaderCircle, RefreshCw, Send, Sparkles, XCircle } from "lucide-react";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
-import type { QuizQuestion, QuizStartResponse, QuizSubmitRequest } from "@/lib/quiz-types";
+import type { QuizQuestion, QuizStartResponse, QuizSubmitRequest, QuizRecoveryResponse } from "@/lib/quiz-types";
+import type { StudentMaterial } from "@/lib/class-types";
+import { useQuizExitGuard } from "./use-quiz-exit-guard";
 import { prepareQuizSubmission, quizProgress, readQuizSubmissionResponse, submissionFailureAction } from "@/lib/quiz-submission.mjs";
 import { VoiceControls } from "./voice-controls";
 
@@ -29,13 +31,20 @@ async function readJson<T>(response: Response, fallback: string) {
   return (await response.json()) as T;
 }
 
-export function StudentQuiz() {
-  const { t } = useI18n();
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [question, setQuestion] = useState<QuizQuestion | null>(null);
+export function StudentQuiz({ materials = [], initialSession = null, embedded = false, onReturn }: {
+  materials?: StudentMaterial[];
+  initialSession?: QuizRecoveryResponse | null;
+  embedded?: boolean;
+  onReturn?: () => void;
+}) {
+  const { t, language } = useI18n();
+  const [phase, setPhase] = useState<Phase>(initialSession ? initialSession.status === "completed" ? "complete" : "active" : "idle");
+  const [question, setQuestion] = useState<QuizQuestion | null>(initialSession?.current_question ?? null);
   const [nextQuestion, setNextQuestion] = useState<QuizQuestion | null>(null);
-  const [quizSessionId, setQuizSessionId] = useState("");
-  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [quizSessionId, setQuizSessionId] = useState(initialSession?.quiz_session_id ?? "");
+  const [totalQuestions, setTotalQuestions] = useState(initialSession?.total_questions ?? 0);
+  const [materialId, setMaterialId] = useState(initialSession?.material_id ?? "");
+  const [contentLanguage] = useState(initialSession?.language);
   const [submissionPending, setSubmissionPending] = useState(false);
   const [restartRequired, setRestartRequired] = useState(false);
   const [answerAttempt, setAnswerAttempt] = useState(0);
@@ -43,7 +52,7 @@ export function StudentQuiz() {
   const [feedback, setFeedback] = useState("");
   const [isCorrect, setIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
-  const [cumulativeScore, setCumulativeScore] = useState(0);
+  const [cumulativeScore, setCumulativeScore] = useState(initialSession?.last_result?.cumulative_score ?? 0);
   const [summary, setSummary] = useState("");
   const [count, setCount] = useState("5");
   const [difficulty, setDifficulty] = useState("adaptive");
@@ -51,8 +60,11 @@ export function StudentQuiz() {
   const questionStartedAt = useRef(0);
   const pendingSubmission = useRef<Readonly<QuizSubmitRequest> | null>(null);
   const requestInFlight = useRef(false);
-  const acceptingAnswer = useRef(false);
+  const acceptingAnswer = useRef(Boolean(initialSession?.current_question));
   const answerAttemptRef = useRef(0);
+  const activeQuiz = ["active", "submitting", "review"].includes(phase);
+  useQuizExitGuard(activeQuiz);
+  useEffect(() => { questionStartedAt.current = performance.now(); }, []);
 
   function beginAnswer() {
     pendingSubmission.current = null;
@@ -71,13 +83,16 @@ export function StudentQuiz() {
 
   async function startQuiz(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (activeQuiz || embedded) return;
+    const selectedMaterial = materials.find((item) => item.id === materialId);
+    if (!selectedMaterial) { setError(t("Pilih materi untuk menyiapkan asesmen.")); return; }
     if (requestInFlight.current) return;
     requestInFlight.current = true;
     try {
       if (phase !== "idle") {
         const confirmed = await confirmAction({
           title: "Mulai latihan baru?",
-          text: "Latihan yang sedang berjalan akan ditinggalkan. Jawaban yang sudah diterima tetap tersimpan.",
+          text: "Hasil latihan sebelumnya tetap tersimpan. Soal baru akan dibuat dari materi yang dipilih.",
           confirmText: "Ya, mulai baru",
         });
         if (!confirmed) return;
@@ -94,6 +109,9 @@ export function StudentQuiz() {
       setNextQuestion(null);
       setCumulativeScore(0);
       const payload: Record<string, number | string> = { n_questions: Number(count) };
+      payload.class_id = selectedMaterial.class_id;
+      payload.material_id = selectedMaterial.id;
+      payload.language = language;
       if (difficulty !== "adaptive") payload.difficulty = difficulty;
       const response = await fetch("/api/quiz/start", {
         method: "POST",
@@ -187,10 +205,13 @@ export function StudentQuiz() {
           <div className="quiz-start-icon" aria-hidden="true">
             <Sparkles size={28} />
           </div>
-          <span className="quiz-kicker"><UiText>{"LATIHAN ADAPTIF"}</UiText></span>
-          <h2><UiText>{"Siap mengecek pemahamanmu?"}</UiText></h2>
+          <h2><UiText>{"Asesmen mandiri"}</UiText></h2>
           <p><UiText>{"Jawab dengan kata-katamu sendiri. Tutor akan memberi umpan balik di setiap langkah, bukan sekadar nilai akhir."}</UiText></p>
           <form className="quiz-settings" onSubmit={(event) => void startQuiz(event)}>
+            <label className="field"><UiText>{"Materi belajar"}</UiText><select value={materialId} onChange={(event) => setMaterialId(event.target.value)} disabled={phase === "starting"} required>
+              <option value=""><UiText>{"Pilih materi"}</UiText></option>
+              {materials.map((item) => <option value={item.id} key={item.id} disabled={item.rag_status !== "ready" || item.content_version !== item.indexed_version}>{item.subject} · {item.title}</option>)}
+            </select></label>
             <label className="field"><UiText>{"Jumlah soal"}</UiText><select value={count} onChange={(event) => setCount(event.target.value)} disabled={phase === "starting"}>
                 <option value="3"><UiText>{"3 soal · cepat"}</UiText></option>
                 <option value="5"><UiText>{"5 soal · seimbang"}</UiText></option>
@@ -204,7 +225,7 @@ export function StudentQuiz() {
                 <option value="hard"><UiText>{"Menantang"}</UiText></option>
               </select>
             </label>
-            <button className="button primary quiz-start-button" type="submit" disabled={phase === "starting"}>
+            <button className="button primary quiz-start-button" type="submit" disabled={phase === "starting" || !materialId}>
               {phase === "starting" ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Lightbulb size={18} aria-hidden="true" />}
               {phase === "starting" ? <UiText>{"Menyiapkan soal…"}</UiText> : <UiText>{"Mulai latihan"}</UiText>}
             </button>
@@ -221,14 +242,15 @@ export function StudentQuiz() {
         <>
           <section className="panel quiz-progress" aria-label={t("Progres latihan")}>
             <div>
-              <span className="quiz-kicker"><UiText>{"PERJALANANMU"}</UiText></span>
+              <span className="muted"><UiText>{embedded ? "Mini kuis Tutor" : "Asesmen mandiri"}</UiText></span>
               <strong><UiText>{"Soal "}</UiText>{questionNumber}<UiText>{" dari "}</UiText>{totalQuestions}
               </strong>
             </div>
             <span className="quiz-score-label"><UiText>{"Skor sementara "}</UiText>{Math.round(cumulativeScore * 100)}%</span>
             <progress value={answeredQuestions} max={totalQuestions || 1} aria-label={`${answeredQuestions} dari ${totalQuestions} soal selesai`} />
-            <button type="button" className="button secondary small" onClick={() => void startQuiz()} disabled={phase === "submitting"}>
+            {!embedded && phase === "complete" && <button type="button" className="button secondary small" onClick={() => void startQuiz()}>
               <RefreshCw size={16} aria-hidden="true" /><UiText>{"Latihan baru"}</UiText></button>
+            }
           </section>
 
           <section className="panel quiz-question-card">
@@ -240,6 +262,8 @@ export function StudentQuiz() {
             <VoiceControls
               key={`${answerAttempt}:${answerLocked ? "read" : "answer"}`}
               text={feedback || question.question}
+              language={contentLanguage}
+              autoPlayKey={phase === "submitting" ? null : `${quizSessionId}:${question.question_id}:${phase}:${answerAttempt}`}
               onTranscript={answerLocked ? undefined : changeAnswer}
             />
 
@@ -289,8 +313,8 @@ export function StudentQuiz() {
                 {phase === "complete" ? (
                   <div className="quiz-complete-summary">
                     <strong>{summary || <UiText>{"Latihan selesai."}</UiText>}</strong>
-                    <button type="button" className="button primary" onClick={() => void startQuiz()}>
-                      <RefreshCw size={17} aria-hidden="true" /><UiText>{"Coba lagi"}</UiText></button>
+                    {embedded ? <button type="button" className="button primary" onClick={onReturn}><UiText>{"Kembali belajar"}</UiText></button> : <button type="button" className="button primary" onClick={() => void startQuiz()}>
+                      <RefreshCw size={17} aria-hidden="true" /><UiText>{"Coba lagi"}</UiText></button>}
                   </div>
                 ) : (
                   <button type="button" className="button primary" onClick={continueQuiz}>
@@ -303,7 +327,8 @@ export function StudentQuiz() {
         </>
       )}
 
-      {error && <p className="alert error-message quiz-feedback-alert" role="alert">{error}</p>}
+      {error && <p className="alert error-message quiz-feedback-alert" role="alert">{t(error)}</p>}
+      {initialSession && phase === "active" && <p className="info-note" role="status"><UiText>{"Sesi dilanjutkan. Jawaban yang sudah dikirim tetap tersimpan."}</UiText>{initialSession.last_result?.feedback ? ` ${initialSession.last_result.feedback}` : ""}</p>}
     </div>
   );
 }

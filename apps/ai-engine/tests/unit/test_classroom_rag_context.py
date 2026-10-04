@@ -92,7 +92,7 @@ async def test_quiz_questions_use_selected_class_material_instead_of_shared_know
             return SimpleNamespace(
                 content='{"questions":[{"text":"'
                 + ("Latihan materi pilihan" if grounded else "Latihan umum")
-                + '","expected_answer":"A"}]}'
+                + '","expected_answer":"A","source_indices":[1]}]}'
             )
 
     monkeypatch.setattr(problem_generator.RAGTool, "retrieve", retrieve)
@@ -111,7 +111,7 @@ async def test_quiz_questions_use_selected_class_material_instead_of_shared_know
 
 @pytest.mark.parametrize("existing_concept", ["", "stale"])
 @pytest.mark.parametrize("requested_topic", ["", "Pecahan senilai"])
-@pytest.mark.parametrize("generated_count", [0, 1])
+@pytest.mark.parametrize("generated_count", [0, 1, 2])
 @pytest.mark.parametrize("scope", ["class", "material", "selected_material"])
 async def test_unmapped_classroom_quiz_never_attributes_an_unrelated_concept(
     monkeypatch, existing_concept, requested_topic, generated_count, scope
@@ -153,12 +153,14 @@ async def test_unmapped_classroom_quiz_never_attributes_an_unrelated_concept(
                     {
                         "questions": [
                             {
-                                "text": "Latihan pecahan senilai" if grounded else "Topik keliru",
+                                "text": f"Latihan pecahan senilai {number}" if grounded else "Topik keliru",
                                 "type": "spoken",
                                 "expected_answer": "Dua per empat",
                                 "concept_id": unrelated_concept,
+                                "source_indices": [1],
                             }
-                        ][:generated_count]
+                            for number in range(generated_count)
+                        ]
                     }
                 )
             )
@@ -167,8 +169,7 @@ async def test_unmapped_classroom_quiz_never_attributes_an_unrelated_concept(
     monkeypatch.setattr(problem_generator, "_infer_concept", infer_global_concept)
     monkeypatch.setattr(problem_generator.RAGTool, "retrieve", retrieve)
     monkeypatch.setattr(problem_generator, "get_quiz_llm", lambda: ContextLLM())
-    result = await problem_generator.problem_generator_node(
-        {
+    state = {
             "student_id": sid,
             "class_id": None if scope == "material" else cid,
             "material_id": None if scope == "class" else mid,
@@ -178,14 +179,19 @@ async def test_unmapped_classroom_quiz_never_attributes_an_unrelated_concept(
             "mastery_confidence": {unrelated_concept: 1.0},
             "quiz_n_questions": 2,
         }
-    )
+    if generated_count != 2:
+        with pytest.raises(ValueError, match="quality contract"):
+            await problem_generator.problem_generator_node(state)
+        assert concept_lookups == []
+        return
+    result = await problem_generator.problem_generator_node(state)
     questions = result["quiz_questions"]
     assert concept_lookups == []
     assert len(questions) == 2
     assert all(question["concept_id"] == "" for question in questions)
     if generated_count:
-        assert questions[0]["text"] == "Latihan pecahan senilai"
-    assert "Pecahan senilai" in questions[-1]["text"]
+        assert questions[0]["text"] == "Latihan pecahan senilai 0"
+    assert "pecahan senilai" in questions[-1]["text"].lower()
     assert unrelated_concept not in questions[-1]["text"]
 
 

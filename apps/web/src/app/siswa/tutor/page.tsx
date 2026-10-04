@@ -1,8 +1,8 @@
 
 import { UiText } from "@/components/language-provider";
-import { StudentTutor } from "@/components/student-tutor";
+import { GuidedTutor } from "@/components/guided-tutor";
 import { Heading } from "@/components/ui";
-import type { ChatSessionSummary } from "@/lib/chat-types";
+import type { LearningSession } from "@/lib/learning-types";
 import { requireSession } from "@/lib/session";
 import { backend } from "@/lib/server-api";
 import type { StudentMaterial } from "@/lib/class-types";
@@ -12,7 +12,7 @@ export default async function StudentTutorPage({ searchParams }: { searchParams:
   const { token } = await requireSession("student");
   const query = await searchParams;
   const [sessions, materials] = await Promise.all([
-    backend<ChatSessionSummary[]>("/chat/sessions?limit=50", token),
+    backend<LearningSession[]>("/learning/active", token),
     backend<StudentMaterial[]>("/classes/student/materials", token),
   ]);
   const selected = query.material_id ? materials.find((item) => item.id === query.material_id && item.class_id === query.class_id) : undefined;
@@ -22,9 +22,9 @@ export default async function StudentTutorPage({ searchParams }: { searchParams:
     <>
       <Heading
         title={<UiText>{"Tutor KODMOD"}</UiText>}
-        description={<UiText>{"Tanyakan materi, minta contoh, dan susun langkah belajar yang lebih mudah dipahami."}</UiText>}
+        description={<UiText>{"Pelajari materi bersama Tutor, tanyakan yang belum jelas, lalu coba mini kuis."}</UiText>}
       />
-      <StudentTutor key={`${query.class_id || ""}:${query.material_id || ""}`} initialSessions={sessions} materials={materials} initialMaterialId={selected?.id} />
+      <GuidedTutor key={`${query.class_id || ""}:${query.material_id || ""}`} initialSessions={sessions} materials={materials} initialMaterialId={selected?.id} />
     </>
   );
 }

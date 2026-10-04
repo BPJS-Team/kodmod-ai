@@ -105,6 +105,7 @@ _LLM_CONSUMERS = (
     "agents.quiz_analyzer",
     "agents.recommendation_agent",
     "agents.reflection_agent",
+    "graphs.guided_learning",
     "accessibility.simplifier",
     "accessibility.narration",
     "analytics.insights",

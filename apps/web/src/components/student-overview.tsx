@@ -36,11 +36,15 @@ export async function StudentOverview() {
             <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         )}
-        <Link className="button secondary" href="/siswa/materi"><UiText>{"Buka pustaka materi"}</UiText></Link>
+        <Link className="button secondary" href="/siswa/materi">
+          <BookOpen size={18} aria-hidden="true" /><UiText>{"Buka materi"}</UiText>
+        </Link>
         <Link className="button secondary" href="/siswa/tutor">
-          <MessageCircle size={18} aria-hidden="true" /><UiText>{"Tanya tutor AI"}</UiText></Link>
+          <MessageCircle size={18} aria-hidden="true" /><UiText>{"Tutor AI"}</UiText>
+        </Link>
         <Link className="button secondary" href="/siswa/latihan">
-          <ListChecks size={18} aria-hidden="true" /><UiText>{"Coba latihan singkat"}</UiText></Link>
+          <ListChecks size={18} aria-hidden="true" /><UiText>{"Asesmen mandiri"}</UiText>
+        </Link>
       </div>
     </section>
   );

@@ -166,6 +166,8 @@ async def _own_session_or_404(
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such conversation.")
+    if row.guided_state is not None:
+        raise HTTPException(409, "Gunakan sesi belajar terpandu untuk membuka sesi ini.")
     return row
 
 
@@ -228,7 +230,9 @@ async def delete_session(
 async def end_session(
     session_id: uuid.UUID,
     student: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
 ) -> None:
     """Mark a conversation finished."""
+    await _own_session_or_404(session, session_id, student)
     if not await close_session(session_id, student.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such conversation.")

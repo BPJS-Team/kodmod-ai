@@ -1,0 +1,41 @@
+.guided-workspace { display: grid; grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.guided-sidebar, .guided-main { display: grid; gap: 1.1rem; min-width: 0; }
+.guided-material-picker, .guided-sessions, .guided-lesson, .guided-welcome { padding: clamp(1.2rem, 3vw, 2rem); }
+.guided-card-header { display: grid; gap: .7rem; margin-bottom: 1.1rem; color: var(--ink, #12335d); }
+.guided-card-title { font-size: 1.2rem; line-height: 1.4; margin: 0; }
+.guided-material-picker [data-slot="card-content"] { display: grid; gap: 1rem; }
+.guided-material-picker select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.guided-progress { padding: 1.1rem 1.5rem; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.guided-progress h2 { margin: .25rem 0 0; font-size: 1.25rem; overflow-wrap: anywhere; }
+.guided-progress > div { flex: 1; min-width: 10rem; }
+.guided-progress strong { color: #24486f; }
+.guided-progress progress { flex-basis: 100%; width: 100%; accent-color: #2463ed; height: .6rem; }
+.guided-lesson-heading { display: flex; align-items: center; gap: .85rem; margin-bottom: 1.5rem; }
+.guided-lesson-heading h2 { margin: 0; font-size: clamp(1.3rem, 2.5vw, 1.8rem); line-height: 1.45; }
+.guided-symbol { display: inline-flex; padding: .85rem; color: #245be4; background: #ecf3ff; border-radius: 1rem; flex: 0 0 auto; }
+.guided-explanation { max-width: 70ch; font-size: 1.125rem; line-height: 1.9; }
+.guided-explanation p { white-space: pre-line; overflow-wrap: anywhere; margin: 0 0 1.5rem; }
+.guided-source { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; padding-block: 1rem; color: #244b87; font-size: .9rem; overflow-wrap: anywhere; }
+.guided-question-form { display: grid; gap: 1rem; padding-top: 1.5rem; border-top: 1px solid #dce7f6; margin-top: 1rem; }
+.guided-question-form .button { justify-self: end; }
+.guided-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.6rem; padding-top: 1.4rem; border-top: 1px solid #dce7f6; }
+.guided-your-question, .guided-check-result { padding: 1rem; background: #f0f6ff; border-radius: .75rem; margin-bottom: 1.2rem; }
+.guided-check-result { display: flex; gap: .75rem; align-items: start; margin-top: 1.1rem; }
+.guided-check-result p { margin: .4rem 0 0; }
+.guided-sessions ul { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .4rem; }
+.guided-sessions button { text-align: start; display: grid; gap: .3rem; width: 100%; padding: .85rem; border-radius: .65rem; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.guided-sessions button[aria-current="true"] { background: #eef4ff; border-color: #bfd4fc; }
+.guided-sessions small { color: #4c6380; }
+.guided-other-paths { display: grid; gap: .75rem; padding: .3rem .5rem; }
+.guided-other-paths a { display: flex; align-items: center; gap: .6rem; justify-content: space-between; color: #244b87; font-weight: 600; }
+.guided-welcome { min-height: 26rem; background-image: radial-gradient(#d7e5fa .6px, transparent .6px); background-size: 18px 18px; display: flex; flex-direction: column; align-items: start; justify-content: center; gap: 1rem; }
+.guided-welcome .guided-card-title { font-size: 1.8rem; }
+.guided-welcome p { max-width: 48ch; line-height: 1.8; }
+.guided-welcome ol { margin: 0; padding-left: 1.5rem; line-height: 2.2; }
+.guided-workspace button:disabled { cursor: not-allowed; }
+@media (max-width: 900px) { .guided-workspace { grid-template-columns: minmax(0, 1fr); } .guided-sidebar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .guided-other-paths { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .guided-sidebar { grid-template-columns: minmax(0, 1fr); } .guided-progress { padding: 1rem; } .guided-actions .button, .guided-question-form .button { width: 100%; } .guided-lesson .voice-actions { flex-wrap: wrap; } .guided-welcome { min-height: 20rem; } }
+html[data-high-contrast="true"] .guided-symbol, html[data-high-contrast="true"] .guided-check-result { background: transparent; color: inherit; border: 1px solid currentColor; }
+.guided-quiz-container { display: grid; gap: 1rem; }
+.guided-quiz-banner { display: flex; align-items: center; gap: .65rem; padding: .85rem 1.25rem; border-radius: .85rem; background: #eaf1fe; border: 1px solid #bfd4fc; color: #184382; font-weight: 650; font-size: .95rem; }
+

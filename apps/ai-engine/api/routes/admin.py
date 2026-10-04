@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.audit_service import record_audit
 from api.dependencies import db_session, require_admin
 from api.security import generate_invitation_code, hash_password
 from database.models import InvitationCode, User
@@ -54,6 +55,7 @@ async def list_users(
 @router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def create_user(
     body: AdminCreateUserRequest,
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(db_session),
 ) -> User:
     """Create any account, including another admin. No invitation code needed."""
@@ -77,6 +79,17 @@ async def create_user(
         await session.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "That username is already taken.") from e
     await session.refresh(user)
+    record_audit(
+        session,
+        action="user.created",
+        category="account",
+        actor=admin,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+        details={"role": user.role},
+    )
+    await session.flush()
     return user
 
 
@@ -104,6 +117,14 @@ async def update_user(
             "You cannot disable or demote your own admin account.",
         )
 
+    action = "user.updated"
+    if "is_active" in changes:
+        action = "user.activated" if changes["is_active"] else "user.deactivated"
+    elif "role" in changes:
+        action = "user.role_changed"
+    elif "new_password" in changes:
+        action = "user.password_reset"
+
     if (new_password := changes.pop("new_password", None)) is not None:
         try:
             user.password_hash = hash_password(new_password)
@@ -117,6 +138,22 @@ async def update_user(
     session.add(user)
     await session.flush()
     await session.refresh(user)
+
+    audit_details = {k: v for k, v in changes.items()}
+    if new_password is not None:
+        audit_details["password_reset"] = True
+
+    record_audit(
+        session,
+        action=action,
+        category="account",
+        actor=admin,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+        details=audit_details or None,
+    )
+    await session.flush()
     return user
 
 
@@ -132,6 +169,18 @@ async def delete_user(
     user = await session.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such account.")
+    target_name = f"{user.full_name} (@{user.username})"
+    role = user.role
+    record_audit(
+        session,
+        action="user.deleted",
+        category="account",
+        actor=admin,
+        target_type="user",
+        target_id=user_id,
+        target_name=target_name,
+        details={"role": role},
+    )
     await session.delete(user)
     await session.flush()
     log.info("Admin %s deleted account %s", admin.username, user.username)
@@ -172,6 +221,17 @@ async def create_invitation(
             await session.rollback()
             continue
         await session.refresh(invite)
+        record_audit(
+            session,
+            action="invitation.created",
+            category="invitation",
+            actor=admin,
+            target_type="invitation",
+            target_id=invite.id,
+            target_name=invite.code,
+            details={"label": invite.label, "max_uses": invite.max_uses},
+        )
+        await session.flush()
         return invite
     raise HTTPException(
         status.HTTP_503_SERVICE_UNAVAILABLE, "Could not generate a unique code. Try again."
@@ -181,11 +241,24 @@ async def create_invitation(
 @router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_invitation(
     invitation_id: uuid.UUID,
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(db_session),
 ) -> None:
     """Revoke a code. Accounts already created with it are unaffected."""
     invite = await session.get(InvitationCode, invitation_id)
     if invite is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such invitation code.")
+    target_name = invite.code
+    label = invite.label
+    record_audit(
+        session,
+        action="invitation.revoked",
+        category="invitation",
+        actor=admin,
+        target_type="invitation",
+        target_id=invite.id,
+        target_name=target_name,
+        details={"label": label} if label else None,
+    )
     await session.delete(invite)
     await session.flush()

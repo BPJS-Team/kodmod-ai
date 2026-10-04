@@ -84,6 +84,8 @@ class QuizQuestion(TypedDict, total=False):
     options: list[str]  # for MCQ; empty for spoken
     expected_answer: str
     rubric: dict[str, Any]
+    source_indices: list[int]
+    explanation: str
     concept_id: str
     difficulty: DifficultyLevel
 
@@ -163,6 +165,10 @@ class KODMODState(TypedDict, total=False):
 
     # ---- Quiz state --------------------------------------------------------
     assessment_managed: bool  # REST owns the database transaction and durable evidence
+    assessment_kind: Literal["assessment", "tutor"]
+    material_version: int | None
+    quiz_source_docs: list[dict]  # server-selected lesson unit for a Tutor mini quiz
+    quiz_mcq_only: bool
     quiz_session_id: str
     quiz_n_questions: int  # explicit length request (0 = let the agent decide)
     quiz_questions: list[QuizQuestion]
@@ -255,6 +261,10 @@ def initial_state(
         accessible_response="",
         quiz_session_id="",
         assessment_managed=False,
+        assessment_kind="assessment",
+        material_version=None,
+        quiz_source_docs=[],
+        quiz_mcq_only=False,
         quiz_n_questions=0,
         quiz_questions=[],
         current_question_index=0,

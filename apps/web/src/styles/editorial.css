@@ -816,3 +816,7 @@
     color: HighlightText;
   }
 }
+.editorial-proposal { margin-block: 1.2rem; padding: 1.25rem; border: 1px solid #cbddf8; border-radius: .9rem; background: #f3f7ff; }
+.editorial-proposal h3 { margin: 0 0 .5rem; font-size: 1.05rem; }
+.editorial-proposal p { margin: 0 0 1rem; line-height: 1.7; }
+.editorial-proposal .quiz-settings { margin-bottom: 1rem; }

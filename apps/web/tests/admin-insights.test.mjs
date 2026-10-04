@@ -32,6 +32,11 @@ test("admin insights returns operational overview and redacted activity", () => 
   assert.equal(activity.status, 200);
   assert.ok(Array.isArray(activity.data.items));
   assert.ok(activity.data.items.every((item) => !("token" in item) && !("password" in item)));
+  assert.ok(activity.data.items.some((item) => item.type === "audit_event"));
+
+  const filtered = request("/admin/activity?limit=10&category=account");
+  assert.equal(filtered.status, 200);
+  assert.ok(filtered.data.items.every((item) => item.category === "account"));
 
   assert.equal(request("/admin/insights/overview", { id: "test-teacher", role: "teacher" }).status, 403);
 });

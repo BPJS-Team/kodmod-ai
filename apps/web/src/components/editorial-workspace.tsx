@@ -12,12 +12,13 @@ import {
   Check,
   CheckCircle2,
   FileCheck2,
+  Sparkles,
   Plus,
   Save,
   Send,
   Trash2,
 } from "lucide-react";
-import type { Classroom } from "@/lib/class-types";
+import type { Classroom, TeacherMaterial } from "@/lib/class-types";
 import { editorialRequest } from "@/lib/editorial-client";
 import { createQuizSubmissionId } from "@/lib/quiz-submission.mjs";
 import {
@@ -65,6 +66,7 @@ export function QuizWorkspace({
   reviewers = [],
   mode = "owner",
   admin = false,
+  materials = [],
 }: {
   initial?: QuizDraft | null;
   subjects?: Subject[];
@@ -72,8 +74,9 @@ export function QuizWorkspace({
   reviewers?: Reviewer[];
   mode?: "owner" | "review";
   admin?: boolean;
+  materials?: TeacherMaterial[];
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const router = useRouter();
   const [draft, setDraft] = useState(initial);
   const [title, setTitle] = useState(initial?.version.title ?? "");
@@ -99,6 +102,8 @@ export function QuizWorkspace({
   const [opens, setOpens] = useState("");
   const [due, setDue] = useState("");
   const [dirty, setDirty] = useState(!initial);
+  const [proposalMaterial, setProposalMaterial] = useState("");
+  const [proposalCount, setProposalCount] = useState("5");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -252,6 +257,19 @@ export function QuizWorkspace({
                     <p><UiText>{"Berikan konteks yang jelas sebelum siswa mulai."}</UiText></p>
                   </div>
                 </div>
+                <section className="editorial-proposal" aria-label={t("Usulan soal dari materi")}>
+                  <h3><UiText>{"Usulkan soal dari materi"}</UiText></h3>
+                  <p><UiText>{"Soal yang dibuat tetap perlu Anda tinjau sebelum diajukan untuk review dan diterbitkan."}</UiText></p>
+                  <div className="quiz-settings"><label className="field"><UiText>{"Materi sumber"}</UiText><select value={proposalMaterial} onChange={(event) => setProposalMaterial(event.target.value)} disabled={busy}><option value=""><UiText>{"Pilih materi"}</UiText></option>{materials.filter((row) => !row.is_archived).map((row) => <option key={row.id} value={row.id}>{row.class_name} · {row.title}</option>)}</select></label><label className="field"><UiText>{"Jumlah soal"}</UiText><select value={proposalCount} onChange={(event) => setProposalCount(event.target.value)} disabled={busy}><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></label></div>
+                  <button type="button" className="button secondary" disabled={busy || !proposalMaterial} onClick={() => {
+                    const source = materials.find((row) => row.id === proposalMaterial);
+                    if (!source) return;
+                    void run("Ganti soal dengan usulan dari materi?", "Soal di editor akan diganti. Tinjau semua pertanyaan, pilihan, dan pembahasannya sebelum menyimpan.", async () => {
+                      const proposed = await editorialRequest<{ questions: EditableQuestion[] }>("/teacher/quizzes/propose", "POST", { class_id: source.class_id, material_id: source.id, n_questions: Number(proposalCount), language });
+                      setItems(proposed.questions); if (!title.trim()) setTitle(source.title); setDirty(true);
+                    }, "Usulan soal siap ditinjau. Belum diterbitkan ke siswa.");
+                  }}><Sparkles size={17} aria-hidden="true" /><UiText>{"Buat usulan soal"}</UiText></button>
+                </section>
                 <label className="field"><UiText>{"Judul kuis"}</UiText><input
                     value={title}
                     onChange={(e) => {

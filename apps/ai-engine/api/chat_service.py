@@ -65,6 +65,8 @@ async def resolve_chat_context(
             )
         )
         if existing is not None:
+            if existing.guided_state is not None:
+                raise HTTPException(409, "Lanjutkan sesi ini melalui belajar terpandu.")
             if (
                 (class_id is not None
                 and class_id != existing.class_id)

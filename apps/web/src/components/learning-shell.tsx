@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 import { BookOpen } from "lucide-react";
 import { Brand } from "./ui";
 import { LearningNav } from "./learning-nav";
-import { LogoutButton } from "./logout-button";
 import { requireSession } from "@/lib/session";
 import type { LearningRole } from "@/lib/class-types";
 import "@/styles/learning.css";
 import { ExperienceToolbar } from "./experience-toolbar";
 import { getServerI18n } from "@/lib/server-language";
+import { UserProfileDropdown } from "./user-profile-dropdown";
 export async function LearningShell({
   role,
   children,
@@ -40,14 +40,11 @@ export async function LearningShell({
           </span>
           <div className="account">
             <ExperienceToolbar />
-            <span className="avatar" aria-hidden="true">
-              {user.full_name.slice(0, 1).toUpperCase()}
-            </span>
-            <span>
-              <strong>{user.full_name}</strong>
-              <small>{t(teacher ? "Guru" : "Siswa")}</small>
-            </span>
-            <LogoutButton compact />
+            <UserProfileDropdown
+              user={user}
+              roleLabel={teacher ? "Guru" : "Siswa"}
+              role={role}
+            />
           </div>
         </header>
         <main id="konten-utama" tabIndex={-1} className="workspace-main">

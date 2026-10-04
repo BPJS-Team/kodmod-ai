@@ -16,6 +16,7 @@ import {
 } from "@/lib/types";
 import { Badge, Heading, Empty } from "@/components/ui";
 import { AdminInsights } from "@/components/admin-insights";
+import { AdminOverviewCharts } from "@/components/admin-overview-charts";
 import type { AdminActivity, AdminOverview } from "@/lib/admin-insights-types";
 export default async function AdminPage() {
   const { token, user } = await requireSession("admin");
@@ -78,6 +79,7 @@ export default async function AdminPage() {
           </section>
         ))}
       </div>
+      <AdminOverviewCharts overview={overview} />
       <section className="panel table-panel">
         <div className="panel-heading">
           <div>

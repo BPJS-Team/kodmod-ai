@@ -17,6 +17,7 @@ export function editorialRoute(method, parts) {
   if (parts.length === 1 && parts[0] === "subjects" && method === "POST")
     return route(teacher);
   if (parts[0] === "teacher" && parts[1] === "quizzes") {
+    if (parts.length === 3 && parts[2] === "propose" && method === "POST") return route(teacher);
     if (parts.length === 2 && ["GET", "POST"].includes(method))
       return route(teacher);
     if (!uuid.test(parts[2] || "")) return null;

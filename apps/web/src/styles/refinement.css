@@ -87,3 +87,4 @@ html[data-low-vision=true] .muted,html[data-low-vision=true] .field small,html[d
 .book-import-picker select, .book-import-range input { width: 100%; min-width: 0; }
 .book-import-picker .material-status-actions { flex-wrap: wrap; }
 @media (max-width: 420px) { .book-import-range { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .book-import-picker .material-status-actions .button { width: 100%; justify-content: center; } }

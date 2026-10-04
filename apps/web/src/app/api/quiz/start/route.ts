@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Pilih 1 sampai 20 soal." }, { status: 400 });
   }
   const payload: Record<string, string | number> = { n_questions: nQuestions };
+  if (incoming.language === "id" || incoming.language === "en") payload.language = incoming.language;
+  for (const key of ["class_id", "material_id"]) {
+    if (typeof incoming[key] === "string" && incoming[key].trim()) payload[key] = incoming[key].trim();
+  }
   if (typeof incoming.concept_id === "string" && incoming.concept_id.trim()) {
     payload.concept_id = incoming.concept_id.trim();
   }

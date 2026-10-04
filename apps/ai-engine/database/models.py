@@ -200,6 +200,32 @@ class ClassActivity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class AuditEvent(Base):
+    """Metadata-only audit trail for account, sign-in and invitation actions.
+
+    Actor and target names are snapshots so an entry stays readable after the
+    account is deleted. `details` must never hold passwords, tokens or
+    conversation text.
+    """
+
+    __tablename__ = "audit_events"
+    __table_args__ = (Index("ix_audit_events_created_at", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    actor_name: Mapped[str | None] = mapped_column(String(200))
+    actor_role: Mapped[str | None] = mapped_column(String(20))
+    category: Mapped[str] = mapped_column(String(20), index=True)
+    action: Mapped[str] = mapped_column(String(80))
+    target_type: Mapped[str | None] = mapped_column(String(40))
+    target_id: Mapped[str | None] = mapped_column(String(64))
+    target_name: Mapped[str | None] = mapped_column(String(200))
+    details: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Subject(Base):
     __tablename__ = "subjects"
 
@@ -358,8 +384,25 @@ class LearningSession(Base):
     mode: Mapped[str] = mapped_column(String(40), default="tutoring")
     summary: Mapped[str | None] = mapped_column(Text)
 
+    # Canonical guided lesson state, separate from legacy chat checkpoints.
+    guided_state: Mapped[dict | None] = mapped_column(JSON)
+
     student = relationship("User", back_populates="sessions")
     interactions = relationship("InteractionLog", back_populates="session")
+
+
+class LearningActionReceipt(Base):
+    __tablename__ = "learning_action_receipts"
+    __table_args__ = (UniqueConstraint("session_id", "revision", name="uq_learning_action_revision"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("learning_sessions.id", ondelete="CASCADE"), index=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class InteractionLog(Base):

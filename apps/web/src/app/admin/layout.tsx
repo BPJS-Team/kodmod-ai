@@ -1,13 +1,12 @@
 
-import { UiText } from "@/components/language-provider";
 import type { ReactNode } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Brand } from "@/components/ui";
 import { AdminNav } from "@/components/admin-nav";
 import { requireSession } from "@/lib/session";
-import { LogoutButton } from "@/components/logout-button";
 import { ExperienceToolbar } from "@/components/experience-toolbar";
 import { getServerI18n } from "@/lib/server-language";
+import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 export default async function AdminLayout({
   children,
 }: {
@@ -32,14 +31,11 @@ export default async function AdminLayout({
           <span className="workspace-title">{t("Ruang admin")}</span>
           <div className="account">
             <ExperienceToolbar />
-            <span className="avatar" aria-hidden="true">
-              {user.full_name.slice(0, 1).toUpperCase()}
-            </span>
-            <span>
-              <strong>{user.full_name}</strong>
-              <small><UiText>{"Administrator"}</UiText></small>
-            </span>
-            <LogoutButton compact />
+            <UserProfileDropdown
+              user={user}
+              roleLabel="Administrator"
+              role="admin"
+            />
           </div>
         </header>
         <main id="konten-utama" tabIndex={-1} className="workspace-main">

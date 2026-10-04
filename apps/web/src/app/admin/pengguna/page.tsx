@@ -35,6 +35,9 @@ export default async function UsersPage({
       {params.success === "saved" && (
         <p className="alert success-message" role="status"><UiText>{"Data pengguna berhasil disimpan."}</UiText></p>
       )}
+      {params.success === "deleted" && (
+        <p className="alert success-message" role="status"><UiText>{"Akun pengguna berhasil dihapus."}</UiText></p>
+      )}
       <form className="filters" action="/admin/pengguna">
         <div className="field search-field">
           <label htmlFor="q"><UiText>{"Cari pengguna"}</UiText></label>

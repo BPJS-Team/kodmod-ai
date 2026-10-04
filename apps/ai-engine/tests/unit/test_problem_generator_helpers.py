@@ -11,8 +11,8 @@ import pytest
 from agents.problem_generator import (
     _adjust_difficulty,
     _decide_n_questions,
-    _fallback_question,
     _infer_concept,
+    validate_generated_questions,
 )
 
 pytestmark = pytest.mark.unit
@@ -41,14 +41,9 @@ def test_infer_concept_empty_falls_back_to_general() -> None:  # KM-UNIT-054
     assert _infer_concept({}) == "general"
 
 
-def test_fallback_question_is_valid_quiz_question() -> None:  # KM-UNIT-055
-    q = _fallback_question("pecahan", "easy")
-    for key in ("question_id", "text", "type", "concept_id", "difficulty"):
-        assert key in q
-    assert q["concept_id"] == "pecahan"
-    assert q["difficulty"] == "easy"
-    assert q["type"] == "explain"
-    assert q["question_id"]
+def test_generation_without_real_questions_must_fail() -> None:  # KM-UNIT-055
+    with pytest.raises(ValueError):
+        validate_generated_questions('{"questions": []}', 1, 1)
 
 
 # --------------------------------------------------------------------------- #

@@ -133,7 +133,14 @@ export async function saveUser(
   if (id === admin.id && role !== "admin")
     return { error: "Peran akun Anda sendiri tidak dapat diubah." };
   const body: Record<string, unknown> = { full_name, role };
-  if (!id) {
+  if (id) {
+    const new_password = String(data.get("new_password") ?? "");
+    if (new_password) {
+      if (new_password.length < 8 || new TextEncoder().encode(new_password).length > 72)
+        return { error: "Kata sandi baru minimal 8 karakter dan maksimal 72 byte." };
+      body.new_password = new_password;
+    }
+  } else {
     const username = text(data, "username").toLowerCase(),
       password = String(data.get("password") ?? "");
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username))
@@ -175,4 +182,23 @@ export async function toggleUser(
   }
   revalidatePath("/admin", "layout");
   return { success: "Status akun berhasil diperbarui." };
+}
+
+export async function deleteUser(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const { token, user } = await requireSession("admin");
+  const id = text(data, "id");
+  if (!id || id === user.id)
+    return { error: "Anda tidak dapat menghapus akun administrator Anda sendiri." };
+  try {
+    await backend(`/admin/users/${encodeURIComponent(id)}`, token, {
+      method: "DELETE",
+    });
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath("/admin", "layout");
+  redirect("/admin/pengguna?success=deleted");
 }

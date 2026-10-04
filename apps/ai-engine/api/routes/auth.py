@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.audit_service import record_audit
 from api.dependencies import current_user, db_session
 from api.security import create_access_token, hash_password, verify_password
 from config.settings import settings
@@ -79,6 +80,17 @@ async def register(
 
     await session.refresh(user)
     log.info("Registered %s as %s", user.username, user.role)
+    record_audit(
+        session,
+        action="auth.registered",
+        category="auth",
+        actor=user,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+        details={"role": user.role},
+    )
+    await session.flush()
     return _token_response(user)
 
 
@@ -101,6 +113,14 @@ async def login(
         )
 
     user.last_login_at = datetime.now(UTC)
+    record_audit(
+        session,
+        action="auth.login",
+        category="auth",
+        actor=user,
+        target_type="session",
+        target_name=f"Sesi @{user.username}",
+    )
     await session.flush()
     return _token_response(user)
 
@@ -122,6 +142,15 @@ async def update_me(
         if value is not None:
             setattr(user, field, value)
     session.add(user)
+    record_audit(
+        session,
+        action="auth.profile_updated",
+        category="auth",
+        actor=user,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+    )
     await session.flush()
     return user
 
@@ -140,6 +169,15 @@ async def change_password(
     except ValueError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
     session.add(user)
+    record_audit(
+        session,
+        action="auth.password_changed",
+        category="auth",
+        actor=user,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+    )
     await session.flush()
 
 

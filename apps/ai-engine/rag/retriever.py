@@ -57,7 +57,11 @@ async def retrieve(
         "language": language or settings.DEFAULT_LANGUAGE,
     }
     if class_id or material_id:
-        filters.update(student_id=student_id, class_id=class_id, material_id=material_id)
+        # Response language is a learner preference; the source can be in
+        # another language. Keep the permission scope, regardless of language.
+        filters.update(
+            student_id=student_id, class_id=class_id, material_id=material_id, language=None
+        )
     candidates = await pgvector_store.query(embedding, **filters)
     if not candidates:
         if class_id or material_id:

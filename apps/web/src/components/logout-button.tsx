@@ -7,14 +7,30 @@ import { confirmAction } from "@/lib/dialogs";
 import { useI18n } from "./language-provider";
 import { speechOutput } from "@/lib/browser-speech";
 
-export function LogoutButton({ compact = false }: { compact?: boolean }) {
+export function LogoutButton({
+  compact = false,
+  variant,
+}: {
+  compact?: boolean;
+  variant?: "button" | "compact" | "nav";
+}) {
   const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const busy = useRef(false);
+
+  const isNav = variant === "nav";
+  const isCompact = variant === "compact" || (compact && !variant);
+
+  const buttonClass = isNav
+    ? "admin-nav-item admin-nav-logout"
+    : isCompact
+      ? "icon-button"
+      : "button secondary";
+
   return (
     <button
       type="button"
-      className={compact ? "icon-button" : "button secondary"}
+      className={buttonClass}
       aria-label={t("Keluar dari akun")}
       data-voice-menu="logout"
       disabled={pending}
@@ -26,6 +42,7 @@ export function LogoutButton({ compact = false }: { compact?: boolean }) {
           title: "Yakin ingin keluar?",
           text: "Anda perlu masuk kembali untuk mengakses ruang KODMOD.",
           confirmText: "Ya, keluar",
+          destructive: true,
         });
         if (confirmed)
           startTransition(async () => {
@@ -38,12 +55,12 @@ export function LogoutButton({ compact = false }: { compact?: boolean }) {
         else busy.current = false;
       }}
     >
-      {!compact && t(pending ? "Keluar…" : "Keluar")}
       {pending ? (
-        <LoaderCircle className="spin" size={19} aria-hidden="true" />
+        <LoaderCircle className="spin" size={isNav ? 20 : 19} aria-hidden="true" />
       ) : (
-        <LogOut size={19} aria-hidden="true" />
+        <LogOut size={isNav ? 20 : 19} aria-hidden="true" />
       )}
+      {!isCompact && <span>{t(pending ? "Keluar…" : "Keluar")}</span>}
     </button>
   );
 }

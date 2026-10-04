@@ -108,6 +108,32 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
     indexed_version: m.indexed_version,
   });
   return (req, url, body, user, send) => {
+    if (req.method === "GET" && ["/learning/active", "/quiz/active"].includes(url.pathname)) {
+      send(user.role === "student" ? 200 : 403, user.role === "student" ? [] : {});
+      return true;
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/admin/materials")) {
+      if (user.role !== "admin") { send(403, {}); return true; }
+      const items = materials.map(m => ({ ...metadata(m), class_name: classes.find(c => c.id === m.class_id).name,
+        subject: classes.find(c => c.id === m.class_id).subject, teacher_name: "Ratna Dewi", is_archived: false,
+        teacher_id: "test-teacher", updated_at: m.created_at }));
+      const id = url.pathname.split("/")[3];
+      if (id) {
+        const material = items.find(m => m.id === id);
+        send(material ? 200 : 404, material ? { ...material, content: materials.find(m => m.id === id).content } : {});
+      } else send(200, { items, total: items.length, limit: 25, offset: 0 });
+      return true;
+    }
+    if (req.method === "GET" && url.pathname === "/admin/insights/ai-usage") {
+      send(user.role === "admin" ? 200 : 403, user.role !== "admin" ? {} : {
+        generated_at: "2026-10-04T12:00:00Z", recent_requests: [],
+        elevenlabs: { enabled: true, configured: true, available: false, tier: null, character_count: null,
+          character_limit: null, next_reset_unix: null, tts_model: "eleven_multilingual_v2", tts_voice_id: "fixture", stt_backend: "elevenlabs" },
+        openai: { configured: true, usage_available: false, total_tokens: null, prompt_tokens: null, completion_tokens: null,
+          models: { tutor: "gpt-6-luna", router: "gpt-6-luna", quiz: "gpt-6-luna", embedding: "fixture" } },
+      });
+      return true;
+    }
     if (
       url.pathname === "/admin/insights/overview" ||
       url.pathname === "/admin/activity"
@@ -127,19 +153,35 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
           },
         });
       } else if (url.pathname === "/admin/activity" && req.method === "GET") {
+        const category = url.searchParams.get("category");
+        const allItems = [
+          {
+            id: "activity-1",
+            type: "learning_session",
+            category: "learning",
+            action: "session.ended",
+            actor_name: "Siswa Uji",
+            actor_role: "student",
+            target_name: "Memahami pecahan",
+            occurred_at: "2026-09-22T00:00:00Z",
+          },
+          {
+            id: "audit-1",
+            type: "audit_event",
+            category: "account",
+            action: "user.created",
+            actor_name: "Admin Uji",
+            actor_role: "admin",
+            target_name: "Guru Baru (@guru_baru)",
+            details: { role: "teacher" },
+            occurred_at: "2026-09-22T01:00:00Z",
+          },
+        ];
+        const filtered = category ? allItems.filter((i) => i.category === category) : allItems;
         send(200, {
-          items: [
-            {
-              id: "activity-1",
-              type: "learning_session",
-              action: "session.ended",
-              actor_name: "Siswa Uji",
-              actor_role: "student",
-              target_name: "Memahami pecahan",
-              occurred_at: "2026-09-22T00:00:00Z",
-            },
-          ],
+          items: filtered,
           limit: Number(url.searchParams.get("limit") || 30),
+          category: category || null,
           generated_at: "2026-09-22T00:00:00Z",
         });
       } else {
@@ -461,7 +503,10 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
       ...c,
       material_count: materials.filter((m) => m.class_id === c.id).length,
     });
-    if (url.pathname === "/classes/student/materials" && req.method === "GET") {
+    if (url.pathname === "/classes/teacher/materials" && req.method === "GET") {
+      send(user.role === "teacher" ? 200 : 403, user.role !== "teacher" ? {} : materials.map(m => ({ ...metadata(m),
+        class_name: classes.find(c => c.id === m.class_id).name, subject: classes.find(c => c.id === m.class_id).subject, is_archived: false })));
+    } else if (url.pathname === "/classes/student/materials" && req.method === "GET") {
       send(
         user.role === "student" ? 200 : 403,
         user.role !== "student"

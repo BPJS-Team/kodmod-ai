@@ -15,7 +15,7 @@ import { notFound } from "next/navigation";
 import { editorialBackend, editorialData } from "@/lib/editorial-server";
 import { backend } from "@/lib/server-api";
 import { requireSession } from "@/lib/session";
-import type { Classroom } from "@/lib/class-types";
+import type { Classroom, TeacherMaterial } from "@/lib/class-types";
 import {
   availabilityLabel,
   quizState,
@@ -147,13 +147,14 @@ export async function TeacherQuizIndex({ page: raw }: { page?: string }) {
 
 export async function TeacherQuizEditor({ id }: { id?: string }) {
   const { token, user } = await requireSession("teacher");
-  const [draft, subjects, classes, reviewers] = await Promise.all([
+  const [draft, subjects, classes, reviewers, materials] = await Promise.all([
     id
       ? editorialData<QuizDraft>(`/teacher/quizzes/${id}`, "teacher")
       : Promise.resolve(null),
     backend<Subject[]>("/subjects", token),
     backend<Classroom[]>("/classes", token),
     editorialBackend<Reviewer[]>("/quiz-reviewers", token),
+    backend<TeacherMaterial[]>("/classes/teacher/materials", token),
   ]);
   if (draft && draft.teacher_id !== user.id) notFound();
   return (
@@ -174,6 +175,7 @@ export async function TeacherQuizEditor({ id }: { id?: string }) {
         subjects={subjects}
         classes={classes}
         reviewers={reviewers}
+        materials={materials}
       />
     </>
   );

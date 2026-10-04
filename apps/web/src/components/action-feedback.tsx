@@ -53,6 +53,7 @@ const messages: Record<string, string> = {
     "Akun berhasil dibuat. Selamat memulai perjalanan bersama KODMOD.",
   "signed-out": "Anda sudah keluar dari akun dengan aman.",
   saved: "Data pengguna berhasil disimpan.",
+  deleted: "Akun pengguna berhasil dihapus.",
 };
 
 export function RedirectFeedback() {

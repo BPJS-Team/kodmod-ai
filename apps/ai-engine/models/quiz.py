@@ -6,14 +6,25 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class QuizStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     concept_id: uuid.UUID | None = None
+    class_id: uuid.UUID | None = None
+    material_id: uuid.UUID | None = None
     n_questions: int = Field(default=5, ge=1, le=20)
     difficulty: Literal["easy", "medium", "hard"] | None = None
     language: Literal["id", "en"] = "id"
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if bool(self.class_id) != bool(self.material_id):
+            raise ValueError("Pilih kelas dan materi bersama.")
+        if self.class_id and self.concept_id:
+            raise ValueError("Konsep kurikulum dan materi kelas adalah pilihan berbeda.")
+        return self
 
 
 class QuizQuestionOut(BaseModel):
@@ -52,6 +63,21 @@ class QuizSubmitResponse(BaseModel):
     quiz_complete: bool = False
     final_summary: str | None = None
     cumulative_score: float = 0.0
+
+
+class QuizRecoveryResponse(BaseModel):
+    quiz_session_id: uuid.UUID
+    kind: Literal["assessment", "tutor"] = "assessment"
+    status: Literal["in_progress", "completed"]
+    class_id: uuid.UUID | None = None
+    material_id: uuid.UUID | None = None
+    material_title: str | None = None
+    language: Literal["id", "en"] = "id"
+    total_questions: int
+    answered_questions: int
+    current_question: QuizQuestionOut | None = None
+    last_result: QuizSubmitResponse | None = None
+    started_at: datetime
 
 
 class QuizSessionOut(BaseModel):

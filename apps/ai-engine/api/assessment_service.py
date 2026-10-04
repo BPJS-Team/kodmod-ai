@@ -18,8 +18,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics.student_model import StudentModel
+from api.material_service import resolve_tutoring_context
 from database.models import (
     AssessmentSubmission,
+    ClassMaterial,
     Concept,
     MasteryEvent,
     MasteryScore,
@@ -31,6 +33,7 @@ from database.models import (
 from graphs.state import build_learning_profile, initial_state
 from models.quiz import (
     QuizQuestionOut,
+    QuizRecoveryResponse,
     QuizStartRequest,
     QuizStartResponse,
     QuizSubmitRequest,
@@ -56,6 +59,9 @@ STATE_KEYS = (
     "subject_id",
     "class_id",
     "material_id",
+    "material_version",
+    "assessment_kind",
+    "quiz_source_docs",
     "tutoring_context",
     "retrieved_docs",
     "mastery_scores",
@@ -129,22 +135,30 @@ async def invoke(graph, state: dict, sid: uuid.UUID) -> dict:
 
 
 async def start_assessment(
-    session: AsyncSession, graph, student: User, body: QuizStartRequest
+    session: AsyncSession, graph, student: User, body: QuizStartRequest,
+    *, kind: str = "assessment", source_docs: list[dict] | None = None,
 ) -> QuizStartResponse:
+    context = await resolve_tutoring_context(session, body.class_id, body.material_id, student)
+    material = await session.get(ClassMaterial, body.material_id) if body.material_id else None
     concept = await session.get(Concept, body.concept_id) if body.concept_id else None
     if body.concept_id and concept is None:
         raise HTTPException(404, "Konsep tidak ditemukan.")
     sid = uuid.uuid4()
     state = initial_state(
-        str(sid), str(student.id), subject_id=str(concept.subject_id) if concept else None
+        str(sid), str(student.id), subject_id=str(concept.subject_id) if concept else None,
+        class_id=str(body.class_id) if body.class_id else None,
+        material_id=str(body.material_id) if body.material_id else None,
     )
     model, _ = await load_model(session, student.id)
     state.update(
         assessment_managed=True,
+        assessment_kind=kind,
+        material_version=material.content_version if material else None,
+        quiz_source_docs=copy.deepcopy(source_docs or []),
         intent="quiz",
         quiz_n_questions=body.n_questions,
         current_concept_id=str(concept.id) if concept else "",
-        current_topic=concept.name if concept else "",
+        current_topic=context["material_title"] if context else concept.name if concept else "",
         current_difficulty=body.difficulty or "medium",
         detected_language=body.language,
         mastery_scores=dict(model._scores),
@@ -153,12 +167,12 @@ async def start_assessment(
     )
     final = await invoke(graph, state, sid)
     questions = copy.deepcopy(final.get("quiz_questions", []))
-    if not questions or len(questions) > 20:
+    if len(questions) != body.n_questions:
         raise ValueError("Graph did not generate a valid quiz")
     for question in questions:
         question["question_id"] = str(as_uuid(question.get("question_id")) or uuid.uuid4())
         cid = as_uuid(question.get("concept_id"))
-        question["concept_id"] = str(cid) if cid and await session.get(Concept, cid) else ""
+        question["concept_id"] = str(cid) if not context and cid and await session.get(Concept, cid) else ""
     final.update(
         quiz_questions=questions,
         quiz_question=questions[0],
@@ -201,6 +215,66 @@ async def start_assessment(
     )
 
 
+async def validate_assessment_source(session: AsyncSession, owned: QuizSession, student: User):
+    canonical = owned.assessment_state or {}
+    if canonical.get("class_id") or canonical.get("material_id"):
+        await resolve_tutoring_context(
+            session, as_uuid(canonical.get("class_id")), as_uuid(canonical.get("material_id")), student
+        )
+        material = await session.get(ClassMaterial, as_uuid(canonical.get("material_id")))
+        if material is None or canonical.get("material_version") != material.content_version:
+            raise HTTPException(409, "Materi kuis sudah berubah. Minta guru meninjau sesi ini.")
+
+
+async def recover_assessment(
+    session: AsyncSession, student: User, sid: uuid.UUID
+) -> QuizRecoveryResponse:
+    owned = await session.scalar(
+        select(QuizSession).where(QuizSession.id == sid, QuizSession.student_id == student.id)
+    )
+    if owned is None:
+        raise HTTPException(404, "Sesi kuis tidak ditemukan.")
+    if not owned.assessment_state:
+        raise HTTPException(409, "Sesi lama belum mendukung pemulihan. Mulai latihan baru.")
+    await validate_assessment_source(session, owned, student)
+    state = owned.assessment_state
+    index = int(state.get("current_question_index", 0))
+    questions = state.get("quiz_questions", [])
+    receipt = await session.scalar(
+        select(AssessmentSubmission).where(AssessmentSubmission.quiz_session_id == sid)
+        .order_by(AssessmentSubmission.attempt_index.desc()).limit(1)
+    )
+    return QuizRecoveryResponse(
+        quiz_session_id=sid, kind=state.get("assessment_kind", "assessment"),
+        status=owned.status, class_id=state.get("class_id"), material_id=state.get("material_id"),
+        material_title=state.get("current_topic") or None,
+        language=state.get("detected_language", "id"), total_questions=owned.total_questions,
+        answered_questions=min(index, owned.total_questions),
+        current_question=question_out(questions[index], index)
+        if owned.status == "in_progress" and index < len(questions) else None,
+        last_result=QuizSubmitResponse.model_validate(receipt.response_payload) if receipt else None,
+        started_at=owned.started_at,
+    )
+
+
+async def active_assessments(session: AsyncSession, student: User, *, kind="assessment"):
+    rows = (await session.scalars(
+        select(QuizSession).where(QuizSession.student_id == student.id,
+                                  QuizSession.status == "in_progress")
+        .order_by(QuizSession.started_at.desc()).limit(50)
+    )).all()
+    result = []
+    for row in rows:
+        if not row.assessment_state or row.assessment_state.get("assessment_kind", "assessment") != kind:
+            continue
+        try:
+            result.append(await recover_assessment(session, student, row.id))
+        except HTTPException as exc:
+            if exc.status_code not in (404, 409):
+                raise
+    return result
+
+
 async def submit_assessment(
     session: AsyncSession, graph, student: User, body: QuizSubmitRequest
 ) -> QuizSubmitResponse:
@@ -214,6 +288,7 @@ async def submit_assessment(
     )
     if owned is None:
         raise HTTPException(404, "Sesi kuis tidak ditemukan.")
+    await validate_assessment_source(session, owned, student)
     fingerprint = hashlib.sha256(
         json.dumps(
             body.model_dump(mode="json", exclude={"submission_id"}),

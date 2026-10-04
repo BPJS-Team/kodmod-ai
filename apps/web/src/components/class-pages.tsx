@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   BookOpen,
+  CheckCircle2,
   Layers3,
   Plus,
   Users,
@@ -17,6 +18,7 @@ import type {
   ClassDetail,
   LearningRole,
   Material,
+  StudentMaterial,
 } from "@/lib/class-types";
 import { Badge, Empty, Heading } from "./ui";
 import { ClassAction, MaterialForm } from "./class-forms";
@@ -86,16 +88,22 @@ export async function ClassIndex({
   role: LearningRole;
   dashboard?: boolean;
 }) {
-  const [{ user }, rows] = await Promise.all([
+  const teacher = role === "teacher";
+  const [{ user }, rows, studentMaterials] = await Promise.all([
     requireSession(role),
     classroomData<Classroom[]>(role),
+    !teacher && dashboard
+      ? classroomData<StudentMaterial[]>("student", "/student/materials")
+      : Promise.resolve([]),
   ]);
   const active = rows.filter((row) => !row.is_archived);
-  const teacher = role === "teacher";
+  const completedMaterialsCount = studentMaterials.filter(
+    (m) => m.progress?.completed,
+  ).length;
   return (
     <>
       <Heading
-        title={dashboard ? <><UiText>{"Halo, "}</UiText> {user.full_name}.</> : <UiText>{"Kelas saya"}</UiText>}
+        title={dashboard ? <><UiText>{"Halo, "}</UiText> {user.full_name}.</> : <UiText>{"Kelas"}</UiText>}
         description={
           dashboard
             ? teacher
@@ -142,11 +150,11 @@ export async function ClassIndex({
                 icon: BookOpen,
               },
               {
-                title: teacher ? "Keanggotaan siswa" : "Username Anda",
+                title: teacher ? "Keanggotaan siswa" : "Materi selesai",
                 value: teacher
                   ? active.reduce((sum, row) => sum + row.member_count, 0)
-                  : `@${user.username}`,
-                icon: Users,
+                  : completedMaterialsCount,
+                icon: teacher ? Users : CheckCircle2,
               },
             ].map(({ title, value, icon: Icon }) => (
               <div className="panel learning-stat" key={title}>
@@ -218,7 +226,7 @@ export async function ClassRoom({
                 className="button primary"
                 href={`/guru/kelas/${id}/materi/baru`}
               >
-                <Plus size={16} aria-hidden="true" /><UiText>{"Tambah materi"}</UiText></Link>
+                <Plus size={16} aria-hidden="true" /><UiText>{"Upload materi"}</UiText></Link>
             )}
           </div>
           {row.materials.length ? (

@@ -62,6 +62,16 @@ Untuk username berbeda, jalankan perintah lengkap berikut:
 
 Password diminta di terminal dan tidak ditulis pada command. Script ini juga mereset password jika username tersebut sudah merupakan admin; gunakan username yang dimaksud. Setelah itu buka `/masuk`.
 
+### Akun demo opsional
+
+Untuk pengujian lokal, jalankan dari PowerShell:
+
+```powershell
+pwsh -NoProfile -File F:\Docker_Centre\kodmod\docker.ps1 demo-users
+```
+
+Seeder membuat atau mereset password untuk `siswa.demo` (student), `guru.demo` (teacher), dan `admin.demo` (admin) menjadi `password`. Menjalankan ulang menjaga ketiga akun demo tetap bisa dipakai dengan kredensial yang sama. Seeder tidak mengubah pengguna lain, termasuk `baysatriow`. Password ini hanya untuk database pengujian lokal; jangan gunakan pada database produksi atau saat membagikan tunnel publik.
+
 ## VPS Linux
 
 Konfigurasi utama: `infra/docker/docker-compose.prod.yml`. Entry lama `apps/ai-engine/docker/docker-compose.prod.yml` hanya meneruskan ke konfigurasi tersebut.

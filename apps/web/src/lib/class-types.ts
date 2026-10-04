@@ -44,3 +44,10 @@ export type ClassDetail = Classroom & {
     is_active: boolean;
   }[];
 };
+
+export type TeacherMaterial = Material & {
+  class_id: string;
+  class_name: string;
+  subject: string;
+  is_archived: boolean;
+};
