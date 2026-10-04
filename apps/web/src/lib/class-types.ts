@@ -19,6 +19,7 @@ export type Material = {
   created_at: string;
   content?: string;
   source_filename?: string | null;
+  source_import_id?: string | null;
   rag_status?: "pending" | "processing" | "ready" | "failed";
   rag_error?: string | null;
   n_chunks?: number;

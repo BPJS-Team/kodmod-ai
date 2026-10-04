@@ -2,7 +2,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 const origin = process.env.WEB_TEST_ORIGIN || "http://127.0.0.1:3110";
-const api = process.env.API_FIXTURE_ORIGIN || "http://127.0.0.1:8109";
+const api = process.env.API_FIXTURE_ORIGIN || "http://127.0.0.1:8119";
 const classId = "10000000-0000-4000-8000-000000000001";
 const materialId = "20000000-0000-4000-8000-000000000001";
 const headers = (role = "student") => ({ Cookie: `kodmod_session=fixture-test-${role}` });
@@ -18,10 +18,10 @@ test("material import proxy authenticates before reading uploads and preserves r
   const data = new FormData();
   data.set("file", new File(["Pecahan adalah bagian dari keseluruhan."], "pecahan.txt", { type: "text/plain" }));
   const imported = await fetch(origin + path, { method: "POST", headers: headers("teacher"), body: data });
-  assert.equal(imported.status, 200);
+  assert.equal(imported.status, 202);
   const preview = await imported.json();
   assert.equal(preview.filename, "pecahan.txt");
-  assert.match(preview.content, /Pecahan/);
+  assert.match(preview.preview.content, /Pecahan/);
   const library = await fetch(`${api}/classes/student/materials`, { headers: { Authorization: "Bearer fixture-test-student" } });
   assert.equal((await library.json()).length, 3, "Import preview must not publish or save a material.");
 });

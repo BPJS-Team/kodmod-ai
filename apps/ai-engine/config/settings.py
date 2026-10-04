@@ -188,6 +188,10 @@ class Settings(BaseSettings):
     # --------------------------------------------------------- file uploads
     UPLOAD_DIR: Path = Path("./data/uploads")
     MAX_UPLOAD_MB: int = 25
+    OCR_LANGUAGES: str = "ind+eng"
+    OCR_PAGE_TIMEOUT: int = Field(default=45, ge=5, le=120)
+    OCR_MAX_PIXELS: int = Field(default=16_000_000, ge=1_000_000, le=30_000_000)
+    JOB_LEASE_SECONDS: int = Field(default=120, ge=30, le=600)
 
     @property
     def MAX_UPLOAD_BYTES(self) -> int:  # noqa: N802

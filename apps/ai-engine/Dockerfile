@@ -68,6 +68,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
     tini \
+    tesseract-ocr \
+    tesseract-ocr-ind \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -u ${APP_UID} -m -s /bin/bash ${APP_USER}
 

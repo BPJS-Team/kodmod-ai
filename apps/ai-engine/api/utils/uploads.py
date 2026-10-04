@@ -47,7 +47,7 @@ def validate_suffix(filename: str | None) -> str:
     return suffix
 
 
-async def save_upload(upload_file, dest_dir: Path | None = None) -> Path:
+async def save_upload(upload_file, dest_dir: Path | None = None, *, allowed_suffixes=None) -> Path:
     """
     Stream a Starlette/FastAPI UploadFile to disk and return the stored path.
 
@@ -57,7 +57,11 @@ async def save_upload(upload_file, dest_dir: Path | None = None) -> Path:
         415 if the extension is not allowed, 413 if the body exceeds
         `settings.MAX_UPLOAD_MB`.
     """
-    suffix = validate_suffix(getattr(upload_file, "filename", None))
+    suffix = Path(getattr(upload_file, "filename", None) or "").suffix.lower()
+    if allowed_suffixes is None:
+        suffix = validate_suffix(getattr(upload_file, "filename", None))
+    elif suffix not in allowed_suffixes:
+        raise HTTPException(415, "Gunakan berkas PDF, DOCX, Markdown atau TXT.")
 
     dest = dest_dir or settings.UPLOAD_DIR
     dest.mkdir(parents=True, exist_ok=True)

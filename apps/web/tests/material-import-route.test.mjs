@@ -24,6 +24,7 @@ const hooks = registerHooks({
   },
 });
 const { POST } = await import("../src/app/api/classes/[classId]/materials/import/route.ts");
+const importDetail = await import("../src/app/api/classes/[classId]/imports/[...path]/route.ts");
 hooks.deregister();
 const params = { params: Promise.resolve({ classId: "10000000-0000-4000-8000-000000000001" }) };
 function request(first, last) {
@@ -48,14 +49,31 @@ test("proxy forwards only teacher document and selected page boundaries", async 
   boundary.current = { token: "test-token", user: { role: "teacher" } };
   globalThis.fetch = async (url, options) => {
     boundary.calls.push([url, options]);
-    return Response.json({ content: "Reviewed page", preview_type: "material" });
+    return Response.json({ import_id: "20000000-0000-4000-8000-000000000001", state: "pending" }, { status: 202 });
   };
   const response = await POST(request("12", "23"), params);
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 202);
   const payload = boundary.calls.at(-1)[1].body;
   assert.equal(payload.get("first_page"), "12"); assert.equal(payload.get("last_page"), "23");
   assert.equal(payload.get("file").name, "buku.pdf");
   assert.equal(payload.has("published"), false); assert.equal(payload.has("teacher_id"), false);
+});
+
+test("durable import access rejects students and unknown paths and streams originals privately", async () => {
+  const context = path => ({ params: Promise.resolve({ classId: "10000000-0000-4000-8000-000000000001", path }) });
+  const id = "20000000-0000-4000-8000-000000000001";
+  boundary.current = { token: "test-token", user: { role: "student" } };
+  assert.equal((await importDetail.GET(new Request("http://localhost"), context([id]))).status, 403);
+  boundary.current = { token: "test-token", user: { role: "teacher" } };
+  assert.equal((await importDetail.GET(new Request("http://localhost"), context([id, "..", "auth"]))).status, 404);
+  globalThis.fetch = async (url, options) => {
+    assert.match(url, new RegExp(`/imports/${id}/original$`));
+    assert.equal(options.headers.Authorization, "Bearer test-token");
+    return new Response("private-original", { headers: { "Content-Disposition": "attachment; filename=book.pdf" } });
+  };
+  const response = await importDetail.GET(new Request("http://localhost"), context([id, "original"]));
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal(await response.text(), "private-original");
 });
 
 test("invalid ranges are rejected before any upstream import", async () => {

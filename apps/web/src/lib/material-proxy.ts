@@ -9,14 +9,18 @@ export async function teacherMaterialSession() {
   return current;
 }
 
-export async function forwardMaterial(current: Exclude<Awaited<ReturnType<typeof teacherMaterialSession>>, NextResponse>, path: string, body?: FormData) {
+export async function forwardMaterial(current: Exclude<Awaited<ReturnType<typeof teacherMaterialSession>>, NextResponse>, path: string, body?: FormData | string, options: { method?: "GET" | "POST"; download?: boolean } = {}) {
   try {
     const origin = (process.env.API_ORIGIN || "http://127.0.0.1:8109").replace(/\/$/, "");
     const response = await fetch(`${origin}${path}`, {
-      method: "POST", body, cache: "no-store", redirect: "error",
-      headers: { Authorization: `Bearer ${current.token}`, Accept: "application/json" },
+      method: options.method ?? "POST", body, cache: "no-store", redirect: "error",
+      headers: { Authorization: `Bearer ${current.token}`, Accept: "application/json", ...(typeof body === "string" ? { "Content-Type": "application/json" } : {}) },
       signal: AbortSignal.timeout(60_000),
     });
+    if (options.download && response.ok) return new Response(response.body, { headers: {
+      "Content-Type": "application/octet-stream", "Content-Disposition": response.headers.get("Content-Disposition") ?? "attachment",
+      "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+    } });
     const data = await response.json().catch(() => null);
     if (!response.ok) {
       const messages: Record<number, string> = {

@@ -44,6 +44,7 @@ async def learning_http(monkeypatch):
         "classrooms",
         "enrollments",
         "class_materials",
+        "material_imports", "background_jobs",
         "class_activities",
         "audit_events",
         "subjects",
@@ -162,7 +163,9 @@ async def learning_http(monkeypatch):
     async def index(*args):
         pass
 
-    monkeypatch.setattr(admin_materials, "index_class_material", index)
+    async def queued(session, material, **kwargs):
+        return None
+    monkeypatch.setattr(admin_materials, "enqueue_material", queued)
     async def unavailable_quota():
         return {"configured": True, "available": False}
     monkeypatch.setattr(admin_insights, "get_subscription_info", unavailable_quota)

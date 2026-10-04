@@ -169,6 +169,9 @@ class ClassMaterial(Base):
     content: Mapped[str] = mapped_column(Text)
     published: Mapped[bool] = mapped_column(Boolean, default=False)
     source_filename: Mapped[str | None] = mapped_column(String(300))
+    source_import_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("material_imports.id", ondelete="RESTRICT")
+    )
     rag_status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
     rag_error: Mapped[str | None] = mapped_column(Text)
     content_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
@@ -177,6 +180,42 @@ class ClassMaterial(Base):
     indexed_mapping_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     n_chunks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class MaterialImport(Base):
+    __tablename__ = "material_imports"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    class_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="CASCADE"), index=True)
+    uploaded_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
+    filename: Mapped[str] = mapped_column(String(300))
+    stored_path: Mapped[str] = mapped_column(String(1000))
+    sha256: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BackgroundJob(Base):
+    __tablename__ = "background_jobs"
+    __table_args__ = (
+        CheckConstraint("state IN ('pending','running','retry','complete','failed')", name="ck_background_jobs_state"),
+        Index("ix_background_jobs_claim", "state", "available_at", "lease_expires_at"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(40))
+    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    result: Mapped[dict | None] = mapped_column(JSON)
+    state: Mapped[str] = mapped_column(String(20), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    lease_token: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    error_message: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
 class MaterialProgress(Base):

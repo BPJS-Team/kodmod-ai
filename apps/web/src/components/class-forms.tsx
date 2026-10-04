@@ -10,6 +10,8 @@ import type { Material } from "@/lib/class-types";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
 import { materialTutorStatus, validateMaterialFile, parseMaterialPageRange, type MaterialSection } from "@/lib/material-flow.mjs";
 import type { CurriculumSubject } from "@/lib/concept-types";
+import type { MaterialImportRecord } from "@/lib/import-types";
+import { MaterialImportHistory } from "./material-import-history";
 
 export function ClassForm({ subjects = [] }: { subjects?: CurriculumSubject[] }) {
   const { t } = useI18n();
@@ -151,9 +153,11 @@ export function MaterialForm({
   const [published, setPublished] = useState(material?.published || false);
   const [importing, setImporting] = useState(false);
   const [sourceFilename, setSourceFilename] = useState(material?.source_filename || "");
+  const [sourceImportId, setSourceImportId] = useState(material?.source_import_id || "");
+  const [importRefresh, setImportRefresh] = useState(0);
   const [importNotice, setImportNotice] = useState("");
   const [importError, setImportError] = useState("");
-  const [book, setBook] = useState<{ file: File; totalPages: number; sections: MaterialSection[] } | null>(null);
+  const [book, setBook] = useState<{ importId: string; filename: string; totalPages: number; sections: MaterialSection[] } | null>(null);
   const [pageRange, setPageRange] = useState({ first: "1", last: "30" });
   const [sectionChoice, setSectionChoice] = useState("");
   const [indexing, setIndexing] = useState(false);
@@ -190,11 +194,38 @@ export function MaterialForm({
         body.set("first_page", String(selection.first)); body.set("last_page", String(selection.last));
       }
       const response = await fetch(`/api/classes/${encodeURIComponent(classId)}/materials/import`, { method: "POST", body });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Dokumen belum dapat dibaca.");
+      const receipt = await response.json();
+      if (!response.ok) throw new Error(receipt.message || "Dokumen belum dapat dibaca.");
+      setImportRefresh(value => value + 1);
+      await waitForPreview(receipt);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Dokumen belum dapat dibaca.";
+      setImportError(message);
+      await notifyResult(message, true);
+    } finally { setImporting(false); }
+  }
+
+  async function waitForPreview(receipt: MaterialImportRecord) {
+    let record = receipt;
+    for (let attempt = 0; attempt < 8 && record.state !== "complete"; attempt++) {
+      if (record.state === "failed") throw new Error("Dokumen belum dapat dibaca. Gunakan Proses ulang pada dokumen tersimpan.");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`/api/classes/${classId}/imports/${record.import_id}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Status dokumen belum dapat dibuka.");
+      record = await response.json();
+    }
+    setImportRefresh(value => value + 1);
+    if (record.state === "complete") await applyPreview(record);
+    else setImportNotice(t("Dokumen sedang diproses. Anda boleh meninggalkan halaman ini dan melanjutkan dari Dokumen tersimpan."));
+  }
+
+  async function applyPreview(record: MaterialImportRecord) {
+      const result = record.preview;
+      if (!result) throw new Error("Dokumen belum dapat dibaca.");
+      const selection = result.page_range;
       if (result.preview_type === "book") {
         const sections = Array.isArray(result.sections) ? result.sections as MaterialSection[] : [];
-        setBook({ file, totalPages: result.total_pages, sections });
+        setBook({ importId: record.import_id, filename: record.filename, totalPages: result.total_pages ?? 0, sections });
         const first = sections[0]?.first ?? 1, last = Math.min(sections[0]?.last ?? 30, first + 149);
         setPageRange({ first: String(first), last: String(last) }); setSectionChoice(sections.length ? "0" : "");
         setImportNotice(t("Pilih bab atau halaman yang ingin dijadikan materi. Isi editor belum berubah."));
@@ -203,22 +234,18 @@ export function MaterialForm({
       if (typeof result.content !== "string" || !result.content.trim() || result.content.length > 100000) throw new Error("Teks dokumen harus berisi 1 sampai 100.000 karakter.");
       if (content.trim() && !(await confirmAction({ title: "Ganti isi editor dengan dokumen?", text: "Isi editor saat ini akan diganti dengan hasil pembacaan dokumen. Perubahan baru tersimpan setelah Anda menekan Simpan materi.", confirmText: "Ya, gunakan dokumen" }))) return;
       setContent(result.content);
+      setSourceImportId(record.import_id);
       if (!title.trim()) {
         const chapter = selection && book?.sections[Number(sectionChoice)];
         setTitle(chapter && chapter.first === selection.first && chapter.last === selection.last ? chapter.title
-          : `${typeof result.title === "string" ? result.title.slice(0, 170) : file.name.replace(/\.[^.]+$/, "")}${selection ? ` · ${t("Halaman {first}–{last}", selection)}` : ""}`);
+          : `${typeof result.title === "string" ? result.title.slice(0, 170) : record.filename.replace(/\.[^.]+$/, "")}${selection ? ` · ${t("Halaman {first}–{last}", selection)}` : ""}`);
       }
-      const source = typeof result.filename === "string" ? result.filename : file.name;
+      const source = typeof result.filename === "string" ? result.filename : record.filename;
       setSourceFilename(`${source}${selection ? ` · ${t("Halaman {first}–{last}", selection)}` : ""}`.slice(0, 300));
       if (!selection) setBook(null);
       const warnings = Array.isArray(result.warnings) ? result.warnings.filter((item: unknown) => typeof item === "string").join(" ") : "";
       setImportNotice(`${t("Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.")}${warnings ? ` ${warnings}` : ""}`);
       await notifyResult("Dokumen siap ditinjau di editor.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Dokumen belum dapat dibaca.";
-      setImportError(message);
-      await notifyResult(message, true);
-    } finally { setImporting(false); }
   }
 
   async function importPages() {
@@ -226,8 +253,14 @@ export function MaterialForm({
     try {
       const selection = parseMaterialPageRange(pageRange.first, pageRange.last);
       if (!selection || selection.last > book.totalPages) throw new Error(t("Pilihan halaman tidak valid."));
-      await importFile(book.file, selection);
+      if (!(await confirmAction({ title: "Baca halaman terpilih?", text: "Halaman ini akan dibaca dari dokumen yang tersimpan.", confirmText: "Baca halaman" }))) return;
+      setImporting(true);
+      const response = await fetch(`/api/classes/${classId}/imports/${book.importId}/pages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ first_page: selection.first, last_page: selection.last }) });
+      const receipt = await response.json();
+      if (!response.ok) throw new Error(receipt.message || "Pilihan halaman tidak valid.");
+      await waitForPreview(receipt);
     } catch (error) { setImportError(error instanceof Error ? error.message : "Pilihan halaman tidak valid."); }
+    finally { setImporting(false); setImportRefresh(value => value + 1); }
   }
 
   async function retryIndex() {
@@ -250,6 +283,7 @@ export function MaterialForm({
     >
       <ActionFeedback state={state} />
       <input type="hidden" name="source_filename" value={sourceFilename} />
+      <input type="hidden" name="source_import_id" value={sourceImportId} />
       {material && tutorStatus && (
         <section className={`material-ai-status ${material.rag_status === "failed" ? "failed" : ""}`} aria-label={t("Kesiapan materi untuk Tutor")}>
           <div>
@@ -286,11 +320,11 @@ export function MaterialForm({
             if (file) void importFile(file);
           }}
         />
-        <small><UiText>{"PDF dengan teks, DOCX, Markdown, atau TXT. Maksimal 25 MB. PDF hasil scan perlu diubah menjadi teks terlebih dahulu."}</UiText></small>
+        <small><UiText>{"PDF, termasuk hasil scan, DOCX, Markdown, atau TXT. Maksimal 25 MB. Tinjau hasil pembacaan sebelum menyimpan."}</UiText></small>
         </label>
         {book && <fieldset className="book-import-picker" disabled={importing || pending}>
           <legend>{t("Pilih bagian buku")}</legend>
-          <p>{book.file.name} · {t("{count} halaman", { count: book.totalPages })}</p>
+          <p>{book.filename} · {t("{count} halaman", { count: book.totalPages })}</p>
           <label className="field">{t("Saran pembagian")}
             <select value={sectionChoice} onChange={event => {
               const next = event.target.value; setSectionChoice(next);
@@ -320,6 +354,7 @@ export function MaterialForm({
         {importNotice && <p className="material-import-notice" role="status">{importNotice}</p>}
         {importError && <p className="alert error-message" role="alert">{t(importError)}</p>}
       </section>
+      <MaterialImportHistory classId={classId} refreshKey={importRefresh} onPreview={applyPreview} />
       <label className="field"><UiText>{"Isi materi"}</UiText><textarea
           className="material-editor"
           required

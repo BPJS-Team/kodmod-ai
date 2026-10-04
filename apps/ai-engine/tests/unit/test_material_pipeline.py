@@ -18,6 +18,17 @@ pytestmark = pytest.mark.unit
 
 
 class MaterialImportTest(classroom_test.ClassroomRoutesTest):
+    async def completed_preview(self, cid, response):
+        from api import durable_jobs, material_worker
+        self.assertEqual(response.status_code, 202, response.text)
+        iid = response.json()["import_id"]
+        with patch.object(durable_jobs, "async_session", self.sessions), patch.object(material_worker, "async_session", self.sessions):
+            job = await durable_jobs.claim()
+            self.assertIsNotNone(job)
+            await material_worker.run_job(job)
+        result = (await self.client.get(f"/classes/{cid}/imports/{iid}")).json()
+        return result
+
     async def test_pdf_text_can_be_reviewed_and_scan_only_pdf_is_rejected(self):
         from pypdf import PdfWriter
         from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
@@ -43,8 +54,8 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
         response = await self.client.post(
             f"/classes/{cid}/materials/import", files={"file": ("buku.pdf", data.getvalue())}
         )
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertIn("Pecahan senilai", response.json()["content"])
+        preview = await self.completed_preview(cid, response)
+        self.assertIn("Pecahan senilai", preview["preview"]["content"])
         scan = PdfWriter()
         scan.add_blank_page(width=300, height=300)
         data = io.BytesIO()
@@ -52,8 +63,11 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
         response = await self.client.post(
             f"/classes/{cid}/materials/import", files={"file": ("scan.pdf", data.getvalue())}
         )
-        self.assertEqual(response.status_code, 422)
-        self.assertIn("OCR", response.json()["detail"])
+        from api import pdf_ocr
+        with patch.object(pdf_ocr, "recognize_page", return_value={"text": "Teks scan sudah dibaca", "confidence": 91}):
+            preview = await self.completed_preview(cid, response)
+        self.assertEqual(preview["state"], "complete")
+        self.assertEqual(preview["preview"]["pages"][0]["method"], "ocr")
 
     async def test_import_rejects_oversize_and_xml_entities(self):
         from config.settings import settings
@@ -73,7 +87,8 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
         response = await self.client.post(
             f"/classes/{cid}/materials/import", files={"file": ("unsafe.docx", data.getvalue())}
         )
-        self.assertEqual(response.status_code, 422)
+        preview = await self.completed_preview(cid, response)
+        self.assertEqual(preview["state"], "retry")
 
     async def test_retrieval_enforces_enrollment_publication_and_revision(self):
         from rag.stores import pgvector_store
@@ -314,13 +329,37 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
                 "file": ("pecahan.txt", b"Satu per dua sama dengan dua per empat.", "text/plain")
             },
         )
-        self.assertEqual(response.status_code, 200, response.text)
+        preview = await self.completed_preview(cid, response)
         self.assertEqual(response.json()["filename"], "pecahan.txt")
-        self.assertIn("Satu per dua", response.json()["content"])
+        self.assertIn("Satu per dua", preview["preview"]["content"])
         async with self.sessions() as session:
             self.assertEqual(
                 await session.scalar(select(func.count()).select_from(ClassMaterial)), 0
             )
+
+    async def test_saved_original_is_private_and_reviewed_source_cannot_cross_classes(self):
+        cid = await self.create_class()
+        uploaded = await self.client.post(f"/classes/{cid}/materials/import", files={"file": ("../source.txt", b"Materi asli untuk ditinjau.")})
+        preview = await self.completed_preview(cid, uploaded)
+        iid = preview["import_id"]
+        self.assertEqual(preview["filename"], "source.txt")
+        # Resuming uses persisted SQL, without another upload/provider request.
+        resumed = await self.client.get(f"/classes/{cid}/imports/{iid}")
+        self.assertEqual(resumed.json()["preview"], preview["preview"])
+        download = await self.client.get(f"/classes/{cid}/imports/{iid}/original")
+        self.assertEqual(download.content, b"Materi asli untuk ditinjau.")
+        self.assertEqual(download.headers["cache-control"], "private, no-store")
+        for actor, expected in [(self.other_teacher, 404), (self.student, 403)]:
+            self.actor = actor
+            self.assertEqual((await self.client.get(f"/classes/{cid}/imports/{iid}")).status_code, expected)
+            self.assertEqual((await self.client.get(f"/classes/{cid}/imports/{iid}/original")).status_code, expected)
+        self.actor = self.teacher
+        other = await self.create_class()
+        body = {"title": "Hasil tinjauan", "content": "Teks telah diperbaiki guru.", "source_import_id": iid}
+        self.assertEqual((await self.client.post(f"/classes/{other}/materials", json=body)).status_code, 422)
+        saved = await self.client.post(f"/classes/{cid}/materials", json=body)
+        self.assertEqual(saved.status_code, 201, saved.text)
+        self.assertEqual(saved.json()["source_import_id"], iid)
 
     async def test_import_accepts_docx_paragraphs_and_table_text(self):
         cid = await self.create_class()
@@ -337,9 +376,9 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
             f"/classes/{cid}/materials/import",
             files={"file": ("aljabar.docx", stream.getvalue(), "application/octet-stream")},
         )
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertIn("Persamaan linear", response.json()["content"])
-        self.assertIn("x + 2 = 5", response.json()["content"])
+        preview = await self.completed_preview(cid, response)
+        self.assertIn("Persamaan linear", preview["preview"]["content"])
+        self.assertIn("x + 2 = 5", preview["preview"]["content"])
 
     async def test_import_denies_other_teachers_and_students(self):
         cid = await self.create_class()
@@ -352,8 +391,11 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
 
     async def test_import_rejects_bad_extension_and_invalid_utf8(self):
         cid = await self.create_class()
-        for filename, data, status in (("bad.exe", b"MZ", 415), ("bad.txt", b"\xff\x00", 422)):
+        for filename, data, status in (("bad.exe", b"MZ", 415), ("bad.txt", b"\xff\x00", 202)):
             response = await self.client.post(
                 f"/classes/{cid}/materials/import", files={"file": (filename, data)}
             )
             self.assertEqual(response.status_code, status, response.text)
+            if status == 202:
+                preview = await self.completed_preview(cid, response)
+                self.assertEqual(preview["state"], "retry")

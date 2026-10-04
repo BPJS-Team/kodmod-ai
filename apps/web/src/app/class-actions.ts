@@ -114,6 +114,7 @@ export async function saveMaterial(
           content: value(data, "content"),
           published: value(data, "published") === "yes",
           source_filename: value(data, "source_filename") || null,
+          source_import_id: value(data, "source_import_id") || null,
         }),
       },
     );

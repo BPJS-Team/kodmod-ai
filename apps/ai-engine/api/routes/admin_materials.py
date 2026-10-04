@@ -6,9 +6,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import func, select
 
 from api.dependencies import db_session, require_admin
-from api.material_service import index_class_material
+from api.durable_jobs import enqueue_material
+from api.material_artifacts import import_out, original_path, source_for
 from api.routes.classrooms import MaterialWrite, material_info, record
-from database.models import ClassMaterial, Classroom, User
+from database.models import ClassMaterial, Classroom, MaterialImport, User
 
 router = APIRouter(tags=["admin-materials"])
 
@@ -94,9 +95,10 @@ async def update_material(
     session=Depends(db_session),
 ):
     material, classroom, teacher = await material_for(session, material_id, lock=True)
+    await source_for(session, classroom.id, body.source_import_id)
     if classroom.is_archived:
         raise HTTPException(409, "Buka arsip kelas sebelum mengubah materi.")
-    if material.content != body.content or material.source_filename != body.source_filename:
+    if material.content != body.content or material.source_filename != body.source_filename or material.source_import_id != body.source_import_id:
         material.content_version += 1
         material.n_chunks = 0
         material.rag_status, material.rag_error = "pending", None
@@ -108,9 +110,9 @@ async def update_material(
         material.rag_status = "ready"
     record(session, classroom, actor, "material.admin-updated", material.id)
     await session.flush()
-    await session.commit()
     if material.published and material.rag_status != "ready":
-        background.add_task(index_class_material, material.id, material.content_version)
+        await enqueue_material(session, material)
+    await session.commit()
     return catalog_item(material, classroom, teacher, content=True)
 
 
@@ -124,9 +126,28 @@ async def reindex_material(
     material, classroom, teacher = await material_for(session, material_id, lock=True)
     if classroom.is_archived or not material.published:
         raise HTTPException(409, "Materi harus terbit di kelas aktif sebelum diproses.")
-    if material.rag_status != "ready" or material.indexed_version != material.content_version or material.indexed_mapping_version != material.mapping_version:
+    if material.rag_status != "ready" or material.indexed_version != material.content_version or material.indexed_mapping_version != material.mapping_version or material.n_chunks <= 0:
         material.rag_status, material.rag_error = "pending", None
         record(session, classroom, actor, "material.admin-index-requested", material.id)
+        await enqueue_material(session, material, retry=True)
         await session.commit()
-        background.add_task(index_class_material, material.id, material.content_version)
     return catalog_item(material, classroom, teacher, content=True)
+
+
+@router.get("/materials/{material_id}/source")
+async def inspect_source(material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)):
+    material, _, _ = await material_for(session, material_id)
+    artifact = await session.get(MaterialImport, material.source_import_id) if material.source_import_id else None
+    if artifact is None:
+        raise HTTPException(404, "Materi ini belum memiliki berkas sumber.")
+    return await import_out(session, artifact)
+
+
+@router.get("/materials/{material_id}/original")
+async def download_source(material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)):
+    from fastapi.responses import FileResponse
+    material, _, _ = await material_for(session, material_id)
+    artifact = await session.get(MaterialImport, material.source_import_id) if material.source_import_id else None
+    if artifact is None:
+        raise HTTPException(404, "Materi ini belum memiliki berkas sumber.")
+    return FileResponse(original_path(artifact), filename=artifact.filename, media_type="application/octet-stream", headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})

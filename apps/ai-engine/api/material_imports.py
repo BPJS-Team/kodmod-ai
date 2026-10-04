@@ -24,11 +24,11 @@ def safe_filename(filename: str | None) -> str:
     return PurePosixPath((filename or "materi.txt").replace("\\", "/")).name[:300]
 
 
-def extract_document(data: bytes, filename: str, *, first_page: int | None = None, last_page: int | None = None) -> dict:
+def extract_document(data: bytes, filename: str, *, first_page: int | None = None, last_page: int | None = None, allow_ocr: bool = False) -> dict:
     """Return editable text; images, scan OCR and page citations are not inferred."""
     suffix = PurePosixPath(filename).suffix.lower()
     warnings = []
-    metadata = {"preview_type": "material", "sections": []}
+    metadata = {"preview_type": "material", "sections": [], "pages": []}
     selected = first_page is not None or last_page is not None
     if selected and suffix != ".pdf":
         raise HTTPException(422, "Pilihan halaman hanya tersedia untuk PDF.")
@@ -48,18 +48,31 @@ def extract_document(data: bytes, filename: str, *, first_page: int | None = Non
                     cache[index] = reader.pages[index].extract_text() or ""
                 return cache[index]
 
+            if allow_ocr and not selected and total > 30 and any(not page_text(index).strip() for index in range(min(3, total))):
+                return {"filename": filename, "title": PurePosixPath(filename).stem[:200],
+                    "content": "", "preview_type": "book", "total_pages": total, "page_range": None,
+                    "sections": suggest_sections(reader, page_text), "pages": [],
+                    "warnings": ["Pilih bab atau rentang halaman untuk membaca buku hasil scan."]}
+
             first, last = (first_page, last_page) if selected else (1, total)
             metadata.update(total_pages=total, page_range={"first": first, "last": last})
             pages, characters = [], 0
             if selected or total <= MAX_SELECTED_PAGES:
                 for index in range(first - 1, last):
                     text = page_text(index)
+                    provenance = {"page": index + 1, "method": "native", "confidence": None}
+                    if allow_ocr and len(text.strip()) < 5:
+                        from api.pdf_ocr import recognize_page
+                        recognized = recognize_page(data, index)
+                        text = recognized["text"]
+                        provenance.update(method="ocr", confidence=recognized["confidence"])
                     characters += len(text) + (2 if pages else 0)
                     if characters > MAX_CONTENT:
                         if selected:
                             raise ValueError("Teks melebihi 100.000 karakter. Pilih rentang halaman yang lebih kecil.")
                         break
                     pages.append(text)
+                    metadata["pages"].append({**provenance, "text": text})
             if not selected and (total > MAX_SELECTED_PAGES or characters > MAX_CONTENT):
                 return {
                     "filename": filename, "title": PurePosixPath(filename).stem[:200],
@@ -69,8 +82,10 @@ def extract_document(data: bytes, filename: str, *, first_page: int | None = Non
                 }
             content = "\n\n".join(pages)
             warnings.append(
-                "Periksa rumus, tabel, dan urutan teks. Gambar atau hasil scan belum dibaca otomatis."
+                "Periksa rumus, tabel, dan urutan teks sebelum menyimpan materi."
             )
+            if any(page["method"] == "ocr" for page in metadata["pages"]):
+                warnings.append("Sebagian halaman dibaca dari gambar. Periksa kembali hasilnya, terutama rumus dan tabel.")
         elif suffix == ".docx":
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
                 entries = archive.infolist()

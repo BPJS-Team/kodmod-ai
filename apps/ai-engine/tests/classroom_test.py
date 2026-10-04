@@ -3,9 +3,11 @@
 Uses an in-memory SQLite database only; never connects to the application DB.
 """
 
+import tempfile
 import unittest
 import uuid
-from unittest.mock import AsyncMock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 from fastapi import FastAPI
@@ -15,11 +17,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from api.dependencies import current_user, db_session
 from api.routes import classrooms
 from database.models import (
+    BackgroundJob,
     Base,
     ClassActivity,
     ClassMaterial,
     Classroom,
     Enrollment,
+    MaterialImport,
     MaterialProgress,
     Subject,
     User,
@@ -100,11 +104,14 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.patch(path, json={"completed": True})).status_code, 404)
 
     async def asyncSetUp(self):
+        from config.settings import settings
+        self.upload_dir = tempfile.TemporaryDirectory(prefix="kodmod-test-imports-")
+        self.addCleanup(self.upload_dir.cleanup)
+        self.upload_patch = patch.object(settings, "UPLOAD_DIR", Path(self.upload_dir.name))
+        self.upload_patch.start()
+        self.addCleanup(self.upload_patch.stop)
         # Published material indexing calls an external embedding provider. Route
         # authorization/progress tests stay offline; the job has separate tests.
-        self.index_job = patch.object(classrooms, "index_class_material", AsyncMock())
-        self.index_job.start()
-        self.addCleanup(self.index_job.stop)
         self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
         async with self.engine.begin() as conn:
             await conn.execute(text("PRAGMA foreign_keys=ON"))
@@ -116,6 +123,8 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
                         Subject.__table__,
                         Classroom.__table__,
                         Enrollment.__table__,
+                        BackgroundJob.__table__,
+                        MaterialImport.__table__,
                         ClassMaterial.__table__,
                         ClassActivity.__table__,
                         MaterialProgress.__table__,

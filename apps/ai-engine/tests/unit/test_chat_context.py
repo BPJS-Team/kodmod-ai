@@ -17,6 +17,7 @@ from api.dependencies import db_session, require_student
 from api.routes import chat, voice
 from database.models import (
     Base,
+    MaterialImport,
     ClassMaterial,
     Classroom,
     Enrollment,
@@ -44,6 +45,7 @@ async def scoped_chat(monkeypatch):
                     Classroom.__table__,
                     Enrollment.__table__,
                     ClassMaterial.__table__,
+                    MaterialImport.__table__,
                     Subject.__table__,
                     LearningSession.__table__,
                     InteractionLog.__table__,

@@ -26,6 +26,7 @@ async def audit_http():
         "classrooms",
         "enrollments",
         "class_materials",
+        "material_imports", "background_jobs",
         "class_activities",
         "audit_events",
         "subjects",

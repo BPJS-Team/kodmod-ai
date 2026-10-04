@@ -4,7 +4,6 @@ import asyncio
 import os
 import uuid
 from pathlib import Path
-from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -40,13 +39,14 @@ def test_concept_migration_preserves_legacy_material_and_roundtrips():
             conn.execute(db.User.__table__.insert().values(id=actor_id, username="legacy-teacher", password_hash="test-only", role="teacher", full_name="Legacy"))
             conn.execute(text("INSERT INTO classrooms (id, teacher_id, name, subject, description, is_archived, created_at) VALUES (:id, :teacher, 'Legacy class', 'Matematika', '', false, NOW())"), {"id": room_id, "teacher": actor_id})
             conn.execute(text("INSERT INTO class_materials (id, class_id, title, content, published, created_at) VALUES (:id, :room, 'Legacy material', 'Existing reviewed text', true, NOW())"), {"id": mid, "room": room_id})
-            command.upgrade(config, "0009_material_concepts")
+            command.upgrade(config, "head")
             row = conn.execute(text("SELECT content, mapping_version, indexed_mapping_version FROM class_materials WHERE id=:id"), {"id": mid}).one()
             assert tuple(row) == ("Existing reviewed text", 0, 0)
             assert conn.scalar(text("SELECT subject_id FROM classrooms WHERE id=:id"), {"id": room_id}) is None
             assert {"material_concepts", "assignment_mastery_events"}.issubset(inspect(conn).get_table_names())
+            assert conn.scalar(text("SELECT count(*) FROM background_jobs WHERE target_id=:id"), {"id": mid}) == 1
             command.downgrade(config, "0008_audit_events")
-            command.upgrade(config, "0009_material_concepts")
+            command.upgrade(config, "head")
             assert conn.scalar(text("SELECT content FROM class_materials WHERE id=:id"), {"id": mid}) == "Existing reviewed text"
     finally:
         if engine:
@@ -64,7 +64,7 @@ async def mapping_pg(monkeypatch):
     async with control.begin() as conn:
         await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_async_engine(DSN, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}})
-    names = {"users", "subjects", "concepts", "classrooms", "enrollments", "class_materials", "class_activities", "material_concepts"}
+    names = {"users", "subjects", "concepts", "classrooms", "enrollments", "class_materials", "class_activities", "material_concepts", "material_imports", "background_jobs"}
     try:
         async with engine.begin() as conn:
             await conn.run_sync(lambda c: db.Base.metadata.create_all(c, tables=[t for t in db.Base.metadata.sorted_tables if t.name in names]))
@@ -93,7 +93,6 @@ async def mapping_pg(monkeypatch):
                     raise
         app.dependency_overrides[current_user] = lambda: actor
         app.dependency_overrides[db_session] = transaction
-        monkeypatch.setattr(classrooms, "index_class_material", AsyncMock())
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://mapping.test") as client:
             yield client, factory, room, material, concept, two
     finally:

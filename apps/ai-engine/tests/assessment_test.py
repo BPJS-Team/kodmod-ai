@@ -98,6 +98,7 @@ async def assessment_http(monkeypatch):
         "classrooms",
         "enrollments",
         "class_materials",
+        "material_imports", "background_jobs",
         "subjects",
         "concepts",
         "quiz_sessions",

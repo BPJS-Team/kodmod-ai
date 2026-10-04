@@ -13,6 +13,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import current_user, db_session, require_student, require_teacher
+from api.durable_jobs import enqueue_material
+from api.material_artifacts import create_import, import_out, original_path, source_for
 from api.material_concepts import (
     MappingApproval,
     approve_mapping,
@@ -20,13 +22,14 @@ from api.material_concepts import (
     mapping_out,
     select_subject,
 )
-from api.material_imports import import_document, safe_filename
-from api.material_service import index_class_material
+from api.material_imports import safe_filename
 from database.models import (
+    BackgroundJob,
     ClassActivity,
     ClassMaterial,
     Classroom,
     Enrollment,
+    MaterialImport,
     MaterialProgress,
     User,
 )
@@ -61,6 +64,7 @@ class MaterialWrite(BaseModel):
     content: str = Field(min_length=1, max_length=100000)
     published: bool = False
     source_filename: str | None = Field(default=None, max_length=300)
+    source_import_id: uuid.UUID | None = None
 
     @field_validator("source_filename")
     @classmethod
@@ -125,6 +129,7 @@ def material_info(row):
         "title": row.title,
         "published": row.published,
         "source_filename": row.source_filename,
+        "source_import_id": str(row.source_import_id) if row.source_import_id else None,
         "rag_status": row.rag_status,
         "rag_error": row.rag_error,
         "n_chunks": row.n_chunks,
@@ -281,10 +286,10 @@ async def update_class(
     record(session, row, user, "class.updated")
     await session.flush()
     result = await summary(session, row, user)
-    await session.commit()
     for material in changed_materials:
         if material.published and not row.is_archived:
-            background.add_task(index_class_material, material.id, material.content_version)
+            await enqueue_material(session, material)
+    await session.commit()
     return result
 
 
@@ -310,9 +315,9 @@ async def review_mapping(class_id: uuid.UUID, material_id: uuid.UUID, body: Mapp
     await approve_mapping(session, material, classroom, body, user)
     record(session, classroom, user, "material.concepts_reviewed", material.id)
     result = await mapping_out(session, material, classroom)
-    await session.commit()
     if material.published:
-        background.add_task(index_class_material, material.id, material.content_version)
+        await enqueue_material(session, material)
+    await session.commit()
     return result
 
 
@@ -370,17 +375,18 @@ async def create_material(
 ):
     """Save reviewed text and queue an AI index when the material is published."""
     row = await accessible(session, class_id, user, write=True)
+    await source_for(session, class_id, body.source_import_id)
     material = ClassMaterial(class_id=class_id, **body.model_dump())
     session.add(material)
     await session.flush()
     record(session, row, user, "material.created", material.id)
-    await session.commit()
     if material.published:
-        background.add_task(index_class_material, material.id, material.content_version)
+        await enqueue_material(session, material)
+    await session.commit()
     return material_info(material)
 
 
-@router.post("/{class_id}/materials/import")
+@router.post("/{class_id}/materials/import", status_code=202)
 async def preview_material_import(
     class_id: uuid.UUID,
     file: UploadFile,
@@ -390,8 +396,73 @@ async def preview_material_import(
     session: AsyncSession = Depends(db_session),
 ):
     """Extract a document for review; importing does not save or publish it."""
+    classroom = await accessible(session, class_id, user, write=True)
+    return await create_import(session, classroom, user, file, first_page, last_page)
+
+
+@router.get("/{class_id}/imports")
+async def list_imports(class_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+    await accessible(session, class_id, user)
+    rows = list(await session.scalars(select(MaterialImport).where(MaterialImport.class_id == class_id)
+        .order_by(MaterialImport.created_at.desc()).limit(20)))
+    return [await import_out(session, row, include_preview=False) for row in rows]
+
+
+async def owned_import(session, class_id, import_id, user):
+    await accessible(session, class_id, user)
+    artifact = await session.get(MaterialImport, import_id)
+    if artifact is None or artifact.class_id != class_id:
+        raise HTTPException(404, "Dokumen tidak ditemukan.")
+    return artifact
+
+
+@router.get("/{class_id}/imports/{import_id}")
+async def read_import(class_id: uuid.UUID, import_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+    return await import_out(session, await owned_import(session, class_id, import_id, user))
+
+
+@router.get("/{class_id}/imports/{import_id}/original")
+async def download_original(class_id: uuid.UUID, import_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+    from fastapi.responses import FileResponse
+    artifact = await owned_import(session, class_id, import_id, user)
+    return FileResponse(original_path(artifact), filename=artifact.filename, media_type="application/octet-stream", headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.post("/{class_id}/imports/{import_id}/retry", status_code=202)
+async def retry_import(class_id: uuid.UUID, import_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
     await accessible(session, class_id, user, write=True)
-    return await import_document(file, first_page=first_page, last_page=last_page)
+    artifact = await owned_import(session, class_id, import_id, user)
+    job = await session.scalar(select(BackgroundJob).where(BackgroundJob.id == artifact.job_id).with_for_update())
+    if job.state == "failed":
+        from api.durable_jobs import enqueue
+        await enqueue(session, job.kind, job.target_id, job.payload, job.dedupe_key, retry=True)
+        await session.commit()
+    return await import_out(session, artifact)
+
+
+class ImportPageRange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    first_page: int = Field(ge=1, le=500)
+    last_page: int = Field(ge=1, le=500)
+
+
+@router.post("/{class_id}/imports/{import_id}/pages", status_code=202)
+async def import_pages(class_id: uuid.UUID, import_id: uuid.UUID, body: ImportPageRange,
+                       user=Depends(require_teacher), session=Depends(db_session)):
+    await accessible(session, class_id, user, write=True)
+    artifact = await owned_import(session, class_id, import_id, user)
+    if not artifact.filename.lower().endswith(".pdf") or body.last_page < body.first_page or body.last_page - body.first_page + 1 > 150:
+        raise HTTPException(422, "Pilih rentang halaman PDF yang valid, maksimal 150 halaman.")
+    from api.durable_jobs import enqueue
+    new = MaterialImport(id=uuid.uuid4(), class_id=class_id, uploaded_by=user.id,
+        filename=artifact.filename, stored_path=str(original_path(artifact)), sha256=artifact.sha256,
+        size_bytes=artifact.size_bytes, job_id=uuid.uuid4())
+    job = await enqueue(session, "material_import", new.id,
+        body.model_dump(), f"import:{new.id}")
+    new.job_id = job.id
+    session.add(new)
+    await session.commit()
+    return await import_out(session, new)
 
 
 @router.get("/{class_id}/materials/{material_id}")
@@ -469,12 +540,13 @@ async def edit_material(
 ):
     """Save a new reviewed revision and rebuild its AI index if published."""
     classroom = await accessible(session, class_id, user, write=True)
+    await source_for(session, class_id, body.source_import_id)
     row = await session.scalar(
         select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
     )
     if row is None or row.class_id != class_id:
         raise HTTPException(404, "Materi tidak ditemukan.")
-    changed = row.content != body.content or row.source_filename != body.source_filename
+    changed = row.content != body.content or row.source_filename != body.source_filename or row.source_import_id != body.source_import_id
     if changed:
         row.content_version += 1
         row.n_chunks = 0
@@ -488,9 +560,9 @@ async def edit_material(
         row.rag_status = "ready"
     record(session, classroom, user, "material.updated", row.id)
     await session.flush()
-    await session.commit()
     if row.published and row.rag_status != "ready":
-        background.add_task(index_class_material, row.id, row.content_version)
+        await enqueue_material(session, row)
+    await session.commit()
     return material_info(row)
 
 
@@ -513,11 +585,11 @@ async def retry_material_index(
         raise HTTPException(
             409, "Terbitkan materi terlebih dahulu agar dapat diproses untuk Tutor AI."
         )
-    if row.rag_status == "ready" and row.indexed_version == row.content_version and row.indexed_mapping_version == row.mapping_version:
+    if row.rag_status == "ready" and row.indexed_version == row.content_version and row.indexed_mapping_version == row.mapping_version and row.n_chunks > 0:
         return material_info(row)
     row.rag_status = "pending"
     row.rag_error = None
     record(session, classroom, user, "material.index-requested", row.id)
+    await enqueue_material(session, row, retry=True)
     await session.commit()
-    background.add_task(index_class_material, row.id, row.content_version)
     return material_info(row)

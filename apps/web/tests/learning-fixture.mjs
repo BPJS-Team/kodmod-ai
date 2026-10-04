@@ -52,6 +52,7 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
   if (legacyPending) Object.assign(materials[0], { rag_status: "pending", indexed_version: 0, n_chunks: 0 });
   let materialSerial = 4;
   const progress = new Map();
+  const imports = new Map();
   const empty = () => ({
     completed: false,
     bookmarked: false,
@@ -537,13 +538,21 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
         (m) => m.id === parts[3] && m.class_id === room?.id,
       );
       if (!member || !room) send(404, {});
+      else if (parts[2] === "imports" && req.method === "GET") {
+        if (user.role !== "teacher") send(403, {});
+        else if (!parts[3]) send(200, [...imports.values()].filter(record => record.class_id === room.id));
+        else send(imports.has(parts[3]) ? 200 : 404, imports.get(parts[3]) || {});
+      }
       else if (parts.length === 5 && parts[4] === "concepts" && material && req.method === "GET") {
         send(user.role === "teacher" ? 200 : 403, { material_id: material.id, content_version: material.content_version, mapping_version: 0, subject_id: null, concepts: [] });
       }
       else if (parts[2] === "materials" && parts[3] === "import" && req.method === "POST") {
         if (user.role !== "teacher") send(403, {});
         else if (validateMaterialFile(body.file)) send(422, { detail: validateMaterialFile(body.file) });
-        else send(200, { filename: body.file.name, title: body.file.name.replace(/\.[^.]+$/, ""), content: body.file.content || "Materi contoh fixture. Pecahan adalah bagian dari keseluruhan.", warnings: ["Pratinjau ini memakai data uji lokal."] });
+        else {
+          const record = { import_id: randomUUID(), job_id: randomUUID(), class_id: room.id, filename: body.file.name, state: "complete", preview: { preview_type: "material", filename: body.file.name, title: body.file.name.replace(/\.[^.]+$/, ""), content: body.file.content || "Materi contoh fixture. Pecahan adalah bagian dari keseluruhan.", warnings: ["Pratinjau ini memakai data uji lokal."] } };
+          imports.set(record.import_id, record); send(202, record);
+        }
       }
       else if (parts.length === 3 && parts[2] === "materials" && req.method === "POST") {
         if (user.role !== "teacher") send(403, {});

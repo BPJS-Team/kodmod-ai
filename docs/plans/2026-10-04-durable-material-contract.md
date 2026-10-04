@@ -1,0 +1,12 @@
+# Durable material processing contract
+
+- `POST /classes/{class}/materials/import` accepts the existing bounded upload and optional PDF page range. It persists the private original, creates an import job and returns 202 with `import_id`, `job_id` and state. It never publishes teaching material.
+- `GET /classes/{class}/imports/{id}` returns queue state and, when ready, the editable preview, page provenance and OCR review warnings. The owning teacher can resume after reload; the class import list finds pending/completed previews. Admin can inspect through its material management boundary. Students cannot read original uploads or import results.
+- `POST /classes/{class}/imports/{id}/retry` restarts a failed job without uploading again. `GET .../original` serves the authorized original as an attachment. Stored UUID paths remain inside `UPLOAD_DIR`.
+- A material can save `source_import_id` only for a completed import in that same class. The retained preview records original SHA256, page numbers, extraction method and OCR confidence. Teacher-edited text is the learning source; the original remains available for verification.
+- PDF text pages use native extraction. Pages with little native text are rendered and processed with Tesseract (`ind+eng`); results remain suggestions requiring teacher review. Bounded render size, page timeout, selected-page count and content limits prevent unbounded work. A long scan first offers page ranges instead of OCRing an entire book.
+- PostgreSQL jobs own pending/running/retry/complete/failed states, lease tokens, attempts and availability. Workers claim with `FOR UPDATE SKIP LOCKED`; expired leases are reclaimable. Heartbeats keep long work leased. Old lease holders cannot publish results. Retries are bounded and errors shown to the UI are safe static messages.
+- Published material indexing is enqueued in the same transaction as the saved version or mapping change. Chunk publication checks both content/mapping revision and worker lease. No browser request relies on an in-memory BackgroundTask.
+- Compose runs a separate worker against the same private uploads and database. Restarting API/worker preserves the original, queued job, reviewed material and student learning/quiz state.
+
+Native extraction and OCR implementation references: [Tesseract command usage](https://tesseract-ocr.github.io/tessdoc/Command-Line-Usage.html), [pypdfium2 renderer](https://pypdfium2.readthedocs.io/en/stable/python_api.html). OCR confidence is a review hint, not a guarantee of correctness.

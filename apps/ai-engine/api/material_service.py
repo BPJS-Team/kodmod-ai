@@ -76,7 +76,7 @@ async def resolve_tutoring_context(
     }
 
 
-async def index_class_material(material_id: uuid.UUID, version: int) -> None:
+async def index_class_material(material_id: uuid.UUID, version: int, *, expected_mapping=None, lease=None) -> None:
     """Publish an index atomically; outdated jobs never replace newer content."""
     mapping_version = None
     try:
@@ -86,14 +86,29 @@ async def index_class_material(material_id: uuid.UUID, version: int) -> None:
             )
             if row is None or row.content_version != version or not row.published:
                 return
+            if expected_mapping is not None and row.mapping_version != expected_mapping:
+                return
+            if lease:
+                from api.durable_jobs import assert_lease
+                await assert_lease(session, *lease)
             classroom = await session.get(Classroom, row.class_id)
             if classroom is None or classroom.is_archived:
                 return
-            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == row.mapping_version:
+            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == row.mapping_version and row.n_chunks > 0:
                 return
             row.rag_status = "processing"
             row.rag_error = None
             content, source = row.content, row.source_filename or row.title
+            provenance = {}
+            if row.source_import_id:
+                from database.models import BackgroundJob, MaterialImport
+                artifact = await session.get(MaterialImport, row.source_import_id)
+                imported = await session.get(BackgroundJob, artifact.job_id) if artifact else None
+                if artifact and imported and imported.result:
+                    provenance = {"source_import_id": str(artifact.id), "source_sha256": artifact.sha256,
+                        "page_range": imported.result.get("page_range"),
+                        "extraction_methods": sorted({p["method"] for p in imported.result.get("pages", [])}),
+                        "teacher_reviewed": True}
             mapping_version = row.mapping_version
             concepts = await current_concepts(session, row, classroom)
             await session.commit()
@@ -106,6 +121,7 @@ async def index_class_material(material_id: uuid.UUID, version: int) -> None:
             record["accessibility_metadata"] = {
                 **record.get("accessibility_metadata", {}),
                 "approved_concept_ids": [concept["id"] for concept in concepts],
+                "original_provenance": provenance,
             }
 
         async with async_session() as session:
@@ -114,7 +130,12 @@ async def index_class_material(material_id: uuid.UUID, version: int) -> None:
             )
             if row is None or row.content_version != version or row.mapping_version != mapping_version or not row.published:
                 return
-            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == mapping_version:
+            classroom = await session.get(Classroom, row.class_id)
+            if classroom is None or classroom.is_archived:
+                return
+            if lease:
+                await assert_lease(session, *lease)
+            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == mapping_version and row.n_chunks > 0:
                 return
             await replace_material_chunks(session, material_id, version, records)
             row.indexed_version = version
@@ -124,6 +145,9 @@ async def index_class_material(material_id: uuid.UUID, version: int) -> None:
             row.rag_error = None
             await session.commit()
     except Exception:
+        if lease:
+            # Queue owns retry status; obsolete lease holders cannot mutate it.
+            raise
         log.exception("Classroom material indexing failed for %s", material_id)
         try:
             async with async_session() as session:

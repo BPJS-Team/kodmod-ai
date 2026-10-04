@@ -327,8 +327,9 @@ async def upload_document(
     session.add(doc)
     await session.flush()
     await session.refresh(doc)
-
-    background.add_task(_ingest_document, doc.id)
+    from api.durable_jobs import enqueue
+    await enqueue(session, "document_index", doc.id, {}, f"document:{doc.id}")
+    await session.commit()
     return doc
 
 

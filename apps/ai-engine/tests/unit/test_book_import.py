@@ -115,3 +115,25 @@ def test_pdf_total_page_limit_remains_bounded():
     with pytest.raises(HTTPException) as error:
         extract_document(pdf(["Isi"] * 501), "buku.pdf")
     assert error.value.status_code == 422
+
+
+def test_ocr_mixed_pdf_records_page_method_and_confidence_for_teacher_review(monkeypatch):
+    from api import pdf_ocr
+    seen = []
+    def recognize(data, index):
+        seen.append(index)
+        return {"text": "Hasil scan pecahan", "confidence": 67.5}
+    monkeypatch.setattr(pdf_ocr, "recognize_page", recognize)
+    result = extract_document(pdf(["Teks asli pada halaman pertama", ""]), "campuran.pdf", allow_ocr=True)
+    assert seen == [1]
+    assert [(page["page"], page["method"], page["confidence"]) for page in result["pages"]] == [(1, "native", None), (2, "ocr", 67.5)]
+    assert any("gambar" in warning for warning in result["warnings"])
+
+
+def test_long_scan_offers_ranges_before_attempting_ocr(monkeypatch):
+    from api import pdf_ocr
+    def forbidden(*args):
+        raise AssertionError("An entire scan book must not be OCRed automatically")
+    monkeypatch.setattr(pdf_ocr, "recognize_page", forbidden)
+    result = extract_document(pdf([""] * 40), "scan-book.pdf", allow_ocr=True)
+    assert result["preview_type"] == "book" and result["sections"]
