@@ -18,7 +18,9 @@ log = logging.getLogger(__name__)
 @router.post("/start", response_model=LearningOut)
 async def start(body: LearningStart, student=Depends(require_student), session=Depends(db_session)):
     try:
-        return await start_lesson(session, student, body)
+        result = await start_lesson(session, student, body)
+        await session.commit()
+        return result
     except HTTPException:
         raise
     except Exception:

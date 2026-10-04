@@ -45,7 +45,10 @@ test("reader and contextual tutor pages render accessible material navigation", 
   const tutor = await fetch(`${origin}/siswa/tutor?class_id=${classId}&material_id=${materialId}`, { headers: headers() });
   assert.equal(tutor.status, 200);
   const html = await tutor.text();
-  assert.match(html, /Jawaban mengacu pada materi kelasmu/);
+  assert.match(html, /Pelajari materi bersama Tutor/);
+  assert.match(html, /Memahami pecahan dalam keseharian/);
+  assert.match(html, /Asesmen mandiri/);
+  assert.match(html, /href="\/siswa\/tugas"/);
   assert.ok(!html.includes("fixture-test-student"));
   const invalid = await fetch(`${origin}/siswa/tutor?class_id=${classId}&material_id=other`, { headers: headers() });
   assert.match(await invalid.text(), /Halaman tidak ditemukan/);

@@ -11,7 +11,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, func, inspect, select, text
 
 from api import learning_service
-from database.models import LearningActionReceipt, LearningSession
+from database.models import LearningActionReceipt, LearningSession, User
 from tests.unit.test_guided_learning import action_body, open_lesson
 from tests.unit.test_guided_learning import learning_http as learning_http
 
@@ -21,18 +21,29 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_guided_migration_upgrade_downgrade_preserves_existing_lessons():
-    url = "postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/kodmod_test"
-    schema = "guided_migration_" + uuid.uuid4().hex
-    engine = create_engine(url)
+    # A completely fresh database also tests first-install migrations. A schema
+    # search_path including public can accidentally see its alembic_version.
+    admin = create_engine("postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/kodmod_test", isolation_level="AUTOCOMMIT")
+    name = "guided_migration_" + uuid.uuid4().hex
+    engine = None
     try:
+        with admin.connect() as connection:
+            connection.execute(text(f'CREATE DATABASE "{name}"'))
+        engine = create_engine(f"postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/{name}")
         with engine.begin() as connection:
-            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        with engine.begin() as connection:
-            connection.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
             config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
             config.attributes["connection"] = connection
+            schema = "public"
             command.upgrade(config, "0006_editorial_quizzes")
             assert "guided_state" not in {c["name"] for c in inspect(connection).get_columns("learning_sessions", schema=schema)}
+            user_id, lesson_id = uuid.uuid4(), uuid.uuid4()
+            connection.execute(User.__table__.insert().values(
+                id=user_id, username="migration-learner", full_name="Migration learner",
+                password_hash="test-only", role="student",
+            ))
+            connection.execute(LearningSession.__table__.insert().values(
+                id=lesson_id, student_id=user_id, title="Existing lesson", mode="tutoring",
+            ))
             command.upgrade(config, "0007_guided_learning")
             assert "guided_state" in {c["name"] for c in inspect(connection).get_columns("learning_sessions", schema=schema)}
             assert "learning_action_receipts" in inspect(connection).get_table_names(schema=schema)
@@ -43,10 +54,15 @@ def test_guided_migration_upgrade_downgrade_preserves_existing_lessons():
             command.upgrade(config, "head")
             assert "audit_events" in inspect(connection).get_table_names(schema=schema)
             assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == "0008_audit_events"
+            assert connection.scalar(select(LearningSession.title).where(LearningSession.id == lesson_id)) == "Existing lesson"
+            assert connection.scalar(select(LearningSession.guided_state).where(LearningSession.id == lesson_id)) is None
     finally:
-        with engine.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
-        engine.dispose()
+        if engine is not None:
+            engine.dispose()
+        assert name.startswith("guided_migration_") and len(name) == 49
+        with admin.connect() as connection:
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{name}"'))
+        admin.dispose()
 
 
 async def overlapping_teaching(monkeypatch, first, second):

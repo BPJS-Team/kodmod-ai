@@ -11,16 +11,17 @@ export function AdminOverviewCharts({
 }) {
   const { t } = useI18n();
 
-  const totalUsers = overview.users.total || 1;
+  const totalUsers = overview.users.total;
   const students = overview.users.students || 0;
   const teachers = overview.users.teachers || 0;
   const admins = overview.users.admins || 0;
   const activeUsers = overview.users.active || 0;
 
-  const studentPct = Math.round((students / totalUsers) * 100);
-  const teacherPct = Math.round((teachers / totalUsers) * 100);
-  const adminPct = Math.max(0, 100 - studentPct - teacherPct);
-  const activePct = Math.round((activeUsers / totalUsers) * 100);
+  const percent = (count: number) => totalUsers > 0 ? (count / totalUsers) * 100 : 0;
+  const studentPct = percent(students);
+  const teacherPct = percent(teachers);
+  const adminPct = percent(admins);
+  const activePct = Math.round(percent(activeUsers));
 
   // Learning metrics for bar chart
   const learningBars = [
@@ -76,18 +77,18 @@ export function AdminOverviewCharts({
           <div className="role-ratio-bar">
             <div
               className="segment segment-student"
-              style={{ width: `${Math.max(4, studentPct)}%` }}
-              title={`Siswa: ${students} (${studentPct}%)`}
+              style={{ width: `${studentPct}%` }}
+              title={`${t("Siswa")}: ${students} (${Math.round(studentPct)}%)`}
             />
             <div
               className="segment segment-teacher"
-              style={{ width: `${Math.max(4, teacherPct)}%` }}
-              title={`Guru: ${teachers} (${teacherPct}%)`}
+              style={{ width: `${teacherPct}%` }}
+              title={`${t("Guru")}: ${teachers} (${Math.round(teacherPct)}%)`}
             />
             <div
               className="segment segment-admin"
-              style={{ width: `${Math.max(4, adminPct)}%` }}
-              title={`Admin: ${admins} (${adminPct}%)`}
+              style={{ width: `${adminPct}%` }}
+              title={`${t("Admin")}: ${admins} (${Math.round(adminPct)}%)`}
             />
           </div>
         </div>
@@ -99,7 +100,7 @@ export function AdminOverviewCharts({
             <div>
               <span className="legend-title"><UiText>{"Siswa"}</UiText></span>
               <strong className="legend-value">{students}</strong>
-              <small className="legend-pct">{studentPct}%</small>
+              <small className="legend-pct">{Math.round(studentPct)}%</small>
             </div>
           </div>
           <div className="role-legend-card teacher-card">
@@ -107,7 +108,7 @@ export function AdminOverviewCharts({
             <div>
               <span className="legend-title"><UiText>{"Guru"}</UiText></span>
               <strong className="legend-value">{teachers}</strong>
-              <small className="legend-pct">{teacherPct}%</small>
+              <small className="legend-pct">{Math.round(teacherPct)}%</small>
             </div>
           </div>
           <div className="role-legend-card admin-card">
@@ -115,7 +116,7 @@ export function AdminOverviewCharts({
             <div>
               <span className="legend-title"><UiText>{"Admin"}</UiText></span>
               <strong className="legend-value">{admins}</strong>
-              <small className="legend-pct">{adminPct}%</small>
+              <small className="legend-pct">{Math.round(adminPct)}%</small>
             </div>
           </div>
         </div>
@@ -137,7 +138,7 @@ export function AdminOverviewCharts({
         {/* Visual Column / Bar Chart */}
         <div className="learning-chart-bars">
           {learningBars.map((bar) => {
-            const heightPct = Math.max(12, Math.round((bar.value / maxLearningValue) * 100));
+            const heightPct = Math.round((bar.value / maxLearningValue) * 100);
             return (
               <div className="learning-bar-col" key={bar.label}>
                 <div className="bar-track">

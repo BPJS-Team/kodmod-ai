@@ -9,6 +9,7 @@ import pytest
 from fastapi import FastAPI
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from api import learning_service
 from api.dependencies import current_user, db_session
@@ -31,10 +32,10 @@ async def learning_http(monkeypatch):
         # Fixed dedicated testing database. Never derive this from settings/.env.
         url = "postgresql+asyncpg://kodmod:kodmod@127.0.0.1:5434/kodmod_test"
         schema = "guided_" + uuid.uuid4().hex
-        admin_engine = create_async_engine(url)
+        admin_engine = create_async_engine(url, poolclass=NullPool)
         async with admin_engine.begin() as connection:
             await connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        engine = create_async_engine(url, connect_args={"server_settings": {"search_path": schema}})
+        engine = create_async_engine(url, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}})
     else:
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -166,7 +167,7 @@ async def learning_http(monkeypatch):
         return {"configured": True, "available": False}
     monkeypatch.setattr(admin_insights, "get_subscription_info", unavailable_quota)
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=os.getenv("KODMOD_GUIDED_POSTGRES") == "1"),
         base_url="http://learning.test",
     ) as client:
         yield client, factory, controls, material, outsider, admin
@@ -205,8 +206,9 @@ async def test_teach_question_continue_repeat_restore_and_retry(learning_http):
     state = await open_lesson(client, material)
     assert state["text"].startswith("Pecahan")
     assert state["total_units"] >= 2 and state["unit_index"] == 0
-    assert (await open_lesson(client, material))["session_id"] == state["session_id"]
+    assert await open_lesson(client, material) == state
     path = f"/learning/sessions/{state['session_id']}"
+    assert (await client.get(path)).json()["text"] == state["text"]
     body = action_body(state, "continue")
     advanced = await client.post(path + "/actions", json=body)
     assert advanced.status_code == 200, advanced.text
@@ -307,6 +309,19 @@ async def test_failed_commit_keeps_original_revision_and_retry_can_complete(lear
     controls["fail_commit"] = False
     retried = await client.post(path + "/actions", json=body)
     assert retried.status_code == 200 and retried.json()["unit_index"] == 1
+
+
+async def test_initial_teaching_does_not_return_success_before_commit(learning_http):
+    client, factory, controls, material, _, _ = learning_http
+    controls["fail_commit"] = True
+    response = await client.post("/learning/start", json={
+        "class_id": str(material.class_id), "material_id": str(material.id),
+    })
+    assert response.status_code in (500, 503)
+    async with factory() as session:
+        assert await session.scalar(select(func.count()).select_from(models.LearningSession)) == 0
+    controls["fail_commit"] = False
+    assert (await open_lesson(client, material))["text"]
 
 
 async def test_source_revision_and_revocation_stop_resume_without_deleting_state(learning_http):

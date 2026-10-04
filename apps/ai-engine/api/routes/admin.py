@@ -105,7 +105,11 @@ async def update_user(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such account.")
 
-    changes = body.model_dump(exclude_unset=True)
+    changes = {
+        field: value
+        for field, value in body.model_dump(exclude_unset=True).items()
+        if value is not None and (field == "new_password" or value != getattr(user, field))
+    }
 
     # An admin locking or demoting themselves would lock everyone out if they
     # were the last one, so block self-demotion outright.
@@ -139,7 +143,7 @@ async def update_user(
     await session.flush()
     await session.refresh(user)
 
-    audit_details = {k: v for k, v in changes.items()}
+    audit_details = dict(changes)
     if new_password is not None:
         audit_details["password_reset"] = True
 

@@ -1,8 +1,9 @@
 """Tests for AuditEvent recording, admin activity feed and category filtering."""
 
 import uuid
-import pytest
+
 import httpx
+import pytest
 from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -150,6 +151,19 @@ async def test_admin_user_crud_records_audit_events(audit_http):
         # Verify target_name survived deletion
         deleted_event = next(e for e in events if e.action == "user.deleted")
         assert "Guru Baru" in deleted_event.target_name
+
+
+async def test_password_reset_does_not_report_unchanged_role_as_a_change(audit_http):
+    client, factory, _, _, student = audit_http
+    response = await client.patch(f"/admin/users/{student.id}", json={
+        "full_name": student.full_name, "role": student.role, "new_password": "replacement-test-123",
+    })
+    assert response.status_code == 200
+    async with factory() as session:
+        event = await session.scalar(select(models.AuditEvent))
+        assert event.action == "user.password_reset"
+        assert event.details == {"password_reset": True}
+        assert "replacement-test-123" not in str(event.details)
 
 
 async def test_admin_invitation_crud_records_audit_events(audit_http):

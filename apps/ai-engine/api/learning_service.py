@@ -228,7 +228,9 @@ async def start_lesson(session, student, body: LearningStart):
         material_id=body.material_id,
         title=material.title,
         mode="guided_tutoring",
-        guided_state=state,
+        # Keep the pre-teaching JSON snapshot independent. Mutating the same
+        # dict after flush hides the first explanation from ORM dirty tracking.
+        guided_state=copy.deepcopy(state),
     )
     session.add(row)
     await session.flush()
