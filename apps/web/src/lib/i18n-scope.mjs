@@ -1,6 +1,16 @@
 // Interface copy for reviewed materials, administration and accessibility.
 // Authored lessons, questions, names and answers retain their source language.
 export const englishScope = {
+  "Penggunaan 7 hari terakhir": "Usage in the last 7 days", "Panggilan layanan": "Service requests",
+  "Audio dari cache": "Cached audio", "Permintaan gagal": "Failed requests", "Estimasi biaya (USD)": "Estimated cost (USD)",
+  "Ringkasan 7 hari terakhir. Estimasi biaya memerlukan tarif dan angka penggunaan yang tersedia.": "Summary for the last 7 days. Cost estimates require configured rates and available usage figures.",
+  "Token terukur": "Measured tokens", "Jumlah token dari respons penyedia selama 7 hari terakhir.": "Tokens reported by the provider in the last 7 days.",
+  "Cari nama atau layanan": "Search by name or service", "Cari nama atau layanan…": "Search by name or service…",
+  "Status permintaan": "Request status", "Dibatalkan": "Cancelled", "token": "tokens", "byte audio": "audio bytes",
+  "Halaman riwayat AI": "AI activity pages", "permintaan": "requests", "Pengajaran": "Teaching", "Pembuatan soal": "Question generation",
+  "Pemilihan alur": "Flow routing", "Penilaian": "Scoring", "Rekomendasi": "Recommendations", "Review jawaban": "Answer review",
+  "Pencarian materi": "Material search", "Pembacaan suara": "Speech generation", "Transkripsi suara": "Speech transcription",
+  "Akun tidak tersedia": "Account unavailable", "Sistem": "System",
   "Sedang disiapkan": "Preparing", "Keluar…": "Signing out…",
   "Dokumen belum dapat dibaca. Gunakan Proses ulang pada dokumen tersimpan.": "The document could not be read. Select Process again in Saved documents.",
   "Status dokumen belum dapat dibuka.": "Document status could not be loaded.",

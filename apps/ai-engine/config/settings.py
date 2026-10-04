@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     # KODMOD_LLM_PROVIDER - nothing in llm_client branches on it anymore.
     KODMOD_LLM_PROVIDER: str = "openai"
     OPENAI_API_KEY: str | None = None
+    # Optional administrator-supplied USD unit rates; absent rates are unknown.
+    PROVIDER_PRICES_JSON: str = "{}"
     # Override only to point at an OpenAI-compatible endpoint (e.g. the test
     # stub started by scripts/serve_test_api).
     OPENAI_BASE_URL: str | None = None

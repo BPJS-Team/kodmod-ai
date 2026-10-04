@@ -152,6 +152,7 @@ async def cached_audio(
     root: Path, text: str, *, language: str, scope: str, voice: str,
     generate: Callable[[], Awaitable[bytes]],
 ) -> tuple[bytes, Path]:
+    started = time.monotonic()
     root.mkdir(parents=True, exist_ok=True)
     key = digest({"text": text, "language": language, "scope": scope,
                   "profile": speech_profile(voice)})
@@ -168,6 +169,10 @@ async def cached_audio(
             if len(audio) > min(settings.SPEECH_CACHE_MAX_MB * 1024 * 1024, 16 * 1024 * 1024):
                 raise ValueError("Speech audio exceeds storage limit.")
             await asyncio.to_thread(atomic_write, path, audio)
+        else:
+            from tools.provider_usage import record_usage
+            await record_usage(provider="elevenlabs", service="tts", model=settings.ELEVENLABS_TTS_MODEL,
+                status="cache_hit", latency_ms=(time.monotonic() - started) * 1000, characters=len(text), audio_bytes=len(audio))
         await asyncio.to_thread(prune, root)
         return audio, path
     finally:

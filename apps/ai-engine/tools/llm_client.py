@@ -64,11 +64,15 @@ def _chat(model: str, **kwargs: Any):
     """Build a LangChain chat model backed by OpenAI."""
     from langchain_openai import ChatOpenAI
 
+    from tools.provider_usage import ProviderUsageHandler
+
     opts: dict[str, Any] = {
         "model": model,
         "temperature": kwargs.get("temperature", 0.4),
         "max_tokens": kwargs.get("max_tokens", 1024),
         "streaming": kwargs.get("streaming", True),
+        "stream_usage": True,
+        "callbacks": [ProviderUsageHandler(kwargs.get("usage_role", "tutor"), model)],
     }
     if model.startswith("gpt-6-"):
         # GPT-6 Chat Completions only supports function/tool calls with
@@ -89,7 +93,7 @@ def _chat(model: str, **kwargs: Any):
 @lru_cache(maxsize=1)
 def get_router_llm():
     """Fast and small: intent classification on every turn."""
-    return _chat(_resolve("LLM_ROUTER_MODEL"), temperature=0.0, max_tokens=256, streaming=False)
+    return _chat(_resolve("LLM_ROUTER_MODEL"), temperature=0.0, max_tokens=256, streaming=False, usage_role="router")
 
 
 @lru_cache(maxsize=1)
@@ -100,24 +104,24 @@ def get_tutor_llm():
 
 @lru_cache(maxsize=1)
 def get_quiz_llm():
-    return _chat(_resolve("LLM_QUIZ_MODEL"), temperature=0.3, max_tokens=2048, streaming=False)
+    return _chat(_resolve("LLM_QUIZ_MODEL"), temperature=0.3, max_tokens=2048, streaming=False, usage_role="quiz")
 
 
 @lru_cache(maxsize=1)
 def get_scoring_llm():
-    return _chat(_resolve("LLM_SCORING_MODEL"), temperature=0.0, max_tokens=512, streaming=False)
+    return _chat(_resolve("LLM_SCORING_MODEL"), temperature=0.0, max_tokens=512, streaming=False, usage_role="scoring")
 
 
 @lru_cache(maxsize=1)
 def get_recommendation_llm():
     return _chat(
-        _resolve("LLM_RECOMMENDATION_MODEL"), temperature=0.3, max_tokens=768, streaming=False
+        _resolve("LLM_RECOMMENDATION_MODEL"), temperature=0.3, max_tokens=768, streaming=False, usage_role="recommendation"
     )
 
 
 @lru_cache(maxsize=1)
 def get_reflection_llm():
-    return _chat(_resolve("LLM_REFLECTION_MODEL"), temperature=0.0, max_tokens=512, streaming=False)
+    return _chat(_resolve("LLM_REFLECTION_MODEL"), temperature=0.0, max_tokens=512, streaming=False, usage_role="reflection")
 
 
 _GETTERS = (

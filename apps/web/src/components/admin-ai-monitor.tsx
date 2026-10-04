@@ -1,5 +1,6 @@
 "use client";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 
 
@@ -25,20 +26,24 @@ export function AdminAiMonitor({
 }: {
   initialData: AdminAiUsage;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [data, setData] = useState<AdminAiUsage>(initialData);
   const [loading, setLoading] = useState(false);
   const [filterProvider, setFilterProvider] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
 
-  async function handleRefresh() {
+  async function handleRefresh(page = 1, provider = filterProvider, status = filterStatus) {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/insights/ai-usage", { cache: "no-store" });
+      const query = new URLSearchParams({ days: "7", page: String(page), limit: "20", search: searchQuery.trim() });
+      if (provider !== "all") query.set("provider", provider);
+      if (status !== "all") query.set("status", status);
+      const res = await fetch(`/api/admin/insights/ai-usage?${query}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Gagal memuat status penggunaan AI.");
       const updated = (await res.json()) as AdminAiUsage;
       setData(updated);
-      await notifyResult("Data pemantauan API berhasil diperbarui.");
+      setFilterProvider(provider); setFilterStatus(status);
     } catch (err) {
       await notifyResult(err instanceof Error ? err.message : "Gagal memperbarui data.", true);
     } finally {
@@ -53,22 +58,12 @@ export function AdminAiMonitor({
   const elLimit = elevenlabs.character_limit ?? 0;
   const elRemaining = Math.max(0, elLimit - elUsed);
   const elPct = elLimit > 0 ? Math.min(100, Math.round((elUsed / elLimit) * 100)) : 0;
-  const metric = (value: number | null) => value === null ? t("Belum tersedia") : value.toLocaleString();
+  const metric = (value: number | null | undefined) => value === null || value === undefined ? t("Belum tersedia") : value.toLocaleString(locale);
+  const cost = (value: number | null | undefined) => value == null ? t("Belum tersedia") : new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 6 }).format(value);
 
   // Filter requests
-  const filteredRequests = (data.recent_requests || []).filter((req) => {
-    if (filterProvider !== "all" && req.provider.toLowerCase() !== filterProvider.toLowerCase()) {
-      return false;
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchName = req.actor_name.toLowerCase().includes(q);
-      const matchTarget = req.target.toLowerCase().includes(q);
-      const matchService = req.service.toLowerCase().includes(q);
-      if (!matchName && !matchTarget && !matchService) return false;
-    }
-    return true;
-  });
+  const filteredRequests = data.recent_requests || [];
+  const serviceLabels: Record<string, string> = { tutor: "Pengajaran", quiz: "Pembuatan soal", router: "Pemilihan alur", scoring: "Penilaian", recommendation: "Rekomendasi", reflection: "Review jawaban", embedding: "Pencarian materi", tts: "Pembacaan suara", stt: "Transkripsi suara" };
 
   return (
     <div className="admin-ai-monitor-layout">
@@ -84,7 +79,7 @@ export function AdminAiMonitor({
         </div>
         <button
           type="button"
-          onClick={() => void handleRefresh()}
+          onClick={() => void handleRefresh(data.pagination?.page || 1)}
           disabled={loading}
           className="button secondary refresh-btn"
         >
@@ -92,6 +87,14 @@ export function AdminAiMonitor({
           <UiText>{"Perbarui Data"}</UiText>
         </button>
       </div>
+
+      <div className="ai-usage-summary" aria-label={t("Penggunaan 7 hari terakhir")}>
+        <div><span>{t("Panggilan layanan")}</span><strong>{metric(data.summary?.provider_calls)}</strong></div>
+        <div><span>{t("Audio dari cache")}</span><strong>{metric(data.summary?.cache_hits)}</strong></div>
+        <div><span>{t("Permintaan gagal")}</span><strong>{metric(data.summary?.errors)}</strong></div>
+        <div><span>{t("Estimasi biaya (USD)")}</span><strong>{cost(data.summary?.estimated_cost_usd)}</strong></div>
+      </div>
+      <p className="muted">{t("Ringkasan 7 hari terakhir. Estimasi biaya memerlukan tarif dan angka penggunaan yang tersedia.")}</p>
 
       {/* Grid: 2 Provider Quota Cards */}
       <div className="ai-quota-grid">
@@ -116,7 +119,7 @@ export function AdminAiMonitor({
               ) : (
                 <>
                   <CircleAlert size={14} aria-hidden="true" />
-                  <UiText>{"Fallback Aktif"}</UiText>
+                  <UiText>{"Belum Ada Key"}</UiText>
                 </>
               )}
             </span>
@@ -197,9 +200,9 @@ export function AdminAiMonitor({
           {/* Token Usage Summary */}
           <div className="ai-token-stats">
             <div className="token-total-box">
-              <span><UiText>{"Akumulasi Token Sesi"}</UiText></span>
+              <span><UiText>{"Token terukur"}</UiText></span>
               <strong>{metric(openai.total_tokens)}</strong>
-              <small><UiText>{"Pemakaian token belum dicatat per permintaan."}</UiText></small>
+              <small><UiText>{"Jumlah token dari respons penyedia selama 7 hari terakhir."}</UiText></small>
             </div>
             <div className="token-breakdown-row">
               <div className="breakdown-sub">
@@ -246,14 +249,16 @@ export function AdminAiMonitor({
             <button
               type="button"
               className={`ai-filter-tab ${filterProvider === "all" ? "active" : ""}`}
-              onClick={() => setFilterProvider("all")}
+              disabled={loading} aria-pressed={filterProvider === "all"}
+              onClick={() => void handleRefresh(1, "all")}
             >
               <UiText>{"Semua Provider"}</UiText>
             </button>
             <button
               type="button"
               className={`ai-filter-tab ${filterProvider === "openai" ? "active" : ""}`}
-              onClick={() => setFilterProvider("openai")}
+              disabled={loading} aria-pressed={filterProvider === "openai"}
+              onClick={() => void handleRefresh(1, "openai")}
             >
               <Sparkles size={14} aria-hidden="true" />
               {"OpenAI"}
@@ -261,22 +266,29 @@ export function AdminAiMonitor({
             <button
               type="button"
               className={`ai-filter-tab ${filterProvider === "elevenlabs" ? "active" : ""}`}
-              onClick={() => setFilterProvider("elevenlabs")}
+              disabled={loading} aria-pressed={filterProvider === "elevenlabs"}
+              onClick={() => void handleRefresh(1, "elevenlabs")}
             >
               <Volume2 size={14} aria-hidden="true" />
               {"ElevenLabs"}
             </button>
           </div>
 
-          <div className="ai-search-box">
+          <form className="ai-search-box" onSubmit={event => { event.preventDefault(); void handleRefresh(); }}>
             <Search size={16} aria-hidden="true" />
             <Input
               type="text"
-              placeholder={t("Cari berdasarkan nama siswa atau sesi…")}
+              placeholder={t("Cari nama atau layanan…")}
+              aria-label={t("Cari nama atau layanan")}
+              maxLength={120}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-          </div>
+            <button className="button secondary" type="submit" disabled={loading}>{t("Cari")}</button>
+          </form>
+          <label className="field">{t("Status permintaan")}<NativeSelect disabled={loading} value={filterStatus} onChange={event => void handleRefresh(1, filterProvider, event.target.value)}>
+            <option value="all">{t("Semua")}</option><option value="success">{t("Sukses")}</option><option value="error">{t("Gagal")}</option><option value="cache_hit">{t("Audio dari cache")}</option><option value="cancelled">{t("Dibatalkan")}</option>
+          </NativeSelect></label>
         </div>
 
         {/* Tabel Request Log */}
@@ -292,6 +304,7 @@ export function AdminAiMonitor({
                   <TableHead><UiText>{"Volume"}</UiText></TableHead>
                   <TableHead><UiText>{"Latensi"}</UiText></TableHead>
                   <TableHead><UiText>{"Status"}</UiText></TableHead>
+                  <TableHead><UiText>{"Estimasi biaya (USD)"}</UiText></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -308,7 +321,7 @@ export function AdminAiMonitor({
                         <span className={`provider-badge ${req.provider.toLowerCase()}`}>
                           {req.provider}
                         </span>
-                        <strong>{req.service}</strong>
+                        <strong>{t(serviceLabels[req.service] || req.service)}</strong>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -316,30 +329,34 @@ export function AdminAiMonitor({
                     </TableCell>
                     <TableCell>
                       <div className="log-target-cell">
-                        <strong>{req.actor_name}</strong>
+                        <strong>{t(req.actor_name)}</strong>
                         <small>{req.target}</small>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="log-units">{req.units}</span>
+                      <span className="log-units">{req.total_tokens != null ? `${metric(req.total_tokens)} ${t("token")}` : req.characters != null ? `${metric(req.characters)} ${t("karakter")}` : req.audio_bytes != null ? `${metric(req.audio_bytes)} ${t("byte audio")}` : t("Belum tersedia")}</span>
                     </TableCell>
                     <TableCell>
                       <span className="log-latency">
                         <Zap size={13} aria-hidden="true" />
-                        {req.latency}
+                        {metric(req.latency_ms)} ms
                       </span>
                     </TableCell>
                     <TableCell>
                       <span className={`log-status-tag ${req.status}`}>
                         {req.status === "success" ? (
                           <UiText>{"Sukses"}</UiText>
-                        ) : req.status === "fallback" ? (
-                          <UiText>{"Fallback"}</UiText>
+                        ) : req.status === "cache_hit" ? (
+                          <UiText>{"Audio dari cache"}</UiText>
+                        ) : req.status === "cancelled" ? (
+                          <UiText>{"Dibatalkan"}</UiText>
                         ) : (
                           <UiText>{"Gagal"}</UiText>
                         )}
                       </span>
+                      {req.error_code && <small className="muted">{req.error_code}</small>}
                     </TableCell>
+                    <TableCell>{cost(req.estimated_cost_usd)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -352,6 +369,11 @@ export function AdminAiMonitor({
           </div>
         )}
       </section>
+      {data.pagination && <nav className="ai-log-pagination" aria-label={t("Halaman riwayat AI")}>
+        <button className="button secondary" disabled={loading || data.pagination.page <= 1} onClick={() => void handleRefresh((data.pagination?.page || 1) - 1)}>{t("Sebelumnya")}</button>
+        <span>{t("Halaman {page}", { page: data.pagination.page })} · {metric(data.pagination.total)} {t("permintaan")}</span>
+        <button className="button secondary" disabled={loading || !data.pagination.has_next} onClick={() => void handleRefresh((data.pagination?.page || 1) + 1)}>{t("Berikutnya")}</button>
+      </nav>}
     </div>
   );
 }

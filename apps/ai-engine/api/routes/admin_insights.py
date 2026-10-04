@@ -9,6 +9,7 @@ conversation text.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -207,10 +208,16 @@ async def activity(
 
 
 @router.get("/insights/ai-usage")
-async def ai_usage(session: AsyncSession = Depends(db_session)) -> dict:
+async def ai_usage(session: AsyncSession = Depends(db_session),
+    days: int = Query(7, ge=1, le=90), page: int = Query(1, ge=1, le=10000), limit: int = Query(20, ge=1, le=100),
+    provider: Literal["openai", "elevenlabs"] | None = None,
+    status: Literal["success", "error", "cancelled", "cache_hit"] | None = None,
+    search: str = Query("", max_length=120)) -> dict:
     """Live provider quota and configuration; unknown metrics stay unknown."""
     quota = await get_subscription_info()
     available = bool(quota.get("available"))
+    from api.provider_insights import measured_usage
+    measured = await measured_usage(session, days=days, page=page, limit=limit, provider=provider, status=status, search=search)
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "elevenlabs": {
@@ -227,10 +234,7 @@ async def ai_usage(session: AsyncSession = Depends(db_session)) -> dict:
         },
         "openai": {
             "configured": bool(settings.OPENAI_API_KEY),
-            "usage_available": False,
-            "total_tokens": None,
-            "prompt_tokens": None,
-            "completion_tokens": None,
+            **measured.pop("openai_usage"),
             "models": {
                 "tutor": settings.LLM_TUTOR_MODEL,
                 "router": settings.LLM_ROUTER_MODEL,
@@ -238,7 +242,7 @@ async def ai_usage(session: AsyncSession = Depends(db_session)) -> dict:
                 "embedding": settings.EMBEDDING_MODEL,
             },
         },
-        "recent_requests": [],
+        **measured,
         "session_counts": {
             "learning": await _count(session, LearningSession),
             "assessments": await _count(session, QuizSession),

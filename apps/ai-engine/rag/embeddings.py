@@ -35,7 +35,10 @@ def _client():
         opts["api_key"] = settings.OPENAI_API_KEY
     if settings.OPENAI_BASE_URL:
         opts["base_url"] = settings.OPENAI_BASE_URL
-    return OpenAIEmbeddings(**opts)
+    from tools.provider_usage import MeasuredEmbeddingClient
+    client = OpenAIEmbeddings(**opts)
+    client.async_client = MeasuredEmbeddingClient(client.async_client, settings.EMBEDDING_MODEL)
+    return client
 
 
 def reset_embeddings_cache() -> None:

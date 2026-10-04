@@ -47,6 +47,7 @@ async def learning_http(monkeypatch):
         "material_imports", "background_jobs",
         "class_activities",
         "audit_events",
+        "provider_usage",
         "subjects",
         "concepts",
         "learning_sessions",

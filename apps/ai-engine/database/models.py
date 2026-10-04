@@ -36,6 +36,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -68,6 +69,41 @@ def _sql_in(column: str, values: tuple[str, ...]) -> str:
 
 class Base(DeclarativeBase):
     pass
+
+
+class ProviderUsage(Base):
+    """One measured provider call or cache reuse, with no content payload."""
+    __tablename__ = "provider_usage"
+    __table_args__ = (
+        CheckConstraint("provider IN ('openai','elevenlabs')", name="ck_provider_usage_provider"),
+        CheckConstraint("status IN ('success','error','cancelled','cache_hit')", name="ck_provider_usage_status"),
+        CheckConstraint("latency_ms >= 0", name="ck_provider_usage_latency"),
+        CheckConstraint("input_tokens >= 0 AND output_tokens >= 0 AND total_tokens >= 0 AND characters >= 0 AND audio_bytes >= 0 AND audio_seconds >= 0 AND estimated_cost_usd >= 0", name="ck_provider_usage_units"),
+        Index("ix_provider_usage_created", "created_at"),
+        Index("ix_provider_usage_filter", "provider", "status", "created_at"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    # Metadata snapshot: no FK lock against a learner held FOR UPDATE by scoring.
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    target_type: Mapped[str | None] = mapped_column(String(40))
+    language: Mapped[str | None] = mapped_column(String(8))
+    provider: Mapped[str] = mapped_column(String(20))
+    service: Mapped[str] = mapped_column(String(40))
+    model: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    total_tokens: Mapped[int | None] = mapped_column(Integer)
+    characters: Mapped[int | None] = mapped_column(Integer)
+    audio_bytes: Mapped[int | None] = mapped_column(Integer)
+    audio_seconds: Mapped[float | None] = mapped_column(Float)
+    estimated_cost_usd: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    pricing_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 # ----------------------------------------------------------------- people --

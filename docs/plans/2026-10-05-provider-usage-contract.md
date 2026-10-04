@@ -1,0 +1,11 @@
+# Provider usage contract
+
+- Store one record per LangChain model run, SDK embedding response, ElevenLabs request or confirmed audio cache reuse. Streaming token metadata comes from the final provider usage chunk; missing usage remains `null`.
+- Store UUID correlation, actor/target identifiers, model/service, safe status/error code, latency and numeric units. Never store prompts, outputs, transcripts, raw audio, provider response bodies, credentials or arbitrary exception messages.
+- Actor and session identifiers are metadata snapshots, without foreign keys. Independent usage writes must not wait on learner/session rows locked by assessment transactions. Names are resolved only for an authenticated admin report.
+- A short independent transaction saves metadata. A telemetry storage failure increments `kodmod_provider_usage_dropped_total` and leaves the learning transaction intact; log only a fixed diagnostic. Duplicate model end callbacks retain one receipt.
+- Cache reuse is an explicit `cache_hit`, with zero provider cost and no new provider request. Generated audio is an independent success record. Cached character volume must not be summed as newly generated/billed speech.
+- Price estimates use backend `PROVIDER_PRICES_JSON`, keyed by `provider:model`. USD rates are `input_per_million`, `output_per_million`, `characters_per_million` or `audio_per_minute`. No vendor price is assumed. Missing/invalid rates, unknown units or failed calls have unknown cost, not zero. Recorded price snapshots preserve the basis of an estimate.
+- `/admin/insights/ai-usage` defaults to seven days, 20 records. Bound days to 1–90, page to 1–10000 and limit to 1–100. Filter records by provider/status/name/service/model. The period summary remains unfiltered; its complete estimate is unknown if any record is unpriced, with a separately named known subtotal.
+- ElevenLabs subscription quota is provider-reported and separate from local request measurements. Configuration presence does not prove provider availability.
+- Additive migration `0011_provider_usage` is deployed after a verified backup. Validate metadata, privacy, authentication, pagination, concurrency and live responses on the isolated environment before updating the release report.

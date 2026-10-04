@@ -17,6 +17,7 @@ from config.logging import configure_logging
 from config.settings import settings
 from database.models import ClassMaterial, Classroom, CurriculumChunk, Document, MaterialImport
 from database.session import async_session, close_db, init_db
+from tools.provider_usage import usage_context
 
 log = logging.getLogger(__name__)
 HEARTBEAT_PATH = Path(tempfile.gettempdir()) / "kodmod-worker-heartbeat"
@@ -87,7 +88,7 @@ async def process(job):
     raise ValueError("Unknown job kind")
 
 
-async def run_job(job):
+async def _run_job(job):
     heartbeat = asyncio.create_task(keep_lease(job))
     try:
         result = await process(job)
@@ -95,12 +96,26 @@ async def run_job(job):
     except jobs.LeaseLostError:
         log.info("Worker lease expired for job %s", job.id)
     except Exception:
-        log.exception("Background job %s failed", job.id)
+        log.warning("Background job %s failed", job.id)
         await jobs.fail(job.id, job.lease_token)
     finally:
         heartbeat.cancel()
         with suppress(asyncio.CancelledError):
             await heartbeat
+
+
+async def run_job(job):
+    actor_id = None
+    async with async_session() as session:
+        if job.kind == "material_import":
+            artifact = await session.get(MaterialImport, job.target_id)
+            actor_id = artifact.uploaded_by if artifact else None
+        elif job.kind == "material_index":
+            row = await session.get(ClassMaterial, job.target_id)
+            classroom = await session.get(Classroom, row.class_id) if row else None
+            actor_id = classroom.teacher_id if classroom else None
+    with usage_context(request_id=job.id, actor_id=actor_id, target_id=job.target_id, target_type=job.kind):
+        await _run_job(job)
 
 
 async def main():

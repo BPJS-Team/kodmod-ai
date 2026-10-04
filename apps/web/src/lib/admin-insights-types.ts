@@ -49,11 +49,19 @@ export type AdminAiRequestLog = {
   provider: "OpenAI" | "ElevenLabs";
   service: string;
   model: string;
-  units: string;
   actor_name: string;
   target: string;
-  status: "success" | "fallback" | "error";
-  latency: string;
+  status: "success" | "cache_hit" | "cancelled" | "error";
+  latency_ms: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  characters: number | null;
+  audio_bytes: number | null;
+  audio_seconds: number | null;
+  estimated_cost_usd: number | null;
+  error_code: string | null;
+  request_id: string;
 };
 
 export type AdminAiUsage = {
@@ -84,4 +92,8 @@ export type AdminAiUsage = {
     };
   };
   recent_requests: AdminAiRequestLog[];
+  period_days?: number;
+  summary?: { requests: number; provider_calls: number; successes: number; errors: number; cache_hits: number;
+    average_latency_ms: number | null; estimated_cost_usd: number | null; known_cost_subtotal_usd: number | null; unpriced_requests: number };
+  pagination?: { page: number; limit: number; total: number; has_next: boolean };
 };

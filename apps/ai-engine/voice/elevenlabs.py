@@ -103,7 +103,7 @@ def _raise_for_provider(response: httpx.Response, *, operation: str) -> None:
     )
 
 
-async def synthesise(
+async def _synthesise(
     text: str,
     *,
     voice_id: str | None = None,
@@ -135,7 +135,7 @@ async def synthesise(
     return response.content
 
 
-async def stream_speech(
+async def _stream_speech(
     text: str,
     *,
     voice_id: str | None = None,
@@ -170,7 +170,7 @@ async def stream_speech(
         raise ElevenLabsError("ElevenLabs TTS stream could not be completed") from exc
 
 
-async def transcribe(
+async def _transcribe(
     audio_bytes: bytes,
     *,
     filename: str = "audio.webm",
@@ -216,6 +216,56 @@ async def transcribe(
     }
     if isinstance(body.get("words"), list):
         result["words"] = body["words"]
+    if isinstance(body.get("audio_duration"), (int, float)):
+        result["audio_seconds"] = body["audio_duration"]
+    return result
+
+
+async def synthesise(text: str, *, voice_id=None, model_id=None, output_format=None) -> bytes:
+    import asyncio
+    import time
+
+    from tools.provider_usage import record_usage
+    started = time.monotonic()
+    model = model_id or getattr(settings, "ELEVENLABS_TTS_MODEL", DEFAULT_TTS_MODEL)
+    try:
+        audio = await _synthesise(text, voice_id=voice_id, model_id=model_id, output_format=output_format)
+    except BaseException as error:
+        await record_usage(provider="elevenlabs", service="tts", model=model, status="cancelled" if isinstance(error, asyncio.CancelledError) else "error", latency_ms=(time.monotonic() - started) * 1000, error=error)
+        raise
+    await record_usage(provider="elevenlabs", service="tts", model=model, status="success", latency_ms=(time.monotonic() - started) * 1000, characters=len(text.strip()), audio_bytes=len(audio))
+    return audio
+
+
+async def stream_speech(text: str, *, voice_id=None, model_id=None, output_format=None, chunk_size=4096) -> AsyncIterator[bytes]:
+    import asyncio
+    import time
+
+    from tools.provider_usage import record_usage
+    started, size = time.monotonic(), 0
+    model = model_id or getattr(settings, "ELEVENLABS_TTS_MODEL", DEFAULT_TTS_MODEL)
+    try:
+        async for chunk in _stream_speech(text, voice_id=voice_id, model_id=model_id, output_format=output_format, chunk_size=chunk_size):
+            size += len(chunk)
+            yield chunk
+    except BaseException as error:
+        await record_usage(provider="elevenlabs", service="tts", model=model, status="cancelled" if isinstance(error, (asyncio.CancelledError, GeneratorExit)) else "error", latency_ms=(time.monotonic() - started) * 1000, error=error)
+        raise
+    await record_usage(provider="elevenlabs", service="tts", model=model, status="success", latency_ms=(time.monotonic() - started) * 1000, characters=len(text.strip()), audio_bytes=size)
+
+
+async def transcribe(audio_bytes: bytes, *, filename="audio.webm", content_type="application/octet-stream", language=None) -> dict[str, Any]:
+    import asyncio
+    import time
+
+    from tools.provider_usage import record_usage
+    started = time.monotonic()
+    try:
+        result = await _transcribe(audio_bytes, filename=filename, content_type=content_type, language=language)
+    except BaseException as error:
+        await record_usage(provider="elevenlabs", service="stt", model=getattr(settings, "ELEVENLABS_STT_MODEL", DEFAULT_STT_MODEL), status="cancelled" if isinstance(error, asyncio.CancelledError) else "error", latency_ms=(time.monotonic() - started) * 1000, error=error)
+        raise
+    await record_usage(provider="elevenlabs", service="stt", model=getattr(settings, "ELEVENLABS_STT_MODEL", DEFAULT_STT_MODEL), status="success", latency_ms=(time.monotonic() - started) * 1000, audio_bytes=len(audio_bytes), audio_seconds=result.get("audio_seconds"))
     return result
 
 

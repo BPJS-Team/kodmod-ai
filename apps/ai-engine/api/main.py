@@ -62,6 +62,7 @@ from config.logging import configure_logging
 from config.settings import settings
 from database.session import close_db, init_db
 from graphs.main_graph import build_kodmod_graph
+from tools.provider_usage import ProviderContextMiddleware
 
 log = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ app = FastAPI(
 
 
 # ---- Middleware -----------------------------------------------------------
+app.add_middleware(ProviderContextMiddleware)
 # Credentials are allowed, so the origin list must be explicit. A "*" here
 # would be rejected by every browser anyway.
 app.add_middleware(

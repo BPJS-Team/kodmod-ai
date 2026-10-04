@@ -128,6 +128,7 @@ def unit_source(row, material, state):
 
 
 async def teach(session, row, material, student, state, action, question=""):
+    from tools.provider_usage import usage_context
     history = (
         await session.scalars(
             select(InteractionLog)
@@ -137,7 +138,8 @@ async def teach(session, row, material, student, state, action, question=""):
         )
     ).all()
     unit = state["units"][state["unit_index"]]
-    result = await guided_graph.ainvoke(
+    with usage_context(actor_id=student.id, target_id=row.id, target_type="learning_session", language=state["language"]):
+        result = await guided_graph.ainvoke(
         {
             "action": action,
             "question": question,
@@ -147,7 +149,7 @@ async def teach(session, row, material, student, state, action, question=""):
             "history": [{"role": log.role, "text": log.text} for log in reversed(history)],
             "learning_profile": {**build_learning_profile(student), "language": state["language"]},
         }
-    )
+        )
     text = result.get("accessible_response", "").strip()
     if not text:
         raise ValueError("Tutor returned no accessible explanation")

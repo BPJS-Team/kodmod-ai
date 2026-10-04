@@ -131,9 +131,11 @@ async def load_model(session: AsyncSession, student_id: uuid.UUID) -> tuple[Stud
 
 
 async def invoke(graph, state: dict, sid: uuid.UUID) -> dict:
-    return await graph.ainvoke(
-        state, config={"configurable": {"thread_id": f"assessment:{sid}:{uuid.uuid4()}"}}
-    )
+    from tools.provider_usage import usage_context
+    with usage_context(target_id=sid, target_type="quiz_session", language=state.get("learning_profile", {}).get("language")):
+        return await graph.ainvoke(
+            state, config={"configurable": {"thread_id": f"assessment:{sid}:{uuid.uuid4()}"}}
+        )
 
 
 async def start_assessment(
