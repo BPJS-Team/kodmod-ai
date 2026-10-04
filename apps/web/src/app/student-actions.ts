@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { parseReadingPreferences } from "@/lib/reading-preferences";
 import { requireSession } from "@/lib/session";
+import { sessionCookieSecure } from "@/lib/cookie-security";
 import { backend, BackendError } from "@/lib/server-api";
 import type { ActionState } from "@/lib/types";
 
@@ -28,7 +29,7 @@ export async function saveReadingSettings(
     ),
     {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: sessionCookieSecure(),
       sameSite: "lax",
       path: "/siswa",
       maxAge: 60 * 60 * 24 * 365,

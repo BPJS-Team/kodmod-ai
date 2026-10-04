@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { backend, BackendError } from "@/lib/server-api";
 import { requireSession, SESSION_COOKIE } from "@/lib/session";
+import { sessionCookieSecure } from "@/lib/cookie-security";
 import { homeFor, type ActionState, type User } from "@/lib/types";
 
 const text = (data: FormData, key: string) =>
@@ -41,7 +42,7 @@ export async function login(
     return { error: "Sesi tidak valid. Hubungi administrator." };
   (await cookies()).set(SESSION_COOKIE, result.access_token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     sameSite: "lax",
     path: "/",
     maxAge: Math.max(0, result.expires_in),
@@ -104,7 +105,7 @@ export async function register(
     return { error: "Sesi tidak valid. Hubungi administrator." };
   (await cookies()).set(SESSION_COOKIE, result.access_token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     sameSite: "lax",
     path: "/",
     maxAge: Math.max(0, result.expires_in),
