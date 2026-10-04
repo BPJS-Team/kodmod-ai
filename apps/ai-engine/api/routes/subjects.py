@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import current_user, db_session, require_teacher
+from api.dependencies import current_user, db_session, require_staff, require_teacher
 from api.utils.uploads import delete_upload, save_upload, validate_suffix
 from database.models import Concept, Document, Subject, User
 from database.session import async_session
@@ -107,7 +107,7 @@ async def list_concepts(
 ) -> list[Concept]:
     """The concepts taught in this subject."""
     await _subject_or_404(session, subject_id)
-    stmt = select(Concept).where(Concept.subject_id == subject_id).order_by(Concept.name)
+    stmt = select(Concept).where(Concept.subject_id == subject_id, Concept.is_active.is_(True)).order_by(Concept.name)
     return list((await session.execute(stmt)).scalars().all())
 
 
@@ -171,8 +171,12 @@ async def delete_subject(
         .scalars()
         .all()
     )
-    await session.delete(subject)  # FKs cascade to concepts, documents, chunks
-    await session.flush()
+    await session.delete(subject)
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(409, "Mata pelajaran sudah dipakai oleh kelas atau kuis. Riwayat tetap disimpan.") from None
     for path in stored:
         delete_upload(path)
 
@@ -200,7 +204,28 @@ async def create_concept(
         await session.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "That slug is already in use.") from e
     await session.refresh(concept)
+    await session.commit()
     return concept
+
+
+@router.delete("/{subject_id}/concepts/{concept_id}", status_code=204)
+async def retire_concept(
+    subject_id: uuid.UUID,
+    concept_id: uuid.UUID,
+    actor: User = Depends(require_staff),
+    session: AsyncSession = Depends(db_session),
+):
+    """Retire future attribution while preserving reviewed historical evidence."""
+    subject = await _subject_or_404(session, subject_id)
+    if actor.role != "admin" and subject.created_by != actor.id:
+        raise HTTPException(403, "Hanya pembuat mata pelajaran atau admin yang bisa menonaktifkan konsep.")
+    concept = await session.scalar(select(Concept).where(
+        Concept.id == concept_id, Concept.subject_id == subject_id
+    ).with_for_update())
+    if concept is None:
+        raise HTTPException(404, "Konsep tidak ditemukan.")
+    concept.is_active = False
+    await session.commit()
 
 
 # ----------------------------------------------------------- documents --

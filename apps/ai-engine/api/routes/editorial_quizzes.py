@@ -50,10 +50,12 @@ async def propose_quiz(body: ProposalInput, actor: User = Depends(require_teache
     from api.routes.classrooms import accessible
     from database.models import ClassMaterial
 
-    await accessible(session, body.class_id, actor, write=True)
+    classroom = await accessible(session, body.class_id, actor, write=True)
     material = await session.get(ClassMaterial, body.material_id)
     if material is None or material.class_id != body.class_id:
         raise HTTPException(404, "Materi tidak ditemukan.")
+    from api.material_concepts import current_concepts
+    approved = await current_concepts(session, material, classroom)
     units = learning_units(material.content)
     count = min(6, len(units))
     indices = sorted({round(i * (len(units) - 1) / max(1, count - 1)) for i in range(count)})
@@ -66,6 +68,8 @@ async def propose_quiz(body: ProposalInput, actor: User = Depends(require_teache
             "quiz_n_questions": body.n_questions, "current_difficulty": body.difficulty,
             "quiz_source_docs": docs, "learning_profile": {"language": body.language},
             "assessment_managed": True,
+            "approved_material_concepts": approved,
+            "material_mapping_version": material.mapping_version,
         })
         questions = []
         for index, question in enumerate(result["quiz_questions"]):
@@ -74,11 +78,14 @@ async def propose_quiz(body: ProposalInput, actor: User = Depends(require_teache
             answer_id = answer if answer in "abcd" and len(answer) == 1 else next((o["id"] for i, o in enumerate(options) if question["options"][i].lower() == answer), "")
             questions.append(QuestionInput(order_index=index + 1, prompt=question["text"],
                 narration=question["text"], options=options, correct_option_id=answer_id,
-                explanation=question["explanation"], difficulty=body.difficulty, concept_id=None))
+                explanation=question["explanation"], difficulty=body.difficulty,
+                concept_id=uuid.UUID(question["concept_id"]) if question.get("concept_id") else None))
     except Exception:
         logging.getLogger(__name__).exception("Could not generate reviewed-material proposal")
         raise HTTPException(503, "Usulan soal belum dapat dibuat. Coba lagi atau tulis soal sendiri.") from None
     return {"material_id": material.id, "material_version": material.content_version,
+            "mapping_version": material.mapping_version,
+            "subject_id": classroom.subject_id,
             "questions": questions, "review_required": True}
 
 

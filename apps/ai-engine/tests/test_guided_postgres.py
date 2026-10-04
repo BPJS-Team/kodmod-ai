@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, func, inspect, select, text
 
 from api import learning_service
@@ -53,7 +54,7 @@ def test_guided_migration_upgrade_downgrade_preserves_existing_lessons():
             assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == "0007_guided_learning"
             command.upgrade(config, "head")
             assert "audit_events" in inspect(connection).get_table_names(schema=schema)
-            assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == "0008_audit_events"
+            assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == ScriptDirectory.from_config(config).get_current_head()
             assert connection.scalar(select(LearningSession.title).where(LearningSession.id == lesson_id)) == "Existing lesson"
             assert connection.scalar(select(LearningSession.guided_state).where(LearningSession.id == lesson_id)) is None
     finally:

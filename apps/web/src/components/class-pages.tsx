@@ -26,6 +26,9 @@ import { StudentReader } from "./student-reader";
 import { StudentOverview } from "./student-overview";
 import { readingSettings } from "@/lib/reading-settings";
 import { readingDefaults } from "@/lib/reading-preferences";
+import { backend } from "@/lib/server-api";
+import type { CurriculumConcept, CurriculumSubject, MaterialMapping } from "@/lib/concept-types";
+import { ClassSubjectForm, MaterialConceptsForm } from "./material-concepts-form";
 
 const baseFor = (role: LearningRole) =>
   role === "teacher" ? "/guru" : "/siswa";
@@ -193,6 +196,7 @@ export async function ClassRoom({
     `/${encodeURIComponent(id)}`,
   );
   const teacher = role === "teacher";
+  const subjects = teacher ? await backend<CurriculumSubject[]>("/subjects", (await requireSession("teacher")).token) : [];
   return (
     <>
       <BackToClasses role={role} />
@@ -217,6 +221,7 @@ export async function ClassRoom({
       {row.is_archived && (
         <p className="info-note"><UiText>{"Kelas ini diarsipkan. Aktifkan kembali untuk mengelola anggota dan materi."}</UiText></p>
       )}
+      {teacher && !row.is_archived && <ClassSubjectForm key={row.subject_id} classId={id} subjectId={row.subject_id} subjects={subjects} />}
       <div className={`class-detail-grid ${teacher ? "" : "student-detail"}`}>
         <section className="panel learning-section">
           <div className="learning-section-heading">
@@ -314,6 +319,12 @@ export async function MaterialPage({
     ),
     role === "student" ? readingSettings() : Promise.resolve(readingDefaults),
   ]);
+  const { token } = await requireSession(role);
+  const [subjects, mapping, concepts]: [CurriculumSubject[], MaterialMapping | null, CurriculumConcept[]] = role === "teacher" && !row.is_archived ? await Promise.all([
+    backend<CurriculumSubject[]>("/subjects", token),
+    backend<MaterialMapping>(`/classes/${id}/materials/${materialId}/concepts`, token),
+    row.subject_id ? backend<CurriculumConcept[]>(`/subjects/${row.subject_id}/concepts`, token) : Promise.resolve([]),
+  ]) : [[], null, []];
   return (
     <>
       <Link className="learning-back" href={`${baseFor(role)}/kelas/${id}`}>
@@ -325,7 +336,11 @@ export async function MaterialPage({
         description={`${row.subject} · ${row.teacher_name} · ${dateLabel(material.created_at)}`}
       />
       {role === "teacher" && !row.is_archived ? (
-        <MaterialForm classId={id} material={material} />
+        <>
+          <MaterialForm classId={id} material={material} />
+          <ClassSubjectForm key={row.subject_id} classId={id} subjectId={row.subject_id} subjects={subjects} />
+          {mapping && <MaterialConceptsForm key={`${mapping.content_version}:${mapping.mapping_version}:${mapping.subject_id}`} classId={id} mapping={mapping} concepts={concepts} />}
+        </>
       ) : role === "student" ? (
         <StudentReader
           key={material.id}

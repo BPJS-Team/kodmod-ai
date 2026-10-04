@@ -39,6 +39,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -136,6 +137,9 @@ class Classroom(Base):
     )
     name: Mapped[str] = mapped_column(String(120))
     subject: Mapped[str] = mapped_column(String(120))
+    subject_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="RESTRICT"), index=True
+    )
     description: Mapped[str] = mapped_column(Text, default="")
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -169,6 +173,8 @@ class ClassMaterial(Base):
     rag_error: Mapped[str | None] = mapped_column(Text)
     content_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     indexed_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    mapping_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    indexed_mapping_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     n_chunks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -250,6 +256,31 @@ class Concept(Base):
     description: Mapped[str | None] = mapped_column(Text)
     prerequisite_ids: Mapped[list] = mapped_column(JSON, default=list)
     difficulty_level: Mapped[str] = mapped_column(String(20), default="medium")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+
+class MaterialConcept(Base):
+    """Historical teacher-approved mappings. Content edits never rewrite them."""
+
+    __tablename__ = "material_concepts"
+    material_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("class_materials.id", ondelete="CASCADE"), primary_key=True
+    )
+    mapping_version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    concept_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="RESTRICT"), primary_key=True
+    )
+    content_version: Mapped[int] = mapped_column(Integer)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    __table_args__ = (
+        CheckConstraint("mapping_version >= 1 AND content_version >= 1", name="ck_material_concept_versions"),
+        Index("uq_material_primary_concept", "material_id", "mapping_version",
+              unique=True, postgresql_where=text("is_primary"), sqlite_where=text("is_primary = 1")),
+    )
 
 
 class Lesson(Base):
@@ -349,6 +380,7 @@ class CurriculumChunk(Base):
         UUID(as_uuid=True), ForeignKey("class_materials.id", ondelete="CASCADE"), index=True
     )
     material_version: Mapped[int | None] = mapped_column(Integer)
+    material_mapping_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     chunk_index: Mapped[int] = mapped_column(Integer, default=0)
     section_title: Mapped[str | None] = mapped_column(String(300))
     accessibility_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -698,10 +730,35 @@ class MasteryEvent(Base):
     confidence: Mapped[float] = mapped_column(Float)
     mastery_before: Mapped[float] = mapped_column(Float)
     mastery_after: Mapped[float] = mapped_column(Float)
+    source_snapshot: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 # --------------------------------------------------------------- mastery --
+class AssignmentMasteryEvent(Base):
+    """One formal-quiz evidence item per immutable answer and Concept."""
+
+    __tablename__ = "assignment_mastery_events"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    answer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assignment_answers.id", ondelete="RESTRICT")
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    concept_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="RESTRICT")
+    )
+    score: Mapped[float] = mapped_column(Float)
+    mastery_before: Mapped[float] = mapped_column(Float)
+    mastery_after: Mapped[float] = mapped_column(Float)
+    source_snapshot: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    __table_args__ = (
+        UniqueConstraint("answer_id", "concept_id", name="uq_assignment_answer_concept"),
+    )
+
+
 class MasteryScore(Base):
     __tablename__ = "mastery_scores"
     __table_args__ = (UniqueConstraint("student_id", "concept_id", name="uq_student_concept"),)

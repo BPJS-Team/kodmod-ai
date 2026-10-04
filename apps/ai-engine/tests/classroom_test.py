@@ -21,6 +21,7 @@ from database.models import (
     Classroom,
     Enrollment,
     MaterialProgress,
+    Subject,
     User,
 )
 
@@ -112,6 +113,7 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
                     c,
                     tables=[
                         User.__table__,
+                        Subject.__table__,
                         Classroom.__table__,
                         Enrollment.__table__,
                         ClassMaterial.__table__,

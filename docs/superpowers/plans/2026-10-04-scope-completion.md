@@ -24,9 +24,9 @@
 
 | # | Milestone | Deliverable / gate | State |
 | --- | --- | --- | --- |
-| 1 | Update local Docker | Verified backup; Linux web/API build; additive 0007–0008 migration; healthy services; latest OpenAPI routes | In progress |
-| 2 | Reviewed concepts and mastery | Subject selection; versioned material mappings; question-specific allowed attribution; exactly-once mastery evidence for adaptive and formal quizzes | Pending |
-| 3 | Reviewed OCR and durable imports | Original files and page provenance; scan/native preview; teacher review; database-backed leased/retry jobs that survive restarts | Pending |
+| 1 | Update local Docker | Verified backup; Linux web/API build; additive 0007–0008 migration; healthy services; latest OpenAPI routes | Complete |
+| 2 | Reviewed concepts and mastery | Subject selection; versioned material mappings; question-specific allowed attribution; exactly-once mastery evidence for adaptive and formal quizzes | Complete |
+| 3 | Reviewed OCR and durable imports | Original files and page provenance; scan/native preview; teacher review; database-backed leased/retry jobs that survive restarts | In progress |
 | 4 | Guided Tutor and accessible UI consistency | Guided learning is the student entry; shadcn forms/tables/dialog/menu; global low-vision preferences; complete keyboard profile menu and ID/EN copy | Pending |
 | 5 | Provider telemetry | Persist real token/latency/status metadata without prompt/text/secrets; admin aggregation; explicitly configured price estimates | Pending |
 | 6 | Operations and release preparation | Updated Compose worker/runtime; backup/restore rehearsal on isolated DB; deployment/smoke tooling and VPS acceptance instructions | Pending |
@@ -47,3 +47,5 @@ VPS host/domain and real assistive-device acceptance are external release gates.
 - Baseline: `9e760bb`, clean checkout. Docker project `kodmod-centre`, persistent files under `F:/Docker_Centre/kodmod`, source stays in this checkout.
 - Milestone 1 preflight: running DB at `0006_editorial_quizzes`; users=4, class_materials=0, learning_sessions=1. Verified custom-format PostgreSQL backup with 236 archive entries before updating. No fixture users were inserted into the main database.
 - Ruling: run focused checks per milestone, then the full suite after all code milestones, as requested. Real phone/assistive technology checks remain user-owned.
+- Milestone 1 verified: images built on Linux; backed up again immediately before startup; main database migrated to `0008_audit_events`; Compose reports web/API/Postgres/Redis healthy. All five required learning, quiz recovery, teacher proposal, admin material and AI usage routes are present in the running OpenAPI; homepage responds 200. Newer concept code is intentionally applied after its focused checks.
+- Milestone 2: subject selection and teacher review UI; additive `0009_material_concepts`; frozen initial Concept schema for correct fresh migrations; historical material mappings; question-specific generation/proposal attribution; formal and adaptive exactly-once mastery receipts. Focused gate: 65 backend/PostgreSQL checks and 9 Node boundary/material tests passed; web typecheck/lint and targeted Ruff passed. Concept migration is verified on disposable PostgreSQL, awaiting final runtime rebuild with subsequent milestones.

@@ -90,8 +90,10 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     requested_topic = (state.get("current_topic") or "").strip()
     classroom_scope = bool(state.get("class_id") or state.get("material_id"))
     subject_id = state.get("subject_id")
-    # Classroom materials have no approved curriculum mapping yet. A prior
-    # Concept or a global name match cannot establish what this material tests.
+    # Only the server supplies reviewed classroom mappings. Never infer them
+    # from the student's previous topic, global mastery or similar names.
+    approved = state.get("approved_material_concepts", []) if classroom_scope else []
+    allowed_concepts = {item["id"] for item in approved}
     concept_id = ""
     if not classroom_scope:
         concept_id = state.get("current_concept_id") or ""
@@ -156,6 +158,8 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         f"<predicted_success_probability>{predicted_success:.2f}</predicted_success_probability>\n"
         f"<mastery>{json.dumps(mastery)}</mastery>\n"
         f"<concept_id>{concept_id}</concept_id>\n"
+        f"<approved_material_concepts>{json.dumps(approved)}</approved_material_concepts>\n"
+        "For classroom questions, concept_id must identify the specific tested concept from that approved list, or be empty if none is tested. Never invent a concept or assign all questions the same concept.\n"
         f"<n_questions>{n_questions}</n_questions>\n"
         f"All {n_questions} questions must be about the topic above.\n"
         f"<curriculum_context>\n{context_block}\n</curriculum_context>\n\n"
@@ -174,7 +178,10 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         response = await llm.ainvoke(messages)
         raw = response.content if hasattr(response, "content") else str(response)
         try:
-            generated = validate_generated_questions(raw, n_questions, len(docs), require_sources=classroom_scope, only_mcq=bool(state.get("quiz_mcq_only")))
+            candidate = validate_generated_questions(raw, n_questions, len(docs), require_sources=classroom_scope, only_mcq=bool(state.get("quiz_mcq_only")))
+            if classroom_scope and approved and any(q.concept_id and q.concept_id not in allowed_concepts for q in candidate):
+                raise ValueError("Question claims an unapproved Concept")
+            generated = candidate
             break
         except (ValueError, TypeError, AttributeError):
             log.warning("Quiz generation did not satisfy the source/quality contract, attempt=%s", attempt + 1)
@@ -183,7 +190,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         raise ValueError("Quiz generation failed the quality contract after retry")
     questions: list[QuizQuestion] = [QuizQuestion(
         question_id=str(uuid4()), text=q.text, type=q.type, options=q.options,
-        expected_answer=q.expected_answer, rubric=q.rubric, concept_id=concept_id,
+        expected_answer=q.expected_answer, rubric=q.rubric, concept_id=(q.concept_id if approved else "") if classroom_scope else concept_id,
         difficulty=cast(DifficultyLevel, q.difficulty or difficulty),
         source_indices=q.source_indices,
         explanation=q.explanation,
@@ -256,6 +263,7 @@ async def generate_questions_for_student(
 
 
 class GeneratedQuestion(BaseModel):
+    concept_id: str = ""
     text: str = Field(min_length=1, max_length=4000)
     type: Literal["mcq", "spoken", "explain", "reasoning", "step_by_step"] = "spoken"
     options: list[str] = Field(default_factory=list)

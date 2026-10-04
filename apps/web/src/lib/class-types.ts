@@ -3,6 +3,7 @@ export type Classroom = {
   id: string;
   name: string;
   subject: string;
+  subject_id?: string | null;
   description: string;
   is_archived: boolean;
   teacher_name: string;
@@ -23,6 +24,8 @@ export type Material = {
   n_chunks?: number;
   content_version?: number;
   indexed_version?: number;
+  mapping_version?: number;
+  indexed_mapping_version?: number;
 };
 export type ReadingProgress = {
   completed: boolean;

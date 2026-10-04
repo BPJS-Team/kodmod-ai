@@ -60,6 +60,8 @@ STATE_KEYS = (
     "class_id",
     "material_id",
     "material_version",
+    "material_mapping_version",
+    "approved_material_concepts",
     "assessment_kind",
     "quiz_source_docs",
     "tutoring_context",
@@ -154,6 +156,8 @@ async def start_assessment(
         assessment_managed=True,
         assessment_kind=kind,
         material_version=material.content_version if material else None,
+        material_mapping_version=material.mapping_version if material else None,
+        approved_material_concepts=context.get("approved_material_concepts", []) if context else [],
         quiz_source_docs=copy.deepcopy(source_docs or []),
         intent="quiz",
         quiz_n_questions=body.n_questions,
@@ -165,6 +169,11 @@ async def start_assessment(
         mastery_confidence=dict(model._confidence),
         learning_profile={**build_learning_profile(student), "language": body.language},
     )
+    if context:
+        state["subject_id"] = context.get("subject_id")
+        state["current_concept_id"] = ""
+        if body.concept_id and str(body.concept_id) not in {c["id"] for c in state["approved_material_concepts"]}:
+            raise HTTPException(422, "Konsep harus sudah disetujui untuk materi ini.")
     final = await invoke(graph, state, sid)
     questions = copy.deepcopy(final.get("quiz_questions", []))
     if len(questions) != body.n_questions:
@@ -172,7 +181,13 @@ async def start_assessment(
     for question in questions:
         question["question_id"] = str(as_uuid(question.get("question_id")) or uuid.uuid4())
         cid = as_uuid(question.get("concept_id"))
-        question["concept_id"] = str(cid) if not context and cid and await session.get(Concept, cid) else ""
+        if context:
+            allowed = {c["id"] for c in state["approved_material_concepts"]}
+            if allowed and cid and str(cid) not in allowed:
+                raise ValueError("Question claims an unapproved material Concept")
+            question["concept_id"] = str(cid) if allowed and cid else ""
+        else:
+            question["concept_id"] = str(cid) if cid and await session.get(Concept, cid) else ""
     final.update(
         quiz_questions=questions,
         quiz_question=questions[0],
@@ -420,8 +435,12 @@ async def submit_assessment(
     for position in range(applied, cursor):
         evidence = attempts[position]
         cid = as_uuid(q_by_id[evidence["question_id"]].get("concept_id"))
-        if not cid or canonical.get("class_id") or canonical.get("material_id"):
+        if not cid:
             continue
+        if canonical.get("class_id") or canonical.get("material_id"):
+            approved_ids = {c["id"] for c in canonical.get("approved_material_concepts", [])}
+            if str(cid) not in approved_ids:
+                continue
         if await session.get(Concept, cid) is None:
             continue
         event_receipt = receipts[position]
@@ -460,6 +479,12 @@ async def submit_assessment(
                 confidence=event_confidence,
                 mastery_before=before,
                 mastery_after=row.mastery,
+                source_snapshot={
+                    "material_id": canonical.get("material_id"),
+                    "content_version": canonical.get("material_version"),
+                    "mapping_version": canonical.get("material_mapping_version"),
+                    "subject_id": canonical.get("subject_id"),
+                },
             )
         )
     final.update(

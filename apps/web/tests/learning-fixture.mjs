@@ -108,6 +108,14 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
     indexed_version: m.indexed_version,
   });
   return (req, url, body, user, send) => {
+    if (url.pathname === "/subjects" && req.method === "GET") {
+      send(200, [{ id: "40000000-0000-4000-8000-000000000001", name: "Matematika", n_concepts: 0 }]);
+      return true;
+    }
+    if (/^\/subjects\/[^/]+\/concepts$/.test(url.pathname) && req.method === "GET") {
+      send(200, []);
+      return true;
+    }
     if (req.method === "GET" && ["/learning/active", "/quiz/active"].includes(url.pathname)) {
       send(user.role === "student" ? 200 : 403, user.role === "student" ? [] : {});
       return true;
@@ -529,6 +537,9 @@ export function createLearningFixture({ legacyPending = false, quizFailureQueue 
         (m) => m.id === parts[3] && m.class_id === room?.id,
       );
       if (!member || !room) send(404, {});
+      else if (parts.length === 5 && parts[4] === "concepts" && material && req.method === "GET") {
+        send(user.role === "teacher" ? 200 : 403, { material_id: material.id, content_version: material.content_version, mapping_version: 0, subject_id: null, concepts: [] });
+      }
       else if (parts[2] === "materials" && parts[3] === "import" && req.method === "POST") {
         if (user.role !== "teacher") send(403, {});
         else if (validateMaterialFile(body.file)) send(422, { detail: validateMaterialFile(body.file) });

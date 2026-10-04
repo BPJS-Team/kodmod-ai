@@ -104,7 +104,7 @@ async def update_material(
         setattr(material, key, value)
     if not material.published:
         material.rag_status = "pending"
-    elif material.indexed_version == material.content_version and material.n_chunks > 0:
+    elif material.indexed_version == material.content_version and material.indexed_mapping_version == material.mapping_version and material.n_chunks > 0:
         material.rag_status = "ready"
     record(session, classroom, actor, "material.admin-updated", material.id)
     await session.flush()
@@ -124,7 +124,7 @@ async def reindex_material(
     material, classroom, teacher = await material_for(session, material_id, lock=True)
     if classroom.is_archived or not material.published:
         raise HTTPException(409, "Materi harus terbit di kelas aktif sebelum diproses.")
-    if material.rag_status != "ready" or material.indexed_version != material.content_version:
+    if material.rag_status != "ready" or material.indexed_version != material.content_version or material.indexed_mapping_version != material.mapping_version:
         material.rag_status, material.rag_error = "pending", None
         record(session, classroom, actor, "material.admin-index-requested", material.id)
         await session.commit()

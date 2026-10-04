@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.material_concepts import current_concepts
 from database.models import ClassMaterial, Classroom, Enrollment, User
 from database.session import async_session
 from rag.ingestion import build_material_records
@@ -43,6 +44,7 @@ async def resolve_tutoring_context(
         ready = (
             material.rag_status == "ready"
             and material.indexed_version == material.content_version
+            and material.indexed_mapping_version == material.mapping_version
             and material.n_chunks > 0
         )
     else:
@@ -54,6 +56,7 @@ async def resolve_tutoring_context(
                 ClassMaterial.published.is_(True),
                 ClassMaterial.rag_status == "ready",
                 ClassMaterial.indexed_version == ClassMaterial.content_version,
+                ClassMaterial.indexed_mapping_version == ClassMaterial.mapping_version,
                 ClassMaterial.n_chunks > 0,
             )
         )
@@ -67,11 +70,15 @@ async def resolve_tutoring_context(
         "material_id": str(material.id) if material else None,
         "subject_name": classroom.subject,
         "material_title": material.title if material else None,
+        "subject_id": str(classroom.subject_id) if classroom.subject_id else None,
+        "mapping_version": material.mapping_version if material else None,
+        "approved_material_concepts": await current_concepts(session, material, classroom) if material else [],
     }
 
 
 async def index_class_material(material_id: uuid.UUID, version: int) -> None:
     """Publish an index atomically; outdated jobs never replace newer content."""
+    mapping_version = None
     try:
         async with async_session() as session:
             row = await session.scalar(
@@ -82,27 +89,36 @@ async def index_class_material(material_id: uuid.UUID, version: int) -> None:
             classroom = await session.get(Classroom, row.class_id)
             if classroom is None or classroom.is_archived:
                 return
-            if row.rag_status == "ready" and row.indexed_version == version:
+            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == row.mapping_version:
                 return
             row.rag_status = "processing"
             row.rag_error = None
             content, source = row.content, row.source_filename or row.title
+            mapping_version = row.mapping_version
+            concepts = await current_concepts(session, row, classroom)
             await session.commit()
 
         records = await build_material_records(content, source=source)
         if not records:
             raise ValueError("No material chunks")
+        for record in records:
+            record["material_mapping_version"] = mapping_version
+            record["accessibility_metadata"] = {
+                **record.get("accessibility_metadata", {}),
+                "approved_concept_ids": [concept["id"] for concept in concepts],
+            }
 
         async with async_session() as session:
             row = await session.scalar(
                 select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
             )
-            if row is None or row.content_version != version or not row.published:
+            if row is None or row.content_version != version or row.mapping_version != mapping_version or not row.published:
                 return
-            if row.rag_status == "ready" and row.indexed_version == version:
+            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == mapping_version:
                 return
             await replace_material_chunks(session, material_id, version, records)
             row.indexed_version = version
+            row.indexed_mapping_version = mapping_version
             row.n_chunks = len(records)
             row.rag_status = "ready"
             row.rag_error = None
@@ -114,7 +130,7 @@ async def index_class_material(material_id: uuid.UUID, version: int) -> None:
                 row = await session.scalar(
                     select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
                 )
-                if row is not None and row.content_version == version and row.rag_status != "ready":
+                if row is not None and row.content_version == version and (mapping_version is None or row.mapping_version == mapping_version) and row.rag_status != "ready":
                     row.rag_status = "failed" if row.published else "pending"
                     row.rag_error = "Indeks AI belum berhasil dibuat. Periksa koneksi lalu gunakan Proses ulang."
                     await session.commit()

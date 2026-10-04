@@ -13,6 +13,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import current_user, db_session, require_student, require_teacher
+from api.material_concepts import (
+    MappingApproval,
+    approve_mapping,
+    change_subject,
+    mapping_out,
+    select_subject,
+)
 from api.material_imports import import_document, safe_filename
 from api.material_service import index_class_material
 from database.models import (
@@ -31,6 +38,7 @@ class ClassWrite(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     name: str = Field(min_length=1, max_length=120)
     subject: str = Field(min_length=1, max_length=120)
+    subject_id: uuid.UUID | None = None
     description: str = Field(default="", max_length=2000)
 
 
@@ -39,6 +47,7 @@ class ClassUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
     is_archived: bool | None = None
+    subject_id: uuid.UUID | None = None
 
 
 class MemberWrite(BaseModel):
@@ -60,7 +69,7 @@ class MaterialWrite(BaseModel):
 
 
 async def accessible(session: AsyncSession, class_id: uuid.UUID, user: User, *, write=False):
-    row = await session.get(Classroom, class_id)
+    row = await session.scalar(select(Classroom).where(Classroom.id == class_id).execution_options(populate_existing=True).with_for_update()) if write else await session.get(Classroom, class_id)
     owner = row is not None and user.role == "teacher" and row.teacher_id == user.id
     member = (
         row is not None
@@ -100,6 +109,7 @@ async def summary(session, row, user):
         "id": str(row.id),
         "name": row.name,
         "subject": row.subject,
+        "subject_id": str(row.subject_id) if row.subject_id else None,
         "description": row.description,
         "is_archived": row.is_archived,
         "teacher_name": teacher.full_name if teacher else "Guru",
@@ -120,6 +130,8 @@ def material_info(row):
         "n_chunks": row.n_chunks,
         "content_version": row.content_version,
         "indexed_version": row.indexed_version,
+        "mapping_version": row.mapping_version,
+        "indexed_mapping_version": row.indexed_mapping_version,
         "created_at": row.created_at.isoformat(),
     }
 
@@ -149,7 +161,11 @@ async def create_class(
     session: AsyncSession = Depends(db_session),
 ):
     """Create a teacher-owned classroom with its subject label."""
-    row = Classroom(teacher_id=user.id, **body.model_dump())
+    subject = await select_subject(session, body.subject_id)
+    values = body.model_dump()
+    if subject:
+        values["subject"] = subject.name
+    row = Classroom(teacher_id=user.id, **values)
     session.add(row)
     await session.flush()
     record(session, row, user, "class.created")
@@ -252,16 +268,52 @@ async def detail(
 async def update_class(
     class_id: uuid.UUID,
     body: ClassUpdate,
+    background: BackgroundTasks,
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
     """Update or archive the teacher's own classroom."""
     row = await accessible(session, class_id, user)
-    for key, value in body.model_dump(exclude_unset=True, exclude_none=True).items():
+    row = await session.scalar(select(Classroom).where(Classroom.id == row.id).execution_options(populate_existing=True).with_for_update())
+    changed_materials = await change_subject(session, row, body.subject_id) if "subject_id" in body.model_fields_set else []
+    for key, value in body.model_dump(exclude_unset=True, exclude_none=True, exclude={"subject_id"}).items():
         setattr(row, key, value)
     record(session, row, user, "class.updated")
     await session.flush()
-    return await summary(session, row, user)
+    result = await summary(session, row, user)
+    await session.commit()
+    for material in changed_materials:
+        if material.published and not row.is_archived:
+            background.add_task(index_class_material, material.id, material.content_version)
+    return result
+
+
+@router.get("/{class_id}/materials/{material_id}/concepts")
+async def read_mapping(class_id: uuid.UUID, material_id: uuid.UUID,
+                       user: User = Depends(require_teacher), session: AsyncSession = Depends(db_session)):
+    classroom = await accessible(session, class_id, user)
+    material = await session.get(ClassMaterial, material_id)
+    if material is None or material.class_id != class_id:
+        raise HTTPException(404, "Materi tidak ditemukan.")
+    return await mapping_out(session, material, classroom)
+
+
+@router.put("/{class_id}/materials/{material_id}/concepts")
+async def review_mapping(class_id: uuid.UUID, material_id: uuid.UUID, body: MappingApproval,
+                         background: BackgroundTasks, user: User = Depends(require_teacher),
+                         session: AsyncSession = Depends(db_session)):
+    classroom = await accessible(session, class_id, user, write=True)
+    material = await session.scalar(select(ClassMaterial).where(
+        ClassMaterial.id == material_id, ClassMaterial.class_id == class_id).with_for_update())
+    if material is None:
+        raise HTTPException(404, "Materi tidak ditemukan.")
+    await approve_mapping(session, material, classroom, body, user)
+    record(session, classroom, user, "material.concepts_reviewed", material.id)
+    result = await mapping_out(session, material, classroom)
+    await session.commit()
+    if material.published:
+        background.add_task(index_class_material, material.id, material.content_version)
+    return result
 
 
 @router.post("/{class_id}/members", status_code=201)
@@ -432,7 +484,7 @@ async def edit_material(
         setattr(row, key, value)
     if not row.published:
         row.rag_status = "pending"
-    elif row.indexed_version == row.content_version and row.n_chunks > 0:
+    elif row.indexed_version == row.content_version and row.indexed_mapping_version == row.mapping_version and row.n_chunks > 0:
         row.rag_status = "ready"
     record(session, classroom, user, "material.updated", row.id)
     await session.flush()
@@ -461,7 +513,7 @@ async def retry_material_index(
         raise HTTPException(
             409, "Terbitkan materi terlebih dahulu agar dapat diproses untuk Tutor AI."
         )
-    if row.rag_status == "ready" and row.indexed_version == row.content_version:
+    if row.rag_status == "ready" and row.indexed_version == row.content_version and row.indexed_mapping_version == row.mapping_version:
         return material_info(row)
     row.rag_status = "pending"
     row.rag_error = None

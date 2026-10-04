@@ -40,6 +40,7 @@ export async function createClass(
       body: JSON.stringify({
         name: value(data, "name"),
         subject: value(data, "subject"),
+        subject_id: value(data, "subject_id") || null,
         description: value(data, "description"),
       }),
     });

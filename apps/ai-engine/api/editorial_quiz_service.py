@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.assignment_mastery import apply_assignment_mastery
 from database.models import (
     AssignmentAnswer,
     AssignmentAttempt,
@@ -74,7 +75,7 @@ async def validate_catalog(session: AsyncSession, body: DraftInput):
         raise HTTPException(422, "Mata pelajaran tidak ditemukan.")
     for concept_id in {q.concept_id for q in body.questions if q.concept_id}:
         concept = await session.get(Concept, concept_id)
-        if concept is None or concept.subject_id != body.subject_id:
+        if concept is None or not concept.is_active or concept.subject_id != body.subject_id:
             raise HTTPException(422, "Konsep harus berasal dari mata pelajaran yang dipilih.")
 
 
@@ -452,6 +453,7 @@ async def submit_attempt(session, assignment, attempt, expected_revision, submis
         answer.is_correct = answer.option_id == q.correct_option_id
         answer.feedback = q.explanation
         correct += int(answer.is_correct)
+    await apply_assignment_mastery(session, assignment, attempt, items, answers)
     attempt.state, attempt.submitted_at = "submitted", now()
     attempt.correct_count, attempt.score = correct, round(correct / len(items) * 100, 2)
     attempt.submission_key, attempt.submission_revision = submission_key, expected_revision

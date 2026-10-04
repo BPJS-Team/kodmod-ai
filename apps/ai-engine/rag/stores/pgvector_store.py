@@ -83,6 +83,7 @@ async def replace_material_chunks(
             CurriculumChunk(
                 material_id=material_id,
                 material_version=version,
+                material_mapping_version=record.get("material_mapping_version", 0),
                 content=record["text"],
                 embedding=record["embedding"],
                 source=record["source"],
@@ -142,7 +143,9 @@ async def query(
                 ClassMaterial.published.is_(True),
                 ClassMaterial.rag_status == "ready",
                 ClassMaterial.indexed_version == ClassMaterial.content_version,
+                ClassMaterial.indexed_mapping_version == ClassMaterial.mapping_version,
                 CurriculumChunk.material_version == ClassMaterial.content_version,
+                CurriculumChunk.material_mapping_version == ClassMaterial.mapping_version,
             )
         )
         if material_id:
@@ -165,7 +168,7 @@ async def query(
             if key in doc and doc[key] is not None:
                 doc[key] = str(doc[key])
         doc["source"] = PurePosixPath((doc.get("source") or "Materi").replace("\\", "/")).name
-        doc["concept_ids"] = [doc["concept_id"]] if doc.get("concept_id") else []
+        doc["concept_ids"] = doc["accessibility_metadata"].get("approved_concept_ids", []) if class_id else [doc["concept_id"]] if doc.get("concept_id") else []
         docs.append(doc)
     return docs
 

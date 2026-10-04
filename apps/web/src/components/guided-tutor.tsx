@@ -49,7 +49,7 @@ export function GuidedTutor({ materials, initialSessions, initialMaterialId }: {
   const explanation = useRef<HTMLHeadingElement>(null);
   const locked = lesson?.phase === "quiz";
   const selected = materials.find((row) => row.id === materialId);
-  const ready = selected?.rag_status === "ready" && selected.indexed_version === selected.content_version;
+  const ready = selected?.rag_status === "ready" && selected.indexed_version === selected.content_version && (selected.indexed_mapping_version ?? 0) === (selected.mapping_version ?? 0);
 
   function accept(next: LearningSession, play = false) {
     setLesson(next);

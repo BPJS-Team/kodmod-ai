@@ -9,8 +9,9 @@ import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 import type { Material } from "@/lib/class-types";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
 import { materialTutorStatus, validateMaterialFile, parseMaterialPageRange, type MaterialSection } from "@/lib/material-flow.mjs";
+import type { CurriculumSubject } from "@/lib/concept-types";
 
-export function ClassForm() {
+export function ClassForm({ subjects = [] }: { subjects?: CurriculumSubject[] }) {
   const { t } = useI18n();
   const [values, setValues] = useState({
     name: "",
@@ -47,6 +48,10 @@ export function ClassForm() {
           onChange={(e) => setValues({ ...values, subject: e.target.value })}
         />
       </label>
+      <label className="field"><UiText>{"Hubungkan mata pelajaran"}</UiText><select name="subject_id" onChange={event => {
+        const subject = subjects.find(row => row.id === event.target.value);
+        if (subject) setValues(previous => ({ ...previous, subject: subject.name }));
+      }}><option value=""><UiText>{"Pilih nanti"}</UiText></option>{subjects.map(subject => <option value={subject.id} key={subject.id}>{subject.name}</option>)}</select></label>
       <label className="field"><UiText>{"Tentang kelas"}</UiText><textarea
           name="description"
           rows={4}
