@@ -50,6 +50,7 @@ Soal siswa hanya berisi `id`, `order_index`, `prompt`, `narration`, `options: [{
 ## Konsistensi pengiriman
 
 - Draft dikunci saat mutasi editorial; assignment lalu attempt dikunci saat start/autosave/submit/close.
+- Keputusan review dan pergantian reviewer membaca ulang status aktif/role actor setelah draft terkunci dan menahan shared User row lock sampai commit. Pencabutan akses yang telah commit saat request menunggu tidak bisa dilewati memakai actor lama dari dependency autentikasi.
 - Constraint unik menjamin satu attempt per assignment/siswa dan satu jawaban per attempt/soal.
 - Autosave dengan revisi lama menghasilkan 409; tidak diam-diam mengganti jawaban terbaru.
 - Pengiriman akhir menyimpan kunci UUID, revisi payload, nilai, pembahasan snapshot, dan receipt JSON dalam transaksi yang sama.
@@ -88,3 +89,7 @@ Siswa memilih satu opsi lalu menekan **Simpan & lanjut**. Jawaban tersimpan di s
 `apps/web/tests/editorial-proxy.test.mjs` menguji alur lintas HTTP Next.js dan PostgreSQL nyata. Jalankan dengan `EDITORIAL_PROXY_TEST=1` hanya setelah `python -m tests.editorial_server` berjalan pada 8118 dan build Next standalone pada 3118 dengan `API_ORIGIN=http://127.0.0.1:8118`. Server fixture memaksa credential dummy, memakai schema `editorial_ui_fixture` pada database test port 5434, dan membersihkan schema saat shutdown normal. Jangan arahkan fixture ke database aplikasi.
 
 Validasi UI produksi pada fixture: draft berhasil dibuat, pesan sukses dan isi tersimpan muncul, label form/kelompok radio dapat diakses, dan viewport 400px tidak mengalami overflow horizontal. Ini pemeriksaan browser desktop dengan viewport kecil, bukan pengujian HP/TalkBack/VoiceOver.
+
+Regresi refresh juga diuji lewat browser: setelah tenggat fixture dimajukan, **Periksa pembahasan** menampilkan pembahasan yang baru dirilis; setelah guru menutup tugas yang sedang terbuka, server menolak simpan dan **Muat ulang progres** menampilkan Ditutup serta menonaktifkan opsi/simpan. Snapshot komponen menyertakan status rilis dan penutupan agar state React tidak mempertahankan data lama.
+
+Stack Docker lokal kini memakai migration head `0006_editorial_quizzes`. Next.js pada 3100, API pada 8109, PostgreSQL dan Redis sehat. Smoke baseline 12 pemeriksaan dan akses tanpa login pada 6 route baru lolos; alur pengguna/penilaian diverifikasi pada database terisolasi, bukan dengan membuat data dummy di database aplikasi.

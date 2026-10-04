@@ -1,6 +1,6 @@
 # KODMOD Technical Priorities Implementation Plan
 
-> **For future implementation:** Execute milestones in dependency order in this workspace, use tests that reproduce the intended behavior, and commit each working milestone without trailers. The current turn is technical mapping. Unchecked items below are planned work, not shipped features.
+> Execute milestones in dependency order in this workspace, use tests that reproduce the intended behavior, and commit each working milestone without trailers. Milestones 0 and 1 are implemented. Unchecked items below are planned work, not shipped features.
 
 **Goal:** Complete teacher assignments and trustworthy concept progress, add reviewed OCR imports, then apply the accessible shadcn UI to verified learning flows.
 
@@ -12,18 +12,18 @@
 
 ## Status and evidence
 
-Audit date: 4 October 2026. CodeGraph source exploration, two independent read-only audits, existing milestone reports, and a direct Docker service check were used. No application code, database schema, dependencies, or providers were changed during this mapping.
+Initial mapping date: 4 October 2026. CodeGraph source exploration, two independent read-only audits, existing milestone reports, and a direct Docker service check were used. That mapping did not change application code, database schema, dependencies, or providers. The table below has since been updated with the completed milestones; delivery evidence appears in each completed section.
 
 | Area | Current implementation | Remaining work |
 | --- | --- | --- |
 | Teacher materials | PDF with native text, DOCX, TXT/Markdown preview; teacher edits and publishes; versioned classroom index and retry | Original-file lineage for classroom imports, scan OCR, page citations, durable jobs, concept mapping |
 | Classroom Tutor | Student membership/publication/version checks; selected class/material; response and history sources | Correct concept attribution, richer provenance, streaming/cancel, real-provider evaluation |
-| Adaptive learning | Student quiz runtime, feedback, mini-quiz, mastery cursor | Session/question preflight, replay/concurrency handling, reliable persistence and question numbering |
-| Teacher quiz | Design contract only | Drafts, review, immutable publication, assignment, attempt, grading, and results |
+| Adaptive learning | Student quiz runtime, feedback, mini-quiz, mastery cursor; milestone 0 added ownership/current-question checks, durable submissions and mastery events | Real-provider and device evaluation; approved concept integration in milestone 2 |
+| Teacher quiz | Manual MCQ drafts, independent review, immutable publication, class assignment, resumable answers, final grade/receipt and results UI | AI draft suggestions, essays, approved Concept mastery integration |
 | Concepts | Subject/Concept catalog exists; questions can carry Concept UUIDs | Classroom Subject relation; reviewed material-to-Concept mapping; attribution restricted to approved concepts |
 | Voice | ElevenLabs TTS/STT, app/device TTS choice, browser audio cache and manual controls | Independent menu narration and Tutor autoplay, coordinated output, stale-request cancellation, mobile/AT tests |
 | UI accessibility | Skip link, semantic navigation, keyboard baseline, reading preferences | Global low-vision preferences, first-run setup, optional guided navigation, shadcn primitives, contrast/focus corrections |
-| Infrastructure | Docker Engine reachable; `kodmod-postgres` and `kodmod-redis` healthy under `kodmod-centre` | Isolated PostgreSQL migration/integration tests, application startup and provider/device smoke tests |
+| Infrastructure | Full PostgreSQL/Redis/FastAPI/Next.js Docker stack and migration job; isolated PostgreSQL migration/concurrency checks | VPS deployment, backup/restore rehearsal and real provider/device smoke tests |
 
 The prior material milestone reports 254 backend tests and 33 frontend tests plus lint/typecheck/build. Those are earlier isolated results, not tests rerun by this audit and not proof of live-provider or phone behavior.
 
@@ -81,7 +81,7 @@ Historical source findings, now reproduced and fixed in isolated assessment test
 
 **Delivery boundary:** Manual multiple-choice authoring on one owned classroom, reviewed publication, one resumable attempt per student, deterministic final grading, and scoped results. AI generation and essay grading follow this working flow.
 
-**Files to add:** `apps/ai-engine/api/routes/editorial_quizzes.py`, `api/editorial_quiz_service.py`, `models/editorial_quiz.py`, `database/migrations/versions/0006_editorial_quizzes.py`, and `tests/contract/test_editorial_quiz_schemas.py` / `tests/api/test_editorial_quizzes.py`. Paths after the first entry are relative to `apps/ai-engine`.
+**Implementation files:** `apps/ai-engine/api/routes/editorial_quizzes.py`, `api/editorial_quiz_service.py`, `models/editorial_quiz.py`, `database/migrations/versions/0006_editorial_quizzes.py`, and `tests/contract/test_editorial_quiz_schemas.py` / `tests/editorial_test.py` / `tests/test_editorial_postgres.py`. Paths after the first entry are relative to `apps/ai-engine`. Frontend pages/components, contracts and isolated HTTP fixture are listed in [the delivered feature](../../editorial-quizzes.md).
 
 **Files to modify:** `apps/ai-engine/database/models.py` and `api/main.py`. Revision name/number must be rechecked against Alembic head before creation. The current chain is `0001` through `0005_assessment_submissions`.
 
@@ -131,14 +131,16 @@ Final submission accepts an `Idempotency-Key`. After authentication/object acces
 
 Milestone 1 produces assignment scores without Concept mastery effects. Milestone 2 connects approved question mappings to the canonical event writer introduced in milestone 0. Do not invoke the adaptive graph's standalone mastery persistence to grade an assignment.
 
-- [ ] Validate 1–20 questions, unique order/option IDs, 2–6 non-empty MCQ options, exactly one correct option present, title at most 200 characters, description at most 2,000, prompt at most 4,000, narration at most 6,000, explanation at most 4,000, valid difficulty, Subject/Concept consistency, and UTC schedule (`opens_at < due_at` when both exist).
-- [ ] Implement the versioned draft/review/publish lifecycle and test its permissions/conflicts before exposing authoring UI.
-- [ ] Implement assignment, resumable autosave, final submit and results against a separate test database.
-- [ ] Test persistence failure, duplicate/concurrent final submit, lost response after commit, autosave/final-submit races, new versions after publication, foreign classes/students, removed enrollment, archived class, early/late access and answer-key disclosure.
-- [ ] Test self-review rejection, reviewer inactivity/reassignment/revocation, stale approval/rejection/publish decisions and queue disclosure outside review capability.
-- [ ] Test upgrade/downgrade on an isolated PostgreSQL database and verify that adaptive `/quiz/*` remains independent.
+- [x] Validate 1–20 questions, unique order/option IDs, 2–6 non-empty MCQ options, exactly one correct option present, title at most 200 characters, description at most 2,000, prompt at most 4,000, narration at most 6,000, explanation at most 4,000, valid difficulty, Subject/Concept consistency, and UTC schedule (`opens_at < due_at` when both exist).
+- [x] Implement the versioned draft/review/publish lifecycle and test its permissions/conflicts before exposing authoring UI.
+- [x] Implement assignment, resumable autosave, final submit and results against a separate test database.
+- [x] Test persistence failure, duplicate/concurrent final submit, lost response after commit, autosave/final-submit races, new versions after publication, foreign classes/students, removed enrollment, archived class, early/late access and answer-key disclosure.
+- [x] Test self-review rejection, reviewer inactivity/reassignment/revocation, stale approval/rejection/publish decisions and queue disclosure outside review capability.
+- [x] Test upgrade/downgrade on an isolated PostgreSQL database and verify that adaptive `/quiz/*` remains independent.
 
 **Gate:** A teacher authors a quiz, its reviewer approves the exact version, the teacher publishes/assigns it, an enrolled student resumes and submits once, and the teacher sees the persisted result. Old assignments retain their original content and policy.
+
+**Delivery evidence, 4 October 2026:** This gate passed through the real Next.js HTTP proxy and an isolated PostgreSQL fixture. After the final review fixes, 321 isolated backend tests, 8 PostgreSQL concurrency tests, 61 offline frontend tests and 2 Next/PostgreSQL HTTP acceptance tests passed; lint, typecheck and production build passed. Migration 0006 was upgraded, downgraded to 0005, upgraded again and checked for drift on a disposable database. Browser UI created a draft, displayed its saved state after reload, and both teacher/student layouts fit a 400px viewport without horizontal overflow. Browser regression checks confirmed release-after-due refresh shows explanations and closure refresh disables answer controls. Final review's two P2 findings were repaired: a revoked reviewer is rechecked under a shared User row lock until decision commit; student snapshots refresh when release/schedule/closure changes. The local Docker stack was rebuilt, migration head is 0006, and 12 baseline plus 6 new-route readiness/access checks passed. This does not prove real-provider synthesis, assistive-device usability or VPS deployment. Registration/voice/multilingual changes are delegated by the user's request through [the next-AI handoff](../../handoff/2026-10-04-auth-voice-i18n.md), not part of this quiz milestone.
 
 ## 2. Reviewed concept mapping and mastery integration
 
