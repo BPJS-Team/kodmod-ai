@@ -41,7 +41,9 @@ def language_instruction(language: str | None = None) -> str:
     whatever language the input, retrieved curriculum, or few-shot examples
     happen to be in.
     """
-    target = {"id": "Bahasa Indonesia", "en": "English"}.get(language, settings.GRAPH_LANGUAGE)
+    target = {"id": "Bahasa Indonesia", "en": "English"}.get(
+        language or "", settings.GRAPH_LANGUAGE
+    )
     return (
         f"\n\nIMPORTANT: Always respond in {target}, no matter what "
         "language the student's input, the curriculum context, or any examples above "
@@ -93,7 +95,13 @@ def _chat(model: str, **kwargs: Any):
 @lru_cache(maxsize=1)
 def get_router_llm():
     """Fast and small: intent classification on every turn."""
-    return _chat(_resolve("LLM_ROUTER_MODEL"), temperature=0.0, max_tokens=256, streaming=False, usage_role="router")
+    return _chat(
+        _resolve("LLM_ROUTER_MODEL"),
+        temperature=0.0,
+        max_tokens=256,
+        streaming=False,
+        usage_role="router",
+    )
 
 
 @lru_cache(maxsize=1)
@@ -104,24 +112,46 @@ def get_tutor_llm():
 
 @lru_cache(maxsize=1)
 def get_quiz_llm():
-    return _chat(_resolve("LLM_QUIZ_MODEL"), temperature=0.3, max_tokens=2048, streaming=False, usage_role="quiz")
+    return _chat(
+        _resolve("LLM_QUIZ_MODEL"),
+        temperature=0.3,
+        max_tokens=2048,
+        streaming=False,
+        usage_role="quiz",
+    )
 
 
 @lru_cache(maxsize=1)
 def get_scoring_llm():
-    return _chat(_resolve("LLM_SCORING_MODEL"), temperature=0.0, max_tokens=512, streaming=False, usage_role="scoring")
+    return _chat(
+        _resolve("LLM_SCORING_MODEL"),
+        temperature=0.0,
+        max_tokens=512,
+        streaming=False,
+        usage_role="scoring",
+    )
 
 
 @lru_cache(maxsize=1)
 def get_recommendation_llm():
     return _chat(
-        _resolve("LLM_RECOMMENDATION_MODEL"), temperature=0.3, max_tokens=768, streaming=False, usage_role="recommendation"
+        _resolve("LLM_RECOMMENDATION_MODEL"),
+        temperature=0.3,
+        max_tokens=768,
+        streaming=False,
+        usage_role="recommendation",
     )
 
 
 @lru_cache(maxsize=1)
 def get_reflection_llm():
-    return _chat(_resolve("LLM_REFLECTION_MODEL"), temperature=0.0, max_tokens=512, streaming=False, usage_role="reflection")
+    return _chat(
+        _resolve("LLM_REFLECTION_MODEL"),
+        temperature=0.0,
+        max_tokens=512,
+        streaming=False,
+        usage_role="reflection",
+    )
 
 
 _GETTERS = (

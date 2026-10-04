@@ -3,6 +3,7 @@
 import io
 import zipfile
 from pathlib import PurePosixPath
+from typing import Any
 
 from defusedxml import ElementTree
 from fastapi import HTTPException, UploadFile
@@ -24,11 +25,18 @@ def safe_filename(filename: str | None) -> str:
     return PurePosixPath((filename or "materi.txt").replace("\\", "/")).name[:300]
 
 
-def extract_document(data: bytes, filename: str, *, first_page: int | None = None, last_page: int | None = None, allow_ocr: bool = False) -> dict:
+def extract_document(
+    data: bytes,
+    filename: str,
+    *,
+    first_page: int | None = None,
+    last_page: int | None = None,
+    allow_ocr: bool = False,
+) -> dict:
     """Return editable text; images, scan OCR and page citations are not inferred."""
     suffix = PurePosixPath(filename).suffix.lower()
     warnings = []
-    metadata = {"preview_type": "material", "sections": [], "pages": []}
+    metadata: dict[str, Any] = {"preview_type": "material", "sections": [], "pages": []}
     selected = first_page is not None or last_page is not None
     if selected and suffix != ".pdf":
         raise HTTPException(422, "Pilihan halaman hanya tersedia untuk PDF.")
@@ -38,9 +46,15 @@ def extract_document(data: bytes, filename: str, *, first_page: int | None = Non
             total = len(reader.pages)
             if reader.is_encrypted or not total or total > MAX_PDF_PAGES:
                 raise ValueError("Gunakan PDF tanpa sandi, maksimal 500 halaman.")
-            if selected and (first_page is None or last_page is None or not 1 <= first_page <= last_page <= total
-                             or last_page - first_page + 1 > MAX_SELECTED_PAGES):
-                raise ValueError("Pilih halaman awal dan akhir yang valid, maksimal 150 halaman per materi.")
+            if selected and (
+                first_page is None
+                or last_page is None
+                or not 1 <= first_page <= last_page <= total
+                or last_page - first_page + 1 > MAX_SELECTED_PAGES
+            ):
+                raise ValueError(
+                    "Pilih halaman awal dan akhir yang valid, maksimal 150 halaman per materi."
+                )
             cache = {}
 
             def page_text(index):
@@ -48,44 +62,67 @@ def extract_document(data: bytes, filename: str, *, first_page: int | None = Non
                     cache[index] = reader.pages[index].extract_text() or ""
                 return cache[index]
 
-            if allow_ocr and not selected and total > 30 and any(not page_text(index).strip() for index in range(min(3, total))):
-                return {"filename": filename, "title": PurePosixPath(filename).stem[:200],
-                    "content": "", "preview_type": "book", "total_pages": total, "page_range": None,
-                    "sections": suggest_sections(reader, page_text), "pages": [],
-                    "warnings": ["Pilih bab atau rentang halaman untuk membaca buku hasil scan."]}
+            if (
+                allow_ocr
+                and not selected
+                and total > 30
+                and any(not page_text(index).strip() for index in range(min(3, total)))
+            ):
+                return {
+                    "filename": filename,
+                    "title": PurePosixPath(filename).stem[:200],
+                    "content": "",
+                    "preview_type": "book",
+                    "total_pages": total,
+                    "page_range": None,
+                    "sections": suggest_sections(reader, page_text),
+                    "pages": [],
+                    "warnings": ["Pilih bab atau rentang halaman untuk membaca buku hasil scan."],
+                }
 
-            first, last = (first_page, last_page) if selected else (1, total)
+            first = first_page if first_page is not None else 1
+            last = last_page if last_page is not None else total
             metadata.update(total_pages=total, page_range={"first": first, "last": last})
-            pages, characters = [], 0
+            pages: list[str] = []
+            characters = 0
             if selected or total <= MAX_SELECTED_PAGES:
                 for index in range(first - 1, last):
                     text = page_text(index)
                     provenance = {"page": index + 1, "method": "native", "confidence": None}
                     if allow_ocr and len(text.strip()) < 5:
                         from api.pdf_ocr import recognize_page
+
                         recognized = recognize_page(data, index)
                         text = recognized["text"]
                         provenance.update(method="ocr", confidence=recognized["confidence"])
                     characters += len(text) + (2 if pages else 0)
                     if characters > MAX_CONTENT:
                         if selected:
-                            raise ValueError("Teks melebihi 100.000 karakter. Pilih rentang halaman yang lebih kecil.")
+                            raise ValueError(
+                                "Teks melebihi 100.000 karakter. Pilih rentang halaman yang lebih kecil."
+                            )
                         break
                     pages.append(text)
                     metadata["pages"].append({**provenance, "text": text})
             if not selected and (total > MAX_SELECTED_PAGES or characters > MAX_CONTENT):
                 return {
-                    "filename": filename, "title": PurePosixPath(filename).stem[:200],
-                    "content": "", "preview_type": "book", "total_pages": total,
-                    "page_range": None, "sections": suggest_sections(reader, page_text),
-                    "warnings": ["Pilih bab atau rentang halaman, lalu tinjau teksnya. Pembagian bab adalah saran dan belum menyimpan materi."],
+                    "filename": filename,
+                    "title": PurePosixPath(filename).stem[:200],
+                    "content": "",
+                    "preview_type": "book",
+                    "total_pages": total,
+                    "page_range": None,
+                    "sections": suggest_sections(reader, page_text),
+                    "warnings": [
+                        "Pilih bab atau rentang halaman, lalu tinjau teksnya. Pembagian bab adalah saran dan belum menyimpan materi."
+                    ],
                 }
             content = "\n\n".join(pages)
-            warnings.append(
-                "Periksa rumus, tabel, dan urutan teks sebelum menyimpan materi."
-            )
+            warnings.append("Periksa rumus, tabel, dan urutan teks sebelum menyimpan materi.")
             if any(page["method"] == "ocr" for page in metadata["pages"]):
-                warnings.append("Sebagian halaman dibaca dari gambar. Periksa kembali hasilnya, terutama rumus dan tabel.")
+                warnings.append(
+                    "Sebagian halaman dibaca dari gambar. Periksa kembali hasilnya, terutama rumus dan tabel."
+                )
         elif suffix == ".docx":
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
                 entries = archive.infolist()
@@ -136,7 +173,9 @@ def extract_document(data: bytes, filename: str, *, first_page: int | None = Non
     }
 
 
-async def import_document(file: UploadFile, *, first_page: int | None = None, last_page: int | None = None) -> dict:
+async def import_document(
+    file: UploadFile, *, first_page: int | None = None, last_page: int | None = None
+) -> dict:
     filename = safe_filename(file.filename)
     if PurePosixPath(filename).suffix.lower() not in ALLOWED_IMPORTS:
         raise HTTPException(415, "Gunakan berkas PDF, DOCX, Markdown (.md), atau teks (.txt).")
@@ -150,4 +189,6 @@ async def import_document(file: UploadFile, *, first_page: int | None = None, la
     # The parser runs outside the event loop so larger PDFs do not block requests.
     from starlette.concurrency import run_in_threadpool
 
-    return await run_in_threadpool(extract_document, bytes(data), filename, first_page=first_page, last_page=last_page)
+    return await run_in_threadpool(
+        extract_document, bytes(data), filename, first_page=first_page, last_page=last_page
+    )

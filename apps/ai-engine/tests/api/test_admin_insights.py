@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = pytest.mark.api
+pytestmark = [pytest.mark.api, pytest.mark.asyncio(loop_scope="session")]
 
 
 async def test_admin_can_read_overview_and_provider_status(client, admin_factory, auth_headers):

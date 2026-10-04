@@ -73,7 +73,16 @@ class MaterialWrite(BaseModel):
 
 
 async def accessible(session: AsyncSession, class_id: uuid.UUID, user: User, *, write=False):
-    row = await session.scalar(select(Classroom).where(Classroom.id == class_id).execution_options(populate_existing=True).with_for_update()) if write else await session.get(Classroom, class_id)
+    row = (
+        await session.scalar(
+            select(Classroom)
+            .where(Classroom.id == class_id)
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
+        if write
+        else await session.get(Classroom, class_id)
+    )
     owner = row is not None and user.role == "teacher" and row.teacher_id == user.id
     member = (
         row is not None
@@ -220,14 +229,29 @@ async def student_materials(
 
 
 @router.get("/teacher/materials")
-async def teacher_materials(user: User = Depends(require_teacher), session: AsyncSession = Depends(db_session)):
-    rows = (await session.execute(select(ClassMaterial, Classroom)
-                                  .join(Classroom, ClassMaterial.class_id == Classroom.id)
-                                  .where(Classroom.teacher_id == user.id)
-                                  .order_by(ClassMaterial.created_at.desc()).limit(200))).all()
-    return [{**material_info(material), "class_id": str(room.id), "class_name": room.name,
-             "subject": room.subject, "is_archived": room.is_archived}
-            for material, room in rows]
+async def teacher_materials(
+    user: User = Depends(require_teacher), session: AsyncSession = Depends(db_session)
+):
+    """List materials in classrooms owned by the authenticated teacher."""
+    rows = (
+        await session.execute(
+            select(ClassMaterial, Classroom)
+            .join(Classroom, ClassMaterial.class_id == Classroom.id)
+            .where(Classroom.teacher_id == user.id)
+            .order_by(ClassMaterial.created_at.desc())
+            .limit(200)
+        )
+    ).all()
+    return [
+        {
+            **material_info(material),
+            "class_id": str(room.id),
+            "class_name": room.name,
+            "subject": room.subject,
+            "is_archived": room.is_archived,
+        }
+        for material, room in rows
+    ]
 
 
 @router.get("/{class_id}")
@@ -279,9 +303,22 @@ async def update_class(
 ):
     """Update or archive the teacher's own classroom."""
     row = await accessible(session, class_id, user)
-    row = await session.scalar(select(Classroom).where(Classroom.id == row.id).execution_options(populate_existing=True).with_for_update())
-    changed_materials = await change_subject(session, row, body.subject_id) if "subject_id" in body.model_fields_set else []
-    for key, value in body.model_dump(exclude_unset=True, exclude_none=True, exclude={"subject_id"}).items():
+    row = await session.scalar(
+        select(Classroom)
+        .where(Classroom.id == row.id)
+        .execution_options(populate_existing=True)
+        .with_for_update()
+    )
+    if row is None:
+        raise HTTPException(404, "Kelas tidak ditemukan.")
+    changed_materials = (
+        await change_subject(session, row, body.subject_id)
+        if "subject_id" in body.model_fields_set
+        else []
+    )
+    for key, value in body.model_dump(
+        exclude_unset=True, exclude_none=True, exclude={"subject_id"}
+    ).items():
         setattr(row, key, value)
     record(session, row, user, "class.updated")
     await session.flush()
@@ -294,8 +331,13 @@ async def update_class(
 
 
 @router.get("/{class_id}/materials/{material_id}/concepts")
-async def read_mapping(class_id: uuid.UUID, material_id: uuid.UUID,
-                       user: User = Depends(require_teacher), session: AsyncSession = Depends(db_session)):
+async def read_mapping(
+    class_id: uuid.UUID,
+    material_id: uuid.UUID,
+    user: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Read reviewed material concepts and the canonical subject catalog."""
     classroom = await accessible(session, class_id, user)
     material = await session.get(ClassMaterial, material_id)
     if material is None or material.class_id != class_id:
@@ -304,12 +346,21 @@ async def read_mapping(class_id: uuid.UUID, material_id: uuid.UUID,
 
 
 @router.put("/{class_id}/materials/{material_id}/concepts")
-async def review_mapping(class_id: uuid.UUID, material_id: uuid.UUID, body: MappingApproval,
-                         background: BackgroundTasks, user: User = Depends(require_teacher),
-                         session: AsyncSession = Depends(db_session)):
+async def review_mapping(
+    class_id: uuid.UUID,
+    material_id: uuid.UUID,
+    body: MappingApproval,
+    background: BackgroundTasks,
+    user: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Approve concept mapping with content and mapping revision checks."""
     classroom = await accessible(session, class_id, user, write=True)
-    material = await session.scalar(select(ClassMaterial).where(
-        ClassMaterial.id == material_id, ClassMaterial.class_id == class_id).with_for_update())
+    material = await session.scalar(
+        select(ClassMaterial)
+        .where(ClassMaterial.id == material_id, ClassMaterial.class_id == class_id)
+        .with_for_update()
+    )
     if material is None:
         raise HTTPException(404, "Materi tidak ditemukan.")
     await approve_mapping(session, material, classroom, body, user)
@@ -401,10 +452,19 @@ async def preview_material_import(
 
 
 @router.get("/{class_id}/imports")
-async def list_imports(class_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+async def list_imports(
+    class_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)
+):
+    """List durable import receipts for an owned classroom."""
     await accessible(session, class_id, user)
-    rows = list(await session.scalars(select(MaterialImport).where(MaterialImport.class_id == class_id)
-        .order_by(MaterialImport.created_at.desc()).limit(20)))
+    rows = list(
+        await session.scalars(
+            select(MaterialImport)
+            .where(MaterialImport.class_id == class_id)
+            .order_by(MaterialImport.created_at.desc())
+            .limit(20)
+        )
+    )
     return [await import_out(session, row, include_preview=False) for row in rows]
 
 
@@ -417,24 +477,51 @@ async def owned_import(session, class_id, import_id, user):
 
 
 @router.get("/{class_id}/imports/{import_id}")
-async def read_import(class_id: uuid.UUID, import_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+async def read_import(
+    class_id: uuid.UUID,
+    import_id: uuid.UUID,
+    user=Depends(require_teacher),
+    session=Depends(db_session),
+):
+    """Read a saved import preview and processing state."""
     return await import_out(session, await owned_import(session, class_id, import_id, user))
 
 
 @router.get("/{class_id}/imports/{import_id}/original")
-async def download_original(class_id: uuid.UUID, import_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+async def download_original(
+    class_id: uuid.UUID,
+    import_id: uuid.UUID,
+    user=Depends(require_teacher),
+    session=Depends(db_session),
+):
+    """Download the private original source of an owned import."""
     from fastapi.responses import FileResponse
+
     artifact = await owned_import(session, class_id, import_id, user)
-    return FileResponse(original_path(artifact), filename=artifact.filename, media_type="application/octet-stream", headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+    return FileResponse(
+        original_path(artifact),
+        filename=artifact.filename,
+        media_type="application/octet-stream",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.post("/{class_id}/imports/{import_id}/retry", status_code=202)
-async def retry_import(class_id: uuid.UUID, import_id: uuid.UUID, user=Depends(require_teacher), session=Depends(db_session)):
+async def retry_import(
+    class_id: uuid.UUID,
+    import_id: uuid.UUID,
+    user=Depends(require_teacher),
+    session=Depends(db_session),
+):
+    """Retry a failed durable import without uploading its source again."""
     await accessible(session, class_id, user, write=True)
     artifact = await owned_import(session, class_id, import_id, user)
-    job = await session.scalar(select(BackgroundJob).where(BackgroundJob.id == artifact.job_id).with_for_update())
+    job = await session.scalar(
+        select(BackgroundJob).where(BackgroundJob.id == artifact.job_id).with_for_update()
+    )
     if job.state == "failed":
         from api.durable_jobs import enqueue
+
         await enqueue(session, job.kind, job.target_id, job.payload, job.dedupe_key, retry=True)
         await session.commit()
     return await import_out(session, artifact)
@@ -447,18 +534,35 @@ class ImportPageRange(BaseModel):
 
 
 @router.post("/{class_id}/imports/{import_id}/pages", status_code=202)
-async def import_pages(class_id: uuid.UUID, import_id: uuid.UUID, body: ImportPageRange,
-                       user=Depends(require_teacher), session=Depends(db_session)):
+async def import_pages(
+    class_id: uuid.UUID,
+    import_id: uuid.UUID,
+    body: ImportPageRange,
+    user=Depends(require_teacher),
+    session=Depends(db_session),
+):
+    """Create a chapter preview from selected pages of a saved PDF."""
     await accessible(session, class_id, user, write=True)
     artifact = await owned_import(session, class_id, import_id, user)
-    if not artifact.filename.lower().endswith(".pdf") or body.last_page < body.first_page or body.last_page - body.first_page + 1 > 150:
+    if (
+        not artifact.filename.lower().endswith(".pdf")
+        or body.last_page < body.first_page
+        or body.last_page - body.first_page + 1 > 150
+    ):
         raise HTTPException(422, "Pilih rentang halaman PDF yang valid, maksimal 150 halaman.")
     from api.durable_jobs import enqueue
-    new = MaterialImport(id=uuid.uuid4(), class_id=class_id, uploaded_by=user.id,
-        filename=artifact.filename, stored_path=str(original_path(artifact)), sha256=artifact.sha256,
-        size_bytes=artifact.size_bytes, job_id=uuid.uuid4())
-    job = await enqueue(session, "material_import", new.id,
-        body.model_dump(), f"import:{new.id}")
+
+    new = MaterialImport(
+        id=uuid.uuid4(),
+        class_id=class_id,
+        uploaded_by=user.id,
+        filename=artifact.filename,
+        stored_path=str(original_path(artifact)),
+        sha256=artifact.sha256,
+        size_bytes=artifact.size_bytes,
+        job_id=uuid.uuid4(),
+    )
+    job = await enqueue(session, "material_import", new.id, body.model_dump(), f"import:{new.id}")
     new.job_id = job.id
     session.add(new)
     await session.commit()
@@ -546,7 +650,11 @@ async def edit_material(
     )
     if row is None or row.class_id != class_id:
         raise HTTPException(404, "Materi tidak ditemukan.")
-    changed = row.content != body.content or row.source_filename != body.source_filename or row.source_import_id != body.source_import_id
+    changed = (
+        row.content != body.content
+        or row.source_filename != body.source_filename
+        or row.source_import_id != body.source_import_id
+    )
     if changed:
         row.content_version += 1
         row.n_chunks = 0
@@ -556,7 +664,11 @@ async def edit_material(
         setattr(row, key, value)
     if not row.published:
         row.rag_status = "pending"
-    elif row.indexed_version == row.content_version and row.indexed_mapping_version == row.mapping_version and row.n_chunks > 0:
+    elif (
+        row.indexed_version == row.content_version
+        and row.indexed_mapping_version == row.mapping_version
+        and row.n_chunks > 0
+    ):
         row.rag_status = "ready"
     record(session, classroom, user, "material.updated", row.id)
     await session.flush()
@@ -585,7 +697,12 @@ async def retry_material_index(
         raise HTTPException(
             409, "Terbitkan materi terlebih dahulu agar dapat diproses untuk Tutor AI."
         )
-    if row.rag_status == "ready" and row.indexed_version == row.content_version and row.indexed_mapping_version == row.mapping_version and row.n_chunks > 0:
+    if (
+        row.rag_status == "ready"
+        and row.indexed_version == row.content_version
+        and row.indexed_mapping_version == row.mapping_version
+        and row.n_chunks > 0
+    ):
         return material_info(row)
     row.rag_status = "pending"
     row.rag_error = None

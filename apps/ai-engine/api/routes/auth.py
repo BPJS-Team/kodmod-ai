@@ -29,6 +29,7 @@ from models.user import (
     RegisterRequest,
     TokenResponse,
     UpdateProfileRequest,
+    Username,
     UserOut,
 )
 
@@ -183,7 +184,7 @@ async def change_password(
 
 @router.get("/username-available")
 async def username_available(
-    username: str,
+    username: Username,
     session: AsyncSession = Depends(db_session),
 ) -> dict:
     """Lets the registration form tell someone a name is taken before they submit."""

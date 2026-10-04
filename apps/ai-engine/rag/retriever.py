@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import TypedDict
 
 from fastapi import HTTPException
 
@@ -23,6 +24,16 @@ from rag.reranker import rerank
 from rag.stores import pgvector_store
 
 logger = logging.getLogger(__name__)
+
+
+class QueryFilters(TypedDict, total=False):
+    top_k: int
+    concept_id: uuid.UUID | None
+    subject_id: uuid.UUID | None
+    language: str | None
+    student_id: uuid.UUID | None
+    class_id: uuid.UUID | None
+    material_id: uuid.UUID | None
 
 
 async def retrieve(
@@ -50,7 +61,7 @@ async def retrieve(
         use_reranker = settings.RAG_RERANK_ENABLED
 
     embedding = (await embed_text([query]))[0]
-    filters = {
+    filters: QueryFilters = {
         "top_k": top_k,
         "concept_id": concept_id,
         "subject_id": subject_id,
@@ -60,7 +71,9 @@ async def retrieve(
         # Response language is a learner preference; the source can be in
         # another language. Keep the permission scope, regardless of language.
         filters.update(
-            student_id=student_id, class_id=class_id, material_id=material_id, language=None
+            QueryFilters(
+                student_id=student_id, class_id=class_id, material_id=material_id, language=None
+            )
         )
     candidates = await pgvector_store.query(embedding, **filters)
     if not candidates:

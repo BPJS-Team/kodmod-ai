@@ -83,6 +83,7 @@ async def current_user(
     """The authenticated account, whatever its role."""
     user = await _load_user(session, _bearer(authorization))
     from tools.provider_usage import set_usage_actor
+
     set_usage_actor(user.id)
     return user
 
@@ -137,5 +138,6 @@ async def authenticate_ws(websocket: WebSocket) -> User:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         raise
     from tools.provider_usage import set_usage_actor
+
     set_usage_actor(user.id)
     return user

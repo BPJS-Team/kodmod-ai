@@ -74,12 +74,15 @@ async def test_km_api_096_cohort_rejects_student(client, student_factory, auth_h
     assert r.status_code == 403
 
 
-async def test_km_api_097_teacher_may_read_any_student(  # type: ignore[no-untyped-def]
-    client, student_factory, teacher_factory, auth_headers
+async def test_km_api_097_teacher_reads_enrolled_students_only(  # type: ignore[no-untyped-def]
+    client, student_factory, teacher_factory, material_source_factory, auth_headers
 ) -> None:
-    """The teacher dashboard depends on this; the student route must allow it."""
+    """Teachers need a classroom enrollment before reading learner progress."""
     student, _ = await student_factory()
-    _teacher, teacher_token = await teacher_factory()
+    teacher, teacher_token = await teacher_factory()
+    r = await client.get(f"/analytics/student/{student.id}", headers=auth_headers(teacher_token))
+    assert r.status_code == 404
+    await material_source_factory(student, teacher=teacher)
     r = await client.get(f"/analytics/student/{student.id}", headers=auth_headers(teacher_token))
     assert r.status_code == 200
     assert r.json()["student_id"] == str(student.id)

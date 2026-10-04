@@ -36,8 +36,8 @@ def test_voice_router_exposes_authenticated_batch_endpoints() -> None:
 
 def test_voice_routers_are_mounted_for_rest_and_websocket() -> None:
     source = _source("api/main.py")
-    assert "app.include_router(voice.router, prefix=\"/voice\"" in source
-    assert "app.include_router(voice_stream.router, prefix=\"/ws\"" in source
+    assert 'app.include_router(voice.router, prefix="/voice"' in source
+    assert 'app.include_router(voice_stream.router, prefix="/ws"' in source
 
 
 def test_voice_provider_errors_are_safe_and_text_fallback_is_documented() -> None:
@@ -48,5 +48,12 @@ def test_voice_provider_errors_are_safe_and_text_fallback_is_documented() -> Non
     assert "str(exc)" not in provider_helper
     assert "response.text" not in provider_helper
 
-    controls = (Path(__file__).resolve().parents[4] / "apps" / "web" / "src" / "components" / "voice-controls.tsx").read_text(encoding="utf-8")
-    assert "jalur teks" in controls
+    controls = (
+        Path(__file__).resolve().parents[4]
+        / "apps"
+        / "web"
+        / "src"
+        / "components"
+        / "voice-controls.tsx"
+    ).read_text(encoding="utf-8")
+    assert "Gunakan kolom jawaban teks." in controls

@@ -150,6 +150,7 @@ async def test_km_api_025_register_then_login(client) -> None:
     from sqlalchemy import text
 
     from database.session import async_session
+
     username = f"pendaftar-{uuid.uuid4().hex[:8]}"
     password = "kata-sandi-uji-123"
     payload = dict(username=username, password=password, full_name="Pendaftar Uji", role="student")
@@ -160,7 +161,9 @@ async def test_km_api_025_register_then_login(client) -> None:
         assert (await client.post("/auth/register", json=payload)).status_code == 409
         ok = await client.post("/auth/login", json={"username": username, "password": password})
         assert ok.status_code == 200
-        bad = await client.post("/auth/login", json={"username": username, "password": "wrong-password"})
+        bad = await client.post(
+            "/auth/login", json={"username": username, "password": "wrong-password"}
+        )
         assert bad.status_code == 401
     finally:
         async with async_session() as s:
@@ -169,8 +172,10 @@ async def test_km_api_025_register_then_login(client) -> None:
 
 
 async def test_km_api_026_registration_rejects_weak_password(client) -> None:
-    r = await client.post("/auth/register", json=dict(username="valid-name", password="short",
-                         full_name="Test", role="teacher"))
+    r = await client.post(
+        "/auth/register",
+        json=dict(username="valid-name", password="short", full_name="Test", role="teacher"),
+    )
     assert r.status_code == 422
 
 
@@ -183,7 +188,7 @@ async def test_km_api_027_cannot_self_register_as_admin(client) -> None:  # type
             "password": "kata-sandi-uji-123",
             "full_name": "Calon Admin",
             "role": "admin",
-                    },
+        },
     )
     assert r.status_code == 422, "role=admin must fail schema validation before creating an account"
 

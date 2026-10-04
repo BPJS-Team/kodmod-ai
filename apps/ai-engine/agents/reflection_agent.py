@@ -79,7 +79,11 @@ async def reflection_node(state: KODMODState) -> dict[str, Any]:
     llm = get_reflection_llm()
     raw_resp = await llm.ainvoke(
         [
-            {"role": "system", "content": SYSTEM_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {"role": "user", "content": user_block},
         ]
     )

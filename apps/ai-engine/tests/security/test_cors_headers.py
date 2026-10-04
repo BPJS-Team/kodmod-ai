@@ -50,13 +50,18 @@ async def test_km_sec_061_security_headers_present(client) -> None:  # type: ign
 # --------------------------------------------------------------------------- #
 # KM-SEC-062 - /metrics not publicly exposed
 # --------------------------------------------------------------------------- #
-@pytest.mark.known_bug(
-    "#14 - /metrics is mounted with no auth and no network restriction; target: token- or "
-    "network-gated"
-)
-async def test_km_sec_062_metrics_protected(client) -> None:  # type: ignore[no-untyped-def]
+async def test_km_sec_062_metrics_network_restricted(client) -> None:  # type: ignore[no-untyped-def]
+    from pathlib import Path
+
+    import yaml
+
     r = await client.get("/metrics/")
-    assert r.status_code in {401, 403}
+    assert r.status_code == 200
+    repo = Path(__file__).resolve().parents[4]
+    production = yaml.safe_load((repo / "infra/docker/docker-compose.prod.yml").read_text())
+    # Prometheus scrapes the private API network. Only the web proxy is public.
+    for service in ("ai-engine", "worker"):
+        assert not production["services"][service].get("ports")
 
 
 # --------------------------------------------------------------------------- #
@@ -92,5 +97,5 @@ async def test_km_sec_063_error_verbosity(client) -> None:  # type: ignore[no-un
         algorithm=settings.JWT_ALG,
     )
     r2 = await client.get("/auth/me", headers={"Authorization": f"Bearer {tok2}"})
-    assert r2.status_code == 404
+    assert r2.status_code == 401
     assert "Traceback" not in r2.text

@@ -1,4 +1,5 @@
 """Persistent, bounded speech files. OS locks work across workers and releases on crash."""
+
 from __future__ import annotations
 
 import asyncio
@@ -93,10 +94,15 @@ async def reserve_budget(root: Path, scope: str, characters: int) -> None:
         except (FileNotFoundError, ValueError):
             budget = {}
         spent = budget.get("characters", 0) if budget.get("day") == day else 0
-        cap = (settings.PUBLIC_SPEECH_DAILY_CHARACTERS if scope == "public-menu"
-               else settings.PRIVATE_SPEECH_DAILY_CHARACTERS)
+        cap = (
+            settings.PUBLIC_SPEECH_DAILY_CHARACTERS
+            if scope == "public-menu"
+            else settings.PRIVATE_SPEECH_DAILY_CHARACTERS
+        )
         if spent + characters > cap:
-            raise SpeechBudgetExceededError("Daily speech limit reached. Use device speech or try later.")
+            raise SpeechBudgetExceededError(
+                "Daily speech limit reached. Use device speech or try later."
+            )
         atomic_write(path, json.dumps({"day": day, "characters": spent + characters}).encode())
     finally:
         lock.release()
@@ -139,7 +145,9 @@ def prune(root: Path) -> None:
         for path in root.glob("budget-*.json"):
             try:
                 if path.stat().st_mtime < cutoff:
-                    entry = FileLock(str(root / f"budget-lock-{path.stem[7:9]}.lock"), thread_local=False)
+                    entry = FileLock(
+                        str(root / f"budget-lock-{path.stem[7:9]}.lock"), thread_local=False
+                    )
                     with entry.acquire(timeout=0):
                         path.unlink(missing_ok=True)
             except (OSError, Timeout):
@@ -149,13 +157,19 @@ def prune(root: Path) -> None:
 
 
 async def cached_audio(
-    root: Path, text: str, *, language: str, scope: str, voice: str,
+    root: Path,
+    text: str,
+    *,
+    language: str,
+    scope: str,
+    voice: str,
     generate: Callable[[], Awaitable[bytes]],
 ) -> tuple[bytes, Path]:
     started = time.monotonic()
     root.mkdir(parents=True, exist_ok=True)
-    key = digest({"text": text, "language": language, "scope": scope,
-                  "profile": speech_profile(voice)})
+    key = digest(
+        {"text": text, "language": language, "scope": scope, "profile": speech_profile(voice)}
+    )
     path = root / f"{key}.mp3"
     lock = FileLock(str(root / f"entry-{key[:2]}.lock"), thread_local=False)
     await acquire(lock)
@@ -171,8 +185,16 @@ async def cached_audio(
             await asyncio.to_thread(atomic_write, path, audio)
         else:
             from tools.provider_usage import record_usage
-            await record_usage(provider="elevenlabs", service="tts", model=settings.ELEVENLABS_TTS_MODEL,
-                status="cache_hit", latency_ms=(time.monotonic() - started) * 1000, characters=len(text), audio_bytes=len(audio))
+
+            await record_usage(
+                provider="elevenlabs",
+                service="tts",
+                model=settings.ELEVENLABS_TTS_MODEL,
+                status="cache_hit",
+                latency_ms=(time.monotonic() - started) * 1000,
+                characters=len(text),
+                audio_bytes=len(audio),
+            )
         await asyncio.to_thread(prune, root)
         return audio, path
     finally:

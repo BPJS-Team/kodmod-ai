@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -67,11 +68,8 @@ async def resolve_chat_context(
         if existing is not None:
             if existing.guided_state is not None:
                 raise HTTPException(409, "Lanjutkan sesi ini melalui belajar terpandu.")
-            if (
-                (class_id is not None
-                and class_id != existing.class_id)
-                or (material_id is not None
-                and material_id != existing.material_id)
+            if (class_id is not None and class_id != existing.class_id) or (
+                material_id is not None and material_id != existing.material_id
             ):
                 raise HTTPException(
                     409, "Mulai sesi baru untuk belajar dari kelas atau materi lain."
@@ -227,7 +225,7 @@ async def build_turn_state(
         "analytics_summary",
         "recommendations",
     ):
-        state.pop(key, None)
+        cast(dict[str, Any], state).pop(key, None)
     state["learning_profile"] = build_learning_profile(student)
     try:
         model = await StudentModel.load(str(student.id))

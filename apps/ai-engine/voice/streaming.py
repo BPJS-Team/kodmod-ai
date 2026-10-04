@@ -131,9 +131,13 @@ class StreamingSTT:
                 compute_type = settings.STT_COMPUTE_TYPE if device == "cuda" else "int8"
                 logger.info(
                     "Loading faster-whisper model=%s device=%s compute=%s",
-                    self.model_size, device, compute_type,
+                    self.model_size,
+                    device,
+                    compute_type,
                 )
-                self._model = WhisperModel(self.model_size, device=device, compute_type=compute_type)
+                self._model = WhisperModel(
+                    self.model_size, device=device, compute_type=compute_type
+                )
             else:
                 # Other backends are wrapped at request boundary in voice/stt.py.
                 # For streaming, we lazily fall back to a single-shot transcribe.
@@ -286,17 +290,14 @@ async def _stream_azure(text: str, voice: str) -> AsyncIterator[bytes]:
     import httpx
 
     url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
-    ssml = (
-        f'<speak version="1.0" xml:lang="id-ID">'
-        f'<voice name="{voice}">{text}</voice></speak>'
-    )
+    ssml = f'<speak version="1.0" xml:lang="id-ID"><voice name="{voice}">{text}</voice></speak>'
     headers = {
         "Ocp-Apim-Subscription-Key": api_key,
         "Content-Type": "application/ssml+xml",
         "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream("POST", url, headers=headers, data=ssml) as r:
+        async with client.stream("POST", url, headers=headers, content=ssml.encode("utf-8")) as r:
             r.raise_for_status()
             async for chunk in r.aiter_bytes(chunk_size=4096):
                 yield chunk

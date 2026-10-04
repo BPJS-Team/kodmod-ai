@@ -23,6 +23,8 @@ ALLOWLIST = {
     ("POST", "/auth/register"),
     ("POST", "/auth/login"),
     ("GET", "/auth/username-available"),
+    ("GET", "/voice/profile"),
+    ("GET", "/voice/menu/{key}"),
     #  - Prometheus scrape endpoint (network-restricted in deployment)
     ("MOUNT", "/metrics"),
 }

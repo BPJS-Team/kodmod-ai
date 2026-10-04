@@ -13,7 +13,8 @@ from config.settings import settings
 
 
 def recognize_page(data: bytes, index: int):
-    import pypdfium2 as pdfium
+    import pypdfium2 as pdfium  # type: ignore[import-untyped]
+
     executable = shutil.which("tesseract")
     if executable is None:
         raise RuntimeError("OCR runtime unavailable")
@@ -29,10 +30,26 @@ def recognize_page(data: bytes, index: int):
                     path = Path(folder) / "page.png"
                     image.save(path)
                     # Arguments are fixed config and a generated private path, never a user command.
-                    process = subprocess.run([executable, str(path), "stdout", "-l", settings.OCR_LANGUAGES,  # noqa: S603
-                        "--oem", "1", "--psm", "3", "tsv"], capture_output=True, timeout=settings.OCR_PAGE_TIMEOUT, check=True)
+                    process = subprocess.run(  # noqa: S603 - absolute executable and fixed argv
+                        [
+                            executable,
+                            str(path),
+                            "stdout",
+                            "-l",
+                            settings.OCR_LANGUAGES,
+                            "--oem",
+                            "1",
+                            "--psm",
+                            "3",
+                            "tsv",
+                        ],
+                        capture_output=True,
+                        timeout=settings.OCR_PAGE_TIMEOUT,
+                        check=True,
+                    )
     words = list(csv.DictReader(io.StringIO(process.stdout.decode("utf-8")), delimiter="\t"))
-    lines, confidence = {}, []
+    lines: dict[tuple[str | None, ...], list[str]] = {}
+    confidence: list[float] = []
     for word in words:
         value = word.get("text", "").strip()
         if word.get("level") != "5" or not value:
@@ -42,5 +59,7 @@ def recognize_page(data: bytes, index: int):
         score = float(word.get("conf", "-1"))
         if score >= 0:
             confidence.append(score)
-    return {"text": "\n".join(" ".join(line) for line in lines.values()),
-        "confidence": round(sum(confidence) / len(confidence), 1) if confidence else None}
+    return {
+        "text": "\n".join(" ".join(line) for line in lines.values()),
+        "confidence": round(sum(confidence) / len(confidence), 1) if confidence else None,
+    }

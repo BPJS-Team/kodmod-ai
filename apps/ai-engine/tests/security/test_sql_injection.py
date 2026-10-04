@@ -34,10 +34,11 @@ async def test_km_sec_020_student_id_injection_via_path(client, student_factory)
 # KM-SEC-021 - concept_id filter injection
 # --------------------------------------------------------------------------- #
 async def test_km_sec_021_concept_id_injection(
-    client, student_factory, curriculum_chunk_count
+    client, student_factory, teacher_factory, curriculum_chunk_count
 ) -> None:  # type: ignore[no-untyped-def]
     _st, tok = await student_factory()
     before = await curriculum_chunk_count()
+    _, teacher_token = await teacher_factory()
 
     payload = "1); DROP TABLE curriculum_chunks;--"
     r1 = await client.get(
@@ -47,6 +48,7 @@ async def test_km_sec_021_concept_id_injection(
 
     r2 = await client.post(
         "/content/retrieve",
+        headers={"Authorization": f"Bearer {teacher_token}"},
         json={"query": "pecahan", "top_k": 4, "language": "id", "student_id": payload},
     )
     assert r2.status_code in {200, 422}
@@ -57,10 +59,14 @@ async def test_km_sec_021_concept_id_injection(
 # --------------------------------------------------------------------------- #
 # KM-SEC-022 - language param injection stays a bind parameter
 # --------------------------------------------------------------------------- #
-async def test_km_sec_022_language_injection(client, curriculum_chunk_count) -> None:  # type: ignore[no-untyped-def]
+async def test_km_sec_022_language_injection(
+    client, teacher_factory, curriculum_chunk_count
+) -> None:  # type: ignore[no-untyped-def]
     before = await curriculum_chunk_count()
+    _, token = await teacher_factory()
     r = await client.post(
         "/content/retrieve",
+        headers={"Authorization": f"Bearer {token}"},
         json={
             "query": "pecahan",
             "top_k": 4,

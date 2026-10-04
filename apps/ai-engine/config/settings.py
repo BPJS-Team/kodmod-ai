@@ -58,13 +58,13 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ------------------------------------------------------------------ api
-    API_HOST: str = "0.0.0.0"
+    API_HOST: str = "0.0.0.0"  # noqa: S104 - container listener; host ports bind to loopback
     API_PORT: int = 8000
     API_PREFIX: str = "/api/v1"
     # Comma-separated. Credentials are allowed on the CORS middleware, so "*"
     # is not a valid value - list the frontend origin(s) explicitly.
     CORS_ALLOW_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
-    JWT_SECRET: str = "change-me-in-production"
+    JWT_SECRET: str = "change-me-in-production"  # noqa: S105 - development sentinel, rejected in production
     JWT_ALG: str = "HS256"
     JWT_EXPIRE_MIN: int = 60 * 24  # 24h
 
@@ -96,7 +96,7 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------- database
     DB_USER: str = "kodmod"
-    DB_PASSWORD: str = "kodmod"
+    DB_PASSWORD: str = "kodmod"  # noqa: S105 - local development default, deploy uses private env
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_NAME: str = "kodmod"

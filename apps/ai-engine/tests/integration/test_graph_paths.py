@@ -1,7 +1,7 @@
-"""Stage 3 §10-11 - whole-graph invocation per intent (stub LLM, real DB).
+"""Stage 3 Â§10-11 - whole-graph invocation per intent (stub LLM, real DB).
 
-Spec: docs/testplan/03-integration.md §10 (KM-INT-140..146) and §11 (KM-INT-150..154).
-The §11 quiz multi-turn group is the quiz-feature definition-of-done (#11 / BUG-3,
+Spec: docs/testplan/03-integration.md Â§10 (KM-INT-140..146) and Â§11 (KM-INT-150..154).
+The Â§11 quiz multi-turn group is the quiz-feature definition-of-done (#11 / BUG-3,
 see docs/LAPORAN_BUG.md) - fixed by wiring scoring -> update_student_model ->
 {quiz_ask, quiz_analyzer} so a passing answer speaks the next question within
 the same turn instead of dead-ending after question 1.
@@ -77,7 +77,7 @@ async def test_km_int_140_tutoring_path(graph, force_intent, clean_db, make_stud
     state["user_input"] = "tolong jelaskan apa itu pecahan"
 
     final = await _run(graph, state, sid)
-    assert final["last_node"] == "tts"
+    assert final["last_node"] == "accessibility"
     assert final.get("accessible_response", "").strip()
     assert final.get("audio_response_path", "") == ""  # TTS disabled
 
@@ -98,7 +98,7 @@ async def test_km_int_141_analytics_path(
     state["user_input"] = "bagaimana perkembangan belajarku"
 
     final = await _run(graph, state, sid)
-    assert final["last_node"] == "tts"
+    assert final["last_node"] == "accessibility"
     assert "overall_mastery" in final.get("analytics_summary", {})
 
 
@@ -115,7 +115,7 @@ async def test_km_int_142_stop_path(graph, force_intent, clean_db, make_student)
     state["user_input"] = "berhenti"
 
     final = await _run(graph, state, sid)
-    assert final["last_node"] == "tts"
+    assert final["last_node"] == "intent_router"
     # never entered a cluster node
     assert not final.get("retrieved_docs")
     assert not final.get("quiz_questions")
@@ -135,9 +135,15 @@ async def test_km_int_143_quiz_start_path(
     state = initial_state(session_id=sid, student_id=str(st.id))
     state["user_input"] = "beri aku kuis pecahan"
     state["current_concept_id"] = str(concept_ids["pecahan"])
+    state["quiz_source_docs"] = [
+        {
+            "text": "Pecahan adalah bagian dari keseluruhan. Satu per dua ditambah satu per dua adalah satu.",
+            "source": "approved-fixture",
+        }
+    ]
 
     final = await _run(graph, state, sid)
-    assert final["last_node"] == "tts"
+    assert final["last_node"] == "accessibility"
     assert final.get("quiz_questions")
     assert final.get("quiz_session_id", "").startswith("quiz-")
 
@@ -180,12 +186,11 @@ async def test_km_int_145_resume_from_interrupt(
     state = initial_state(session_id=sid, student_id=str(st.id))
     state["user_input"] = "jelaskan pecahan"
 
-    # interrupt_after=["reflection"] when a checkpointer is present
-    mid = await checkpointed_graph.ainvoke(state, config=_cfg(sid))
-    assert mid.get("last_node") == "reflection"
-
-    final = await checkpointed_graph.ainvoke(None, config=_cfg(sid))
-    assert final["last_node"] == "tts"
+    # Reflection is now an inline quality check; the saved state is complete.
+    await checkpointed_graph.ainvoke(state, config=_cfg(sid))
+    saved = await checkpointed_graph.aget_state(_cfg(sid))
+    final = saved.values
+    assert final["last_node"] == "accessibility"
     assert final.get("accessible_response", "").strip()
 
 
@@ -208,7 +213,7 @@ async def test_km_int_146_initial_state_is_sufficient(
 
 
 # --------------------------------------------------------------------------- #
-# §11 - quiz multi-turn  #11 / BUG-3
+# Â§11 - quiz multi-turn  #11 / BUG-3
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 async def quiz_started(graph, force_intent, clean_db, make_student, concept_ids):  # type: ignore[no-untyped-def]
@@ -220,6 +225,12 @@ async def quiz_started(graph, force_intent, clean_db, make_student, concept_ids)
     state = initial_state(session_id=sid, student_id=str(st.id))
     state["user_input"] = "kuis pecahan"
     state["current_concept_id"] = str(concept_ids["pecahan"])
+    state["quiz_source_docs"] = [
+        {
+            "text": "Pecahan adalah bagian dari keseluruhan. Satu per dua ditambah satu per dua adalah satu.",
+            "source": "approved-fixture",
+        }
+    ]
     final = await graph.ainvoke(state, config=_cfg(sid))
     return graph, sid, str(st.id), final
 
@@ -231,10 +242,8 @@ async def test_km_int_150_quiz_start_produces_questions(quiz_started) -> None:  
 
 
 async def test_km_int_151_answer_reaches_scoring(quiz_started) -> None:  # type: ignore[no-untyped-def]
-    from graphs.state import initial_state
-
     g, sid, stid, _final = quiz_started
-    turn2 = initial_state(session_id=sid, student_id=stid)
+    turn2 = {"user_input": "A"}
     turn2["user_input"] = "A"
     out = await g.ainvoke(turn2, config=_cfg(sid))
     assert out.get("quiz_attempts"), "answer never scored"
@@ -243,10 +252,9 @@ async def test_km_int_151_answer_reaches_scoring(quiz_started) -> None:  # type:
 
 async def test_km_int_152_score_routes_on_threshold(quiz_started) -> None:  # type: ignore[no-untyped-def]
     from config.settings import settings
-    from graphs.state import initial_state
 
     g, sid, stid, _final = quiz_started
-    turn2 = initial_state(session_id=sid, student_id=stid)
+    turn2 = {"user_input": "A"}
     turn2["user_input"] = "A"
     out = await g.ainvoke(turn2, config=_cfg(sid))
     assert out.get("quiz_score") is not None
@@ -262,10 +270,8 @@ async def test_km_int_152_score_routes_on_threshold(quiz_started) -> None:  # ty
 
 
 async def test_km_int_153_next_question(quiz_started) -> None:  # type: ignore[no-untyped-def]
-    from graphs.state import initial_state
-
     g, sid, stid, _final = quiz_started
-    turn2 = initial_state(session_id=sid, student_id=stid)
+    turn2 = {"user_input": "A"}
     turn2["user_input"] = "A"
     out = await g.ainvoke(turn2, config=_cfg(sid))
     assert out.get("current_question_index", 0) >= 1
@@ -273,12 +279,11 @@ async def test_km_int_153_next_question(quiz_started) -> None:  # type: ignore[n
 
 async def test_km_int_154_quiz_exhausted_runs_analytics(quiz_started) -> None:  # type: ignore[no-untyped-def]
     from database.session import async_session
-    from graphs.state import initial_state
 
     g, sid, stid, final = quiz_started
     n = max(1, len(final.get("quiz_questions", [])))
     for _ in range(n):
-        t = initial_state(session_id=sid, student_id=stid)
+        t = {"user_input": "A"}
         t["user_input"] = "A"
         await g.ainvoke(t, config=_cfg(sid))
     async with async_session() as s:

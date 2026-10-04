@@ -27,6 +27,7 @@ from models.editorial_quiz import (
     AttemptOut,
     DraftInput,
     DraftOut,
+    Option,
     ProposalInput,
     QuestionInput,
     RejectDecision,
@@ -43,8 +44,12 @@ router = APIRouter(tags=["editorial-quizzes"])
 
 
 @router.post("/teacher/quizzes/propose")
-async def propose_quiz(body: ProposalInput, actor: User = Depends(require_teacher),
-                       session: AsyncSession = Depends(db_session)):
+async def propose_quiz(
+    body: ProposalInput,
+    actor: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Propose source grounded questions for teacher review before saving."""
     from agents.problem_generator import problem_generator_node
     from api.learning_service import learning_units
     from api.routes.classrooms import accessible
@@ -55,38 +60,83 @@ async def propose_quiz(body: ProposalInput, actor: User = Depends(require_teache
     if material is None or material.class_id != body.class_id:
         raise HTTPException(404, "Materi tidak ditemukan.")
     from api.material_concepts import current_concepts
+
     approved = await current_concepts(session, material, classroom)
     units = learning_units(material.content)
     count = min(6, len(units))
     indices = sorted({round(i * (len(units) - 1) / max(1, count - 1)) for i in range(count)})
-    docs = [{"text": units[i]["text"], "material_title": material.title,
-             "material_id": str(material.id), "class_id": str(material.class_id)} for i in indices]
+    docs = [
+        {
+            "text": units[i]["text"],
+            "material_title": material.title,
+            "material_id": str(material.id),
+            "class_id": str(material.class_id),
+        }
+        for i in indices
+    ]
     try:
-        result = await problem_generator_node({
-            "class_id": str(material.class_id), "material_id": str(material.id),
-            "current_topic": material.title, "student_id": "", "quiz_mcq_only": True,
-            "quiz_n_questions": body.n_questions, "current_difficulty": body.difficulty,
-            "quiz_source_docs": docs, "learning_profile": {"language": body.language},
-            "assessment_managed": True,
-            "approved_material_concepts": approved,
-            "material_mapping_version": material.mapping_version,
-        })
+        result = await problem_generator_node(
+            {
+                "class_id": str(material.class_id),
+                "material_id": str(material.id),
+                "current_topic": material.title,
+                "student_id": "",
+                "quiz_mcq_only": True,
+                "quiz_n_questions": body.n_questions,
+                "current_difficulty": body.difficulty,
+                "quiz_source_docs": docs,
+                "learning_profile": {"language": body.language},
+                "assessment_managed": True,
+                "approved_material_concepts": approved,
+                "material_mapping_version": material.mapping_version,
+            }
+        )
         questions = []
         for index, question in enumerate(result["quiz_questions"]):
-            options = [{"id": chr(97 + i), "label": re.sub(r"^[A-Da-d][.):\s-]+", "", option).strip()} for i, option in enumerate(question["options"])]
+            options = [
+                {"id": chr(97 + i), "label": re.sub(r"^[A-Da-d][.):\s-]+", "", option).strip()}
+                for i, option in enumerate(question["options"])
+            ]
             answer = question["expected_answer"].strip().lower().rstrip(".")
-            answer_id = answer if answer in "abcd" and len(answer) == 1 else next((o["id"] for i, o in enumerate(options) if question["options"][i].lower() == answer), "")
-            questions.append(QuestionInput(order_index=index + 1, prompt=question["text"],
-                narration=question["text"], options=options, correct_option_id=answer_id,
-                explanation=question["explanation"], difficulty=body.difficulty,
-                concept_id=uuid.UUID(question["concept_id"]) if question.get("concept_id") else None))
+            answer_id = (
+                answer
+                if answer in "abcd" and len(answer) == 1
+                else next(
+                    (
+                        o["id"]
+                        for i, o in enumerate(options)
+                        if question["options"][i].lower() == answer
+                    ),
+                    "",
+                )
+            )
+            questions.append(
+                QuestionInput(
+                    order_index=index + 1,
+                    prompt=question["text"],
+                    narration=question["text"],
+                    options=[Option.model_validate(o) for o in options],
+                    correct_option_id=answer_id,
+                    explanation=question["explanation"],
+                    difficulty=body.difficulty,
+                    concept_id=uuid.UUID(question["concept_id"])
+                    if question.get("concept_id")
+                    else None,
+                )
+            )
     except Exception:
         logging.getLogger(__name__).exception("Could not generate reviewed-material proposal")
-        raise HTTPException(503, "Usulan soal belum dapat dibuat. Coba lagi atau tulis soal sendiri.") from None
-    return {"material_id": material.id, "material_version": material.content_version,
-            "mapping_version": material.mapping_version,
-            "subject_id": classroom.subject_id,
-            "questions": questions, "review_required": True}
+        raise HTTPException(
+            503, "Usulan soal belum dapat dibuat. Coba lagi atau tulis soal sendiri."
+        ) from None
+    return {
+        "material_id": material.id,
+        "material_version": material.content_version,
+        "mapping_version": material.mapping_version,
+        "subject_id": classroom.subject_id,
+        "questions": questions,
+        "review_required": True,
+    }
 
 
 @router.get("/teacher/quizzes")
@@ -96,6 +146,7 @@ async def list_quizzes(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """List the teacher own versioned quiz drafts."""
     rows = (
         await session.execute(
             select(QuizDraft, QuizDraftVersion)
@@ -132,6 +183,7 @@ async def create_quiz(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Create an unpublished teacher quiz draft with validated questions."""
     await service.validate_catalog(session, body)
     draft = QuizDraft(
         teacher_id=actor.id,
@@ -151,6 +203,7 @@ async def create_quiz(
 async def reviewers(
     actor: User = Depends(require_staff), session: AsyncSession = Depends(db_session)
 ):
+    """List active independent teacher reviewers."""
     users = (
         await session.scalars(
             select(User)
@@ -169,6 +222,7 @@ async def review_queue(
     actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ):
+    """List current quiz revisions awaiting the authenticated reviewer."""
     query = (
         select(QuizDraft, QuizDraftVersion, User.full_name)
         .join(
@@ -208,6 +262,7 @@ async def read_quiz(
     actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ):
+    """Read an authorized quiz draft revision and review history."""
     draft, version = await service.draft_for(session, draft_id, actor)
     return await service.draft_out(session, draft, version, actor)
 
@@ -219,6 +274,7 @@ async def save_quiz(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Save a new immutable quiz revision with an optimistic version check."""
     draft, _ = await service.draft_for(session, draft_id, actor, owner=True, lock=True)
     if draft.is_archived or draft.current_version != body.expected_version:
         service.conflict()
@@ -239,6 +295,7 @@ async def nominate_reviewer(
     actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ):
+    """Assign an active independent reviewer to the current quiz revision."""
     draft, version = await service.draft_for(session, draft_id, actor, lock=True)
     actor = await service.lock_staff_actor(session, actor)
     service.check_version(draft, version, body)
@@ -280,6 +337,7 @@ async def submit_review(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Submit the current valid quiz revision for independent review."""
     draft, version = await service.draft_for(session, draft_id, actor, owner=True, lock=True)
     service.check_version(draft, version, body)
     if version.state != "draft":
@@ -332,6 +390,7 @@ async def approve(
     actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ):
+    """Approve an assigned quiz revision with a review revision check."""
     return await decide(draft_id, body, actor, session, approved=True)
 
 
@@ -342,6 +401,7 @@ async def reject(
     actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ):
+    """Reject an assigned quiz revision with required feedback."""
     return await decide(draft_id, body, actor, session, approved=False)
 
 
@@ -352,6 +412,7 @@ async def publish(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Publish the approved current quiz revision."""
     draft, version = await service.draft_for(session, draft_id, actor, owner=True, lock=True)
     service.check_version(draft, version, body)
     if version.state != "approved":
@@ -374,6 +435,7 @@ async def create_assignment(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Assign a published immutable quiz revision to an owned classroom."""
     draft, _ = await service.draft_for(session, draft_id, actor, owner=True, lock=True)
     return await service.assign(session, draft, body, actor)
 
@@ -409,6 +471,7 @@ async def close_assignment(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Close an owned assignment while retaining submitted results."""
     assignment = await teacher_assignment(session, assignment_id, actor, lock=True)
     assignment.is_closed = True
     output = await service.assignment_out(session, assignment)
@@ -422,6 +485,7 @@ async def teacher_results(
     actor: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
+    """Read classroom assignment completion and student results."""
     assignment = await teacher_assignment(session, assignment_id, actor)
     rows = (
         await session.execute(
@@ -450,7 +514,7 @@ async def teacher_results(
         }
         for u, a in rows
     ]
-    scores = [r["score"] for r in results if r["score"] is not None]
+    scores = [a.score for _, a in rows if a is not None and a.score is not None]
     return {
         "assignment": await service.assignment_out(session, assignment),
         "results": results,
@@ -467,6 +531,7 @@ async def student_assignments(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """List formal assignments available through current classroom enrollment."""
     rows = (
         await session.execute(
             select(QuizAssignment, QuizDraftVersion, Classroom, AssignmentAttempt)
@@ -493,6 +558,7 @@ async def student_assignment(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Read an enrolled student assignment schedule and saved attempt state."""
     assignment = await service.accessible_assignment(session, assignment_id, actor)
     attempt = await session.scalar(
         select(AssignmentAttempt).where(
@@ -510,6 +576,7 @@ async def start_assignment(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Start or resume the student single durable assignment attempt."""
     assignment = await service.accessible_assignment(session, assignment_id, actor, lock=True)
     attempt = await session.scalar(
         select(AssignmentAttempt)
@@ -544,6 +611,7 @@ async def read_attempt(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Recover saved questions and answers without exposing answer keys."""
     assignment = await service.accessible_assignment(session, assignment_id, actor)
     attempt = await service.attempt_for(session, assignment, actor)
     # Saved progress remains readable after the deadline; new writes do not.
@@ -558,6 +626,7 @@ async def save_answer(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Save an answer with idempotency and attempt revision checks."""
     assignment = await service.accessible_assignment(session, assignment_id, actor, lock=True)
     attempt = await service.attempt_for(session, assignment, actor, lock=True)
     return await service.save_answer(session, assignment, attempt, question_id, body)
@@ -571,6 +640,7 @@ async def submit_assignment(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Submit all answers atomically and record mastery evidence exactly once."""
     assignment = await service.accessible_assignment(session, assignment_id, actor, lock=True)
     attempt = await service.attempt_for(session, assignment, actor, lock=True)
     return await service.submit_attempt(
@@ -584,6 +654,7 @@ async def read_result(
     actor: User = Depends(require_student),
     session: AsyncSession = Depends(db_session),
 ):
+    """Read owned results according to the quiz feedback release policy."""
     assignment = await service.accessible_assignment(session, assignment_id, actor)
     attempt = await service.attempt_for(session, assignment, actor)
     if attempt.state != "submitted":

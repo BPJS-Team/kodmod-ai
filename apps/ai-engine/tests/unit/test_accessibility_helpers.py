@@ -20,6 +20,7 @@ from agents.accessibility_agent import (
     _strip_markdown,
     accessibility_node,
 )
+from graphs.state import KODMODState
 
 pytestmark = pytest.mark.unit
 
@@ -84,7 +85,7 @@ def test_should_simplify(text: str, expected: bool) -> None:
 
 
 async def test_pipeline_fast_path_order() -> None:  # KM-UNIT-090
-    state = {
+    state: KODMODState = {
         "generated_response": (
             "**Penting**: lihat gambar 3.2 di atas. Apakah kamu paham? Mari lanjut."
         )

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 # Override before importing the cached settings. This fixture cannot read real
 # provider credentials or inherit the main application's connection settings.
@@ -45,7 +46,7 @@ engine = create_async_engine(
     execution_options={"schema_translate_map": {None: SCHEMA}},
 )
 factory = async_sessionmaker(engine, expire_on_commit=False)
-fixture = {}
+fixture: dict[str, Any] = {}
 
 
 @asynccontextmanager

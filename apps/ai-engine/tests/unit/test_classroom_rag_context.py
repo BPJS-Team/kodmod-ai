@@ -153,7 +153,9 @@ async def test_unmapped_classroom_quiz_never_attributes_an_unrelated_concept(
                     {
                         "questions": [
                             {
-                                "text": f"Latihan pecahan senilai {number}" if grounded else "Topik keliru",
+                                "text": f"Latihan pecahan senilai {number}"
+                                if grounded
+                                else "Topik keliru",
                                 "type": "spoken",
                                 "expected_answer": "Dua per empat",
                                 "concept_id": unrelated_concept,
@@ -170,15 +172,15 @@ async def test_unmapped_classroom_quiz_never_attributes_an_unrelated_concept(
     monkeypatch.setattr(problem_generator.RAGTool, "retrieve", retrieve)
     monkeypatch.setattr(problem_generator, "get_quiz_llm", lambda: ContextLLM())
     state = {
-            "student_id": sid,
-            "class_id": None if scope == "material" else cid,
-            "material_id": None if scope == "class" else mid,
-            "current_topic": requested_topic,
-            "current_concept_id": unrelated_concept if existing_concept else "",
-            "mastery_scores": {unrelated_concept: 0.1},
-            "mastery_confidence": {unrelated_concept: 1.0},
-            "quiz_n_questions": 2,
-        }
+        "student_id": sid,
+        "class_id": None if scope == "material" else cid,
+        "material_id": None if scope == "class" else mid,
+        "current_topic": requested_topic,
+        "current_concept_id": unrelated_concept if existing_concept else "",
+        "mastery_scores": {unrelated_concept: 0.1},
+        "mastery_confidence": {unrelated_concept: 1.0},
+        "quiz_n_questions": 2,
+    }
     if generated_count != 2:
         with pytest.raises(ValueError, match="quality contract"):
             await problem_generator.problem_generator_node(state)

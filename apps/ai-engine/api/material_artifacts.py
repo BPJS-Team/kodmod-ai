@@ -22,7 +22,9 @@ def original_path(artifact):
 
 
 async def create_import(session, classroom, actor, file, first_page=None, last_page=None):
-    if (first_page is None) != (last_page is None) or (first_page and (last_page < first_page or last_page - first_page + 1 > 150)):
+    if (first_page is None) != (last_page is None) or (
+        first_page and (last_page < first_page or last_page - first_page + 1 > 150)
+    ):
         raise HTTPException(422, "Pilih rentang halaman yang valid, maksimal 150 halaman.")
     filename = safe_filename(file.filename)
     if first_page and not filename.lower().endswith(".pdf"):
@@ -31,11 +33,23 @@ async def create_import(session, classroom, actor, file, first_page=None, last_p
     try:
         with path.open("rb") as original:
             digest = hashlib.file_digest(original, "sha256").hexdigest()
-        artifact = MaterialImport(id=uuid.uuid4(), class_id=classroom.id, uploaded_by=actor.id,
-            filename=filename, stored_path=str(path), size_bytes=path.stat().st_size,
-            sha256=digest, job_id=uuid.uuid4())
-        job = await enqueue(session, "material_import", artifact.id,
-            {"first_page": first_page, "last_page": last_page}, f"import:{artifact.id}")
+        artifact = MaterialImport(
+            id=uuid.uuid4(),
+            class_id=classroom.id,
+            uploaded_by=actor.id,
+            filename=filename,
+            stored_path=str(path),
+            size_bytes=path.stat().st_size,
+            sha256=digest,
+            job_id=uuid.uuid4(),
+        )
+        job = await enqueue(
+            session,
+            "material_import",
+            artifact.id,
+            {"first_page": first_page, "last_page": last_page},
+            f"import:{artifact.id}",
+        )
         artifact.job_id = job.id
         session.add(artifact)
         await session.flush()
@@ -48,10 +62,18 @@ async def create_import(session, classroom, actor, file, first_page=None, last_p
 
 async def import_out(session, artifact, *, include_preview=True):
     job = await session.get(BackgroundJob, artifact.job_id)
-    return {"import_id": str(artifact.id), "job_id": str(job.id), "filename": artifact.filename,
-        "state": job.state, "attempts": job.attempts, "error": job.error_message,
-        "sha256": artifact.sha256, "size_bytes": artifact.size_bytes,
-        "created_at": artifact.created_at, "preview": job.result if include_preview and job.state == "complete" else None}
+    return {
+        "import_id": str(artifact.id),
+        "job_id": str(job.id),
+        "filename": artifact.filename,
+        "state": job.state,
+        "attempts": job.attempts,
+        "error": job.error_message,
+        "sha256": artifact.sha256,
+        "size_bytes": artifact.size_bytes,
+        "created_at": artifact.created_at,
+        "preview": job.result if include_preview and job.state == "complete" else None,
+    }
 
 
 async def source_for(session, class_id, import_id):

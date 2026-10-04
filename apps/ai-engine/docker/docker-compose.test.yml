@@ -73,7 +73,7 @@ services:
   # ---------------------------------------------------------------- LLM stub --
   # OpenAI-compatible fake: deterministic chat completions + embeddings.
   # The host `api` talks to this (OPENAI_BASE_URL pointed at
-  # http://localhost:8099/v1 by scripts/serve_test_api). Host-side pytest for
+# http://localhost:18199/v1 by scripts/serve_test_api). Host-side pytest for
   # Stage 1/3 (no `api` involved) stubs the LLM in Python instead - tests/_fakes/.
   llm-stub:
     build:
@@ -83,7 +83,7 @@ services:
     environment:
       KODMOD_STUB_EMBED_DIM: "1024"
     ports:
-      - "127.0.0.1:${LLM_STUB_HOST_PORT:-8099}:8000"
+      - "127.0.0.1:${LLM_STUB_HOST_PORT:-18199}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 5s

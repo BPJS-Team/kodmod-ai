@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
@@ -23,7 +24,9 @@ async def queue(monkeypatch):
 async def test_expired_worker_is_reclaimed_and_old_lease_cannot_publish(queue):
     target = uuid.uuid4()
     async with queue() as session:
-        created = await jobs.enqueue(session, "material_index", target, {"version": 1, "mapping": 0}, "material:1:0")
+        created = await jobs.enqueue(
+            session, "material_index", target, {"version": 1, "mapping": 0}, "material:1:0"
+        )
         await session.commit()
     first = await jobs.claim()
     assert first.id == created.id and first.attempts == 1
@@ -44,7 +47,9 @@ async def test_expired_worker_is_reclaimed_and_old_lease_cannot_publish(queue):
 async def test_retry_is_bounded_and_exact_version_enqueue_is_idempotent(queue):
     target = uuid.uuid4()
     async with queue() as session:
-        first = await jobs.enqueue(session, "material_import", target, {}, "import:1", max_attempts=2)
+        first = await jobs.enqueue(
+            session, "material_import", target, {}, "import:1", max_attempts=2
+        )
         second = await jobs.enqueue(session, "material_import", target, {}, "import:1")
         assert first.id == second.id
         await session.commit()
@@ -61,3 +66,26 @@ async def test_retry_is_bounded_and_exact_version_enqueue_is_idempotent(queue):
         assert row.state == "failed" and row.attempts == 2
         assert "Traceback" not in row.error_message
     assert await jobs.claim() is None
+
+
+async def test_republishing_same_revision_requeues_a_skipped_completed_index(queue):
+    material = SimpleNamespace(
+        id=uuid.uuid4(),
+        content_version=1,
+        mapping_version=0,
+        published=True,
+        rag_status="pending",
+    )
+    async with queue() as session:
+        created = await jobs.enqueue_material(session, material)
+        await session.commit()
+    claimed = await jobs.claim()
+    assert await jobs.finish(claimed.id, claimed.lease_token, result={"skipped": True})
+    async with queue() as session:
+        restarted = await jobs.enqueue_material(session, material)
+        assert restarted.id == created.id
+        assert restarted.state == "pending"
+        assert restarted.attempts == 0
+        assert restarted.result is None
+        await session.commit()
+    assert (await jobs.claim()).id == created.id

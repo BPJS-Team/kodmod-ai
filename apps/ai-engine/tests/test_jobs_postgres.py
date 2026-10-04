@@ -1,4 +1,5 @@
 """Lease recovery and concurrent claims on dedicated port 5434 only."""
+
 import asyncio
 import os
 import uuid
@@ -11,7 +12,9 @@ from sqlalchemy.pool import NullPool
 from api import durable_jobs as jobs
 from database.models import BackgroundJob
 
-pytestmark = pytest.mark.skipif(os.getenv("KODMOD_JOBS_POSTGRES") != "1", reason="Dedicated PostgreSQL required")
+pytestmark = pytest.mark.skipif(
+    os.getenv("KODMOD_JOBS_POSTGRES") != "1", reason="Dedicated PostgreSQL required"
+)
 
 
 @pytest.fixture
@@ -21,7 +24,9 @@ async def queue(monkeypatch):
     control = create_async_engine(dsn, poolclass=NullPool)
     async with control.begin() as connection:
         await connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-    engine = create_async_engine(dsn, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}})
+    engine = create_async_engine(
+        dsn, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}}
+    )
     try:
         async with engine.begin() as connection:
             await connection.run_sync(BackgroundJob.__table__.create)
@@ -50,8 +55,11 @@ async def test_two_workers_claim_distinct_jobs_without_waiting_on_each_other(que
 async def test_concurrent_enqueue_commits_one_versioned_job(queue):
     async def submit():
         async with queue() as session:
-            row = await jobs.enqueue(session, "material_import", uuid.UUID(int=1), {}, "same-source-version")
+            row = await jobs.enqueue(
+                session, "material_import", uuid.UUID(int=1), {}, "same-source-version"
+            )
             await session.commit()
             return row.id
+
     ids = await asyncio.gather(submit(), submit())
     assert ids[0] == ids[1]

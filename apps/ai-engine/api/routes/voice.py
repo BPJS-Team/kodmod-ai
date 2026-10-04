@@ -75,6 +75,7 @@ def _provider_error(exc: Exception, *, operation: str) -> HTTPException:
 
 @router.get("/profile")
 async def voice_profile() -> dict:
+    """Read nonsecret voice configuration and provider availability."""
     return {"profile": profile_id()}
 
 
@@ -83,15 +84,20 @@ async def menu_speech(key: str, language: Literal["id", "en"] = "id") -> Respons
     if key not in MENU_AUDIO:
         raise HTTPException(404, "Menu audio not found.")
     try:
-        audio = await synthesise_bytes(MENU_AUDIO[key][language == "en"],
-                                       language=language, scope="public-menu")
+        audio = await synthesise_bytes(
+            MENU_AUDIO[key][language == "en"], language=language, scope="public-menu"
+        )
     except SpeechBudgetExceededError as exc:
-        raise HTTPException(429, "Suara sedang penuh. Gunakan suara perangkat atau coba nanti.") from exc
+        raise HTTPException(
+            429, "Suara sedang penuh. Gunakan suara perangkat atau coba nanti."
+        ) from exc
     except Exception as exc:
         raise _provider_error(exc, operation="sintesis") from exc
-    return Response(audio, media_type="audio/mpeg",
-                    headers={"Cache-Control": "public, max-age=86400",
-                             "X-Speech-Profile": profile_id()})
+    return Response(
+        audio,
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "public, max-age=86400", "X-Speech-Profile": profile_id()},
+    )
 
 
 @router.post("/tts", summary="Synthesize text for an active signed-in account")
@@ -101,8 +107,11 @@ async def text_to_speech(
 ) -> Response:
     """Return audio bytes for an explicit, user-triggered listen action."""
     try:
-        audio = await synthesise_bytes(body.text, language=body.language or user.preferred_language,
-                                       scope="user:" + str(user.id))
+        audio = await synthesise_bytes(
+            body.text,
+            language=body.language or user.preferred_language,
+            scope="user:" + str(user.id),
+        )
     except SpeechBudgetExceededError as exc:
         raise HTTPException(429, "Batas suara hari ini tercapai. Gunakan suara perangkat.") from exc
     except (elevenlabs.ElevenLabsConfigurationError, elevenlabs.ElevenLabsError) as exc:

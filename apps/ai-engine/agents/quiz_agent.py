@@ -60,7 +60,8 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
         return {
             "generated_response": (
                 "Great! This quiz is complete. Let's review the results together."
-                if english else "Bagus! Kuis ini sudah selesai. Mari kita lihat hasilnya bersama."
+                if english
+                else "Bagus! Kuis ini sudah selesai. Mari kita lihat hasilnya bersama."
             ),
             "next_action": "analyze_quiz",
             "last_node": "quiz_ask",
@@ -85,7 +86,11 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     llm = get_quiz_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": ASK_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+            {
+                "role": "system",
+                "content": ASK_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {"role": "user", "content": user_block},
         ]
     )
@@ -95,8 +100,11 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     # questions, carry the previous answer's feedback forward so the student
     # hears it before the next question, instead of losing it.
     if idx == 0:
-        intro = (f"Let's begin the quiz. There are {total} questions. First question: "
-                 if english else f"Baik, kita mulai kuis. Ada {total} soal. Soal pertama: ")
+        intro = (
+            f"Let's begin the quiz. There are {total} questions. First question: "
+            if english
+            else f"Baik, kita mulai kuis. Ada {total} soal. Soal pertama: "
+        )
         spoken_question = intro + spoken_question
     else:
         feedback = (state.get("generated_response") or "").strip()
@@ -156,8 +164,7 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     topic = (state.get("current_topic") or "").strip()
     if classroom_scope and not topic:
         material_titles = (
-            str(doc.get("material_title") or "").strip()
-            for doc in state.get("retrieved_docs", [])
+            str(doc.get("material_title") or "").strip() for doc in state.get("retrieved_docs", [])
         )
         topic = next((title for title in material_titles if title), "materi kelas")
     topic_context = f"Topic: {topic}" if classroom_scope else f"Concept: {concept_id}"
@@ -165,7 +172,11 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     llm = get_quiz_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": MINI_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+            {
+                "role": "system",
+                "content": MINI_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {
                 "role": "user",
                 "content": (
@@ -200,8 +211,11 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     }
 
     log.info("Mini-quiz generated: %s", question["text"][:60])
-    check_label = ("Quick understanding check:" if state.get("learning_profile", {}).get("language") == "en"
-                   else "Cek pemahaman cepat:")
+    check_label = (
+        "Quick understanding check:"
+        if state.get("learning_profile", {}).get("language") == "en"
+        else "Cek pemahaman cepat:"
+    )
     out = {
         "quiz_question": question,
         "quiz_questions": [question],

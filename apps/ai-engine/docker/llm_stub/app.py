@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 
 from fastapi import FastAPI, Request
@@ -53,6 +54,30 @@ def _canned_reply(prompt: str) -> str:
     If the caller clearly wants JSON (intent router / scoring rubric / analyzer),
     hand back a minimal valid object that downstream parsers accept.
     """
+    requested = re.search(r"<n_questions>(\d+)</n_questions>", prompt)
+    if requested:
+        count = max(1, min(20, int(requested.group(1))))
+        approved = re.search(
+            r"<approved_material_concepts>(.*?)</approved_material_concepts>", prompt
+        )
+        concepts = json.loads(approved.group(1)) if approved else []
+        return json.dumps(
+            {
+                "questions": [
+                    {
+                        "text": f"Pada latihan {index + 1}, berapa hasil satu per dua ditambah satu per dua?",
+                        "type": "mcq",
+                        "options": ["A. satu", "B. dua", "C. nol", "D. tiga"],
+                        "expected_answer": "A",
+                        "source_indices": [1],
+                        "difficulty": "easy",
+                        "explanation": "Dua bagian setengah membentuk satu bagian utuh.",
+                        "concept_id": concepts[0]["id"] if concepts else "",
+                    }
+                    for index in range(count)
+                ]
+            }
+        )
     if _looks_like_json_request(prompt):
         return json.dumps(
             {

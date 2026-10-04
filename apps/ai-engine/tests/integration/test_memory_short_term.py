@@ -51,9 +51,9 @@ async def test_km_int_041_delete_session(redis_client) -> None:  # type: ignore[
 async def test_km_int_042_last_response(redis_client) -> None:  # type: ignore[no-untyped-def]
     from memory.short_term import fetch_last_response, store_last_response
 
-    await store_last_response(SID, "Pecahan adalah bagian dari keseluruhan.", audio_url=None)
+    await store_last_response(SID, "Pecahan adalah bagian dari keseluruhan.")
     got = await fetch_last_response(SID)
-    assert got == {"text": "Pecahan adalah bagian dari keseluruhan.", "audio_url": None}
+    assert got == {"text": "Pecahan adalah bagian dari keseluruhan."}
 
 
 # --------------------------------------------------------------------------- #
@@ -73,15 +73,14 @@ async def test_km_int_043_tutoring_window_ltrim(redis_client) -> None:  # type: 
 
 
 # --------------------------------------------------------------------------- #
-# KM-INT-044 - get_pacing falls back to settings.TTS_RATE
+# KM-INT-044 - replay does not expose audio paths or previous deleted sessions
 # --------------------------------------------------------------------------- #
-async def test_km_int_044_pacing_fallback_and_set(redis_client) -> None:  # type: ignore[no-untyped-def]
-    from config.settings import settings
-    from memory.short_term import get_pacing, set_pacing
+async def test_km_int_044_deleted_replay_is_unavailable(redis_client) -> None:  # type: ignore[no-untyped-def]
+    from memory.short_term import delete_session, fetch_last_response, store_last_response
 
-    assert await get_pacing(SID) == pytest.approx(settings.TTS_RATE)
-    await set_pacing(SID, 0.85)
-    assert await get_pacing(SID) == pytest.approx(0.85)
+    await store_last_response(SID, "Jawaban pribadi.")
+    await delete_session(SID)
+    assert await fetch_last_response(SID) is None
 
 
 # --------------------------------------------------------------------------- #

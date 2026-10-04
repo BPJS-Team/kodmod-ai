@@ -25,7 +25,7 @@ async def editorial_http(request):
     if pg:
         if os.environ.get("KODMOD_EDITORIAL_POSTGRES") != "1":
             pytest.skip("Enable isolated PostgreSQL editorial tests explicitly.")
-        url = "postgresql+asyncpg://kodmod:kodmod@127.0.0.1:5434/kodmod_editorial_migration_test"
+        url = "postgresql+asyncpg://kodmod:kodmod@127.0.0.1:5434/kodmod_test"
         control = create_async_engine(url)
         async with control.begin() as connection:
             await connection.execute(text(f'CREATE SCHEMA "{schema}"'))

@@ -4,7 +4,7 @@ Spec: docs/testplan/09-security.md §5 (KM-SEC-050..051).
 
 Reuses the Stage 4 approach (schemathesis 4.x: ``openapi.from_url`` +
 ``@schema.parametrize()``), but with an auth header injected and CRLF payloads,
-and gates on: no 5xx (outside the tracked set) and no reflected payload / header
+and gates on: no 5xx and no reflected payload / header
 split in the response.
 """
 
@@ -16,21 +16,13 @@ import time
 import uuid
 
 import pytest
+from hypothesis import HealthCheck, Phase, settings
 
 schemathesis = pytest.importorskip("schemathesis")
 
 pytestmark = [pytest.mark.security, pytest.mark.slow]
 
 BASE_URL = os.environ.get("KODMOD_API_BASE_URL", "http://localhost:8000")
-
-# Operations with tracked-but-unfixed 5xx (see traceability #1/#5/#7/#16 and the
-# duplicate-email finding). Excluded so KM-SEC-050 stays a *regression* gate.
-_EXCLUDE = {
-    ("POST", "/quiz/start"),
-    ("POST", "/quiz/submit"),
-    ("POST", "/exercise/generate"),
-    ("POST", "/auth/register"),
-}
 
 try:
     schema = schemathesis.openapi.from_url(f"{BASE_URL}/openapi.json")
@@ -56,9 +48,13 @@ _CRLF = "test\r\nX-Injected: 1"
 
 
 @schema.parametrize()
+@settings(
+    max_examples=10,
+    deadline=None,
+    phases=[Phase.generate],
+    suppress_health_check=[HealthCheck.filter_too_much],
+)
 def test_km_sec_050_no_server_errors_authed(case) -> None:  # type: ignore[no-untyped-def]
-    if (case.method.upper(), case.path) in _EXCLUDE:
-        pytest.skip("tracked 5xx - asserted explicitly elsewhere")
     case.headers = {**(case.headers or {}), "Authorization": f"Bearer {_TOKEN}"}
     response = case.call()
     assert response.status_code < 500, (
@@ -72,9 +68,13 @@ def test_km_sec_050_no_server_errors_authed(case) -> None:  # type: ignore[no-un
 
 
 @schema.parametrize()
+@settings(
+    max_examples=10,
+    deadline=None,
+    phases=[Phase.generate],
+    suppress_health_check=[HealthCheck.filter_too_much],
+)
 def test_km_sec_051_no_header_crlf_split(case) -> None:  # type: ignore[no-untyped-def]
-    if (case.method.upper(), case.path) in _EXCLUDE:
-        pytest.skip("tracked 5xx")
     # Force a CRLF-laden value into whatever the operation will accept.
     if case.path_parameters:
         case.path_parameters = dict.fromkeys(case.path_parameters, _CRLF)

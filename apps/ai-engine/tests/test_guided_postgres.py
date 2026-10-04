@@ -21,10 +21,108 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+async def test_admin_material_update_waits_for_class_before_locking_material(learning_http):
+    from fastapi import BackgroundTasks
+
+    from api.routes import admin_materials, classrooms
+    from database.models import ClassMaterial, Classroom
+
+    _, factory, _, material, _, admin = learning_http
+    async with factory() as teacher_session, factory() as admin_session:
+        teacher_pid = await teacher_session.scalar(text("SELECT pg_backend_pid()"))
+        admin_pid = await admin_session.scalar(text("SELECT pg_backend_pid()"))
+        await teacher_session.scalar(
+            select(Classroom).where(Classroom.id == material.class_id).with_for_update()
+        )
+        task = asyncio.create_task(
+            admin_materials.update_material(
+                material.id,
+                classrooms.MaterialWrite(
+                    title=material.title, content=material.content, published=True
+                ),
+                BackgroundTasks(),
+                actor=admin,
+                session=admin_session,
+            )
+        )
+        try:
+            blocked = False
+            for _ in range(100):
+                async with factory() as monitor:
+                    blockers = await monitor.scalar(
+                        text("SELECT pg_blocking_pids(:pid)"), {"pid": admin_pid}
+                    )
+                if teacher_pid in blockers:
+                    blocked = True
+                    break
+                await asyncio.sleep(0.02)
+            assert blocked, "admin did not reach the controlled classroom lock"
+            await asyncio.wait_for(
+                teacher_session.scalar(
+                    select(ClassMaterial).where(ClassMaterial.id == material.id).with_for_update()
+                ),
+                timeout=0.8,
+            )
+            await teacher_session.commit()
+            await asyncio.wait_for(task, timeout=5)
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_republish_before_finish_keeps_non_ready_index_retryable(learning_http, monkeypatch):
+    from api import durable_jobs as jobs
+    from database.models import ClassMaterial
+
+    _, factory, _, material, _, _ = learning_http
+    monkeypatch.setattr(jobs, "async_session", factory)
+    async with factory() as session:
+        row = await session.get(ClassMaterial, material.id)
+        row.rag_status = "pending"
+        await jobs.enqueue_material(session, row)
+        await session.commit()
+    claimed = await jobs.claim()
+    with pytest.raises(ValueError, match="not ready"):
+        await jobs.finish(claimed.id, claimed.lease_token, require_ready=True)
+    assert await jobs.fail(claimed.id, claimed.lease_token)
+    async with factory() as session:
+        from database.models import BackgroundJob
+
+        assert (await session.get(BackgroundJob, claimed.id)).state == "retry"
+
+
+async def test_exhausted_worker_lease_marks_matching_material_failed(learning_http, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from api import durable_jobs as jobs
+    from database.models import BackgroundJob, ClassMaterial
+
+    _, factory, _, material, _, _ = learning_http
+    monkeypatch.setattr(jobs, "async_session", factory)
+    async with factory() as session:
+        row = await session.get(ClassMaterial, material.id)
+        row.rag_status = "processing"
+        job = await jobs.enqueue_material(session, row)
+        job.state, job.attempts = "running", job.max_attempts
+        job.lease_token = uuid.uuid4()
+        job.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        job_id = job.id
+        await session.commit()
+    assert await jobs.claim() is None
+    async with factory() as session:
+        assert (await session.get(BackgroundJob, job_id)).state == "failed"
+        row = await session.get(ClassMaterial, material.id)
+        assert row.rag_status == "failed" and row.rag_error == jobs.ERROR
+
+
 def test_guided_migration_upgrade_downgrade_preserves_existing_lessons():
     # A completely fresh database also tests first-install migrations. A schema
     # search_path including public can accidentally see its alembic_version.
-    admin = create_engine("postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/kodmod_test", isolation_level="AUTOCOMMIT")
+    admin = create_engine(
+        "postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/kodmod_test",
+        isolation_level="AUTOCOMMIT",
+    )
     name = "guided_migration_" + uuid.uuid4().hex
     engine = None
     try:
@@ -36,27 +134,61 @@ def test_guided_migration_upgrade_downgrade_preserves_existing_lessons():
             config.attributes["connection"] = connection
             schema = "public"
             command.upgrade(config, "0006_editorial_quizzes")
-            assert "guided_state" not in {c["name"] for c in inspect(connection).get_columns("learning_sessions", schema=schema)}
+            assert "guided_state" not in {
+                c["name"]
+                for c in inspect(connection).get_columns("learning_sessions", schema=schema)
+            }
             user_id, lesson_id = uuid.uuid4(), uuid.uuid4()
-            connection.execute(User.__table__.insert().values(
-                id=user_id, username="migration-learner", full_name="Migration learner",
-                password_hash="test-only", role="student",
-            ))
-            connection.execute(LearningSession.__table__.insert().values(
-                id=lesson_id, student_id=user_id, title="Existing lesson", mode="tutoring",
-            ))
+            connection.execute(
+                User.__table__.insert().values(
+                    id=user_id,
+                    username="migration-learner",
+                    full_name="Migration learner",
+                    password_hash="test-only",
+                    role="student",
+                )
+            )
+            connection.execute(
+                LearningSession.__table__.insert().values(
+                    id=lesson_id,
+                    student_id=user_id,
+                    title="Existing lesson",
+                    mode="tutoring",
+                )
+            )
             command.upgrade(config, "0007_guided_learning")
-            assert "guided_state" in {c["name"] for c in inspect(connection).get_columns("learning_sessions", schema=schema)}
+            assert "guided_state" in {
+                c["name"]
+                for c in inspect(connection).get_columns("learning_sessions", schema=schema)
+            }
             assert "learning_action_receipts" in inspect(connection).get_table_names(schema=schema)
             command.downgrade(config, "0006_editorial_quizzes")
-            assert "learning_action_receipts" not in inspect(connection).get_table_names(schema=schema)
+            assert "learning_action_receipts" not in inspect(connection).get_table_names(
+                schema=schema
+            )
             command.upgrade(config, "0007_guided_learning")
-            assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == "0007_guided_learning"
+            assert (
+                connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version'))
+                == "0007_guided_learning"
+            )
             command.upgrade(config, "head")
             assert "audit_events" in inspect(connection).get_table_names(schema=schema)
-            assert connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version')) == ScriptDirectory.from_config(config).get_current_head()
-            assert connection.scalar(select(LearningSession.title).where(LearningSession.id == lesson_id)) == "Existing lesson"
-            assert connection.scalar(select(LearningSession.guided_state).where(LearningSession.id == lesson_id)) is None
+            assert (
+                connection.scalar(text(f'SELECT version_num FROM "{schema}".alembic_version'))
+                == ScriptDirectory.from_config(config).get_current_head()
+            )
+            assert (
+                connection.scalar(
+                    select(LearningSession.title).where(LearningSession.id == lesson_id)
+                )
+                == "Existing lesson"
+            )
+            assert (
+                connection.scalar(
+                    select(LearningSession.guided_state).where(LearningSession.id == lesson_id)
+                )
+                is None
+            )
     finally:
         if engine is not None:
             engine.dispose()

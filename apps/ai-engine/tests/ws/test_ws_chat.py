@@ -30,7 +30,7 @@ async def _drain(ws, *, until: str = "final", timeout: float = RECV_TIMEOUT) -> 
 
 
 def _types(frames: list[dict]) -> list[str]:
-    return [f.get("type") for f in frames]
+    return [str(f["type"]) for f in frames]
 
 
 # --------------------------------------------------------------------------- #

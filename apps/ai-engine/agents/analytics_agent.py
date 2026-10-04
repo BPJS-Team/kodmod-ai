@@ -43,14 +43,14 @@ async def analytics_node(state: KODMODState) -> dict[str, Any]:
         # Pending evidence has not committed yet. Keep this preview in the graph;
         # dashboards aggregate the accepted SQL rows after the REST transaction.
         scores = list(state.get("mastery_scores", {}).values())
-        summary = {
+        preview: AnalyticsSummary = {
             **state.get("analytics_summary", {}),
             "overall_mastery": sum(scores) / len(scores) if scores else 0.0,
             "avg_quiz_score": state.get("cumulative_quiz_score", 0.0),
         }
         return {
-            "analytics_summary": summary,
-            "generated_response": f"Latihan selesai. Nilai latihanmu {round(summary['avg_quiz_score'] * 100)} persen.",
+            "analytics_summary": preview,
+            "generated_response": f"Latihan selesai. Nilai latihanmu {round(preview['avg_quiz_score'] * 100)} persen.",
             "next_action": "recommend",
             "last_node": "analytics",
         }

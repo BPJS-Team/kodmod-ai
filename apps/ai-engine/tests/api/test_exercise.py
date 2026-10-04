@@ -64,8 +64,8 @@ async def test_km_api_062_generate(client, student_factory, concept_ids, auth_he
         headers=auth_headers(tok),
         json={"concept_id": concept_ids["pecahan"], "n_questions": 3},
     )
-    assert r.status_code == 200
-    assert "exercises" in r.json()
+    assert r.status_code == 409
+    assert "materi" in r.json()["detail"].lower()
 
 
 async def test_km_api_063_generate_rejects_non_students(

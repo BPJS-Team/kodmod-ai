@@ -15,8 +15,38 @@ from agents.scoring_agent import (
     _find_option_text,
     _score_mcq,
 )
+from graphs.state import KODMODState
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "not JSON",
+        "[]",
+        "{}",
+        '{"score": true, "feedback":"ok"}',
+        '{"score": 1.5, "feedback":"ok"}',
+        '{"score": 0.5, "confidence": -0.2, "feedback":"ok"}',
+    ],
+)
+async def test_malformed_grading_never_consumes_a_student_attempt(payload, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from agents import scoring_agent as agent
+
+    persist = AsyncMock()
+    llm = SimpleNamespace(ainvoke=AsyncMock(return_value=SimpleNamespace(content=payload)))
+    monkeypatch.setattr(agent, "get_scoring_llm", lambda: llm)
+    monkeypatch.setattr(agent, "_persist_progress", persist)
+    state: KODMODState = {"quiz_attempts": [], "current_question_attempts": 2}
+    with pytest.raises(ValueError, match="grading contract"):
+        await agent._score_with_rubric(state, {"text": "Explain a fraction"}, "Half", "Half", {})
+    persist.assert_not_awaited()
+    assert state == {"quiz_attempts": [], "current_question_attempts": 2}
+
 
 _OPTIONS = ["A. satu", "B. dua", "C. tiga", "D. empat"]
 
@@ -88,7 +118,7 @@ def test_is_correct_threshold_0_6(score: float, expected: bool) -> None:  # KM-U
 
 
 async def test_emit_cumulative_is_mean() -> None:  # KM-UNIT-046
-    state = {"quiz_attempts": [{"score": 1.0}, {"score": 0.0}]}
+    state: KODMODState = {"quiz_attempts": [{"score": 1.0}, {"score": 0.0}]}
     out = await _emit(state, _build_attempt({}, "a", 0.5, "fb"))
     assert out["quiz_score"] == 0.5
     assert out["cumulative_quiz_score"] == pytest.approx(0.5)  # mean of [1, 0, 0.5]

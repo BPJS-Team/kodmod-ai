@@ -153,9 +153,7 @@ async def test_revocation_committed_while_approval_waits_on_draft_lock(
     monkeypatch.setattr(service, "draft_for", tracked)
     async with factory() as blocker:
         await blocker.scalar(
-            select(db.QuizDraft)
-            .where(db.QuizDraft.id == uuid.UUID(draft["id"]))
-            .with_for_update()
+            select(db.QuizDraft).where(db.QuizDraft.id == uuid.UUID(draft["id"])).with_for_update()
         )
         approval = asyncio.create_task(
             client.post(

@@ -18,6 +18,7 @@ async def mapping_http():
     fixture = classroom_test.ClassroomRoutesTest()
     await fixture.asyncSetUp()
     from api.routes.editorial_quizzes import router
+
     fixture.client._transport.app.include_router(router)
     try:
         async with fixture.engine.begin() as connection:
@@ -42,23 +43,32 @@ async def mapping_http():
 
 
 async def material_for(fixture):
-    room = await fixture.client.post("/classes", json={
-        "name": "Kelas pemetaan", "subject": "Matematika",
-        "subject_id": str(fixture.subject.id),
-    })
+    room = await fixture.client.post(
+        "/classes",
+        json={
+            "name": "Kelas pemetaan",
+            "subject": "Matematika",
+            "subject_id": str(fixture.subject.id),
+        },
+    )
     assert room.status_code == 201, room.text
     class_id = room.json()["id"]
-    response = await fixture.client.post(f"/classes/{class_id}/materials", json={
-        "title": "Pecahan", "content": "Satu per dua sama dengan dua per empat.",
-        "published": True,
-    })
+    response = await fixture.client.post(
+        f"/classes/{class_id}/materials",
+        json={
+            "title": "Pecahan",
+            "content": "Satu per dua sama dengan dua per empat.",
+            "published": True,
+        },
+    )
     assert response.status_code == 201, response.text
     return class_id, response.json()["id"]
 
 
 def approval(fixture, *, content=1, mapping=0, concepts=None):
     return {
-        "expected_content_version": content, "expected_mapping_version": mapping,
+        "expected_content_version": content,
+        "expected_mapping_version": mapping,
         "concept_ids": concepts if concepts is not None else [str(fixture.concept.id)],
         "primary_concept_id": str(fixture.concept.id) if concepts is None else None,
     }
@@ -88,7 +98,9 @@ async def test_mapping_rejects_other_subject_and_non_owner_without_changing_revi
     path = f"/classes/{cid}/materials/{mid}/concepts"
     body = approval(f, concepts=[str(f.other_concept.id)])
     assert (await f.client.put(path, json=body)).status_code == 422
-    assert (await f.client.put(path, json=approval(f, concepts=[str(uuid.uuid4())]))).status_code == 422
+    assert (
+        await f.client.put(path, json=approval(f, concepts=[str(uuid.uuid4())]))
+    ).status_code == 422
     f.actor = f.other_teacher
     assert (await f.client.get(path)).status_code == 404
     assert (await f.client.put(path, json=approval(f))).status_code == 404
@@ -98,15 +110,21 @@ async def test_mapping_rejects_other_subject_and_non_owner_without_changing_revi
     assert (await f.client.get(path)).json()["mapping_version"] == 0
 
 
-async def test_editing_content_invalidates_current_mapping_and_keeps_historical_review(mapping_http):
+async def test_editing_content_invalidates_current_mapping_and_keeps_historical_review(
+    mapping_http,
+):
     f = mapping_http
     cid, mid = await material_for(f)
     path = f"/classes/{cid}/materials/{mid}/concepts"
     assert (await f.client.put(path, json=approval(f))).status_code == 200
-    response = await f.client.put(f"/classes/{cid}/materials/{mid}", json={
-        "title": "Pecahan baru", "content": "Tiga per enam sama dengan satu per dua.",
-        "published": True,
-    })
+    response = await f.client.put(
+        f"/classes/{cid}/materials/{mid}",
+        json={
+            "title": "Pecahan baru",
+            "content": "Tiga per enam sama dengan satu per dua.",
+            "published": True,
+        },
+    )
     assert response.status_code == 200
     mapping = (await f.client.get(path)).json()
     assert mapping["content_version"] == 2
@@ -115,7 +133,15 @@ async def test_editing_content_invalidates_current_mapping_and_keeps_historical_
     assert (await f.client.put(path, json=approval(f, content=2, mapping=1))).status_code == 200
     table = Base.metadata.tables["material_concepts"]
     async with f.sessions() as session:
-        versions = (await session.execute(select(table.c.content_version).where(table.c.material_id == uuid.UUID(mid)))).scalars().all()
+        versions = (
+            (
+                await session.execute(
+                    select(table.c.content_version).where(table.c.material_id == uuid.UUID(mid))
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert sorted(versions) == [1, 2]
 
 
@@ -134,25 +160,49 @@ async def test_changing_subject_invalidates_mapping_without_rewriting_history(ma
         room = await session.get(Classroom, uuid.UUID(cid))
         assert room.subject_id == f.other_subject.id
         table = Base.metadata.tables["material_concepts"]
-        assert len((await session.execute(select(table).where(table.c.material_id == uuid.UUID(mid)))).all()) == 1
+        assert (
+            len(
+                (
+                    await session.execute(
+                        select(table).where(table.c.material_id == uuid.UUID(mid))
+                    )
+                ).all()
+            )
+            == 1
+        )
 
 
 @pytest.mark.parametrize("forged", [False, True])
 async def test_generator_attributes_only_question_specific_reviewed_concepts(monkeypatch, forged):
     cid, wrong = str(uuid.uuid4()), str(uuid.uuid4())
     prompts = []
+
     class LLM:
         async def ainvoke(self, messages):
             prompts.extend(message["content"] for message in messages)
-            return SimpleNamespace(content=json.dumps({"questions": [{
-                "text": "Apa arti satu per dua?", "type": "spoken",
-                "expected_answer": "Satu dari dua bagian yang sama", "source_indices": [1],
-                "concept_id": wrong if forged else cid,
-            }]}))
+            return SimpleNamespace(
+                content=json.dumps(
+                    {
+                        "questions": [
+                            {
+                                "text": "Apa arti satu per dua?",
+                                "type": "spoken",
+                                "expected_answer": "Satu dari dua bagian yang sama",
+                                "source_indices": [1],
+                                "concept_id": wrong if forged else cid,
+                            }
+                        ]
+                    }
+                )
+            )
+
     monkeypatch.setattr(problem_generator, "get_quiz_llm", lambda: LLM())
     state = {
-        "class_id": str(uuid.uuid4()), "material_id": str(uuid.uuid4()),
-        "current_topic": "Pecahan", "quiz_n_questions": 1, "assessment_managed": True,
+        "class_id": str(uuid.uuid4()),
+        "material_id": str(uuid.uuid4()),
+        "current_topic": "Pecahan",
+        "quiz_n_questions": 1,
+        "assessment_managed": True,
         "approved_material_concepts": [{"id": cid, "name": "Pecahan"}],
         "quiz_source_docs": [{"text": "Pecahan menyatakan bagian yang sama besar."}],
     }
@@ -165,40 +215,72 @@ async def test_generator_attributes_only_question_specific_reviewed_concepts(mon
         assert any(cid in prompt for prompt in prompts)
 
 
-async def test_mapped_assessment_preserves_review_snapshot_and_updates_mastery_once(assessment_http, monkeypatch):
+async def test_mapped_assessment_preserves_review_snapshot_and_updates_mastery_once(
+    assessment_http, monkeypatch
+):
     from database import models as db
+
     client, factory, controls, graph, concept, _ = assessment_http
     async with factory.kw["bind"].begin() as connection:
-        await connection.run_sync(lambda c: db.Base.metadata.create_all(c, tables=[db.MaterialConcept.__table__]))
+        await connection.run_sync(
+            lambda c: db.Base.metadata.create_all(c, tables=[db.MaterialConcept.__table__])
+        )
     async with factory() as session:
-        teacher = db.User(username="mapping-owner", full_name="Teacher", role="teacher", password_hash="test")
+        teacher = db.User(
+            username="mapping-owner", full_name="Teacher", role="teacher", password_hash="test"
+        )
         session.add(teacher)
         await session.flush()
-        room = db.Classroom(teacher_id=teacher.id, name="Kelas", subject="Matematika", subject_id=concept.subject_id)
+        room = db.Classroom(
+            teacher_id=teacher.id, name="Kelas", subject="Matematika", subject_id=concept.subject_id
+        )
         session.add(room)
         await session.flush()
-        material = db.ClassMaterial(class_id=room.id, title="Pecahan", content="Pecahan senilai",
-            published=True, rag_status="ready", indexed_version=1, n_chunks=1,
-            mapping_version=1, indexed_mapping_version=1)
+        material = db.ClassMaterial(
+            class_id=room.id,
+            title="Pecahan",
+            content="Pecahan senilai",
+            published=True,
+            rag_status="ready",
+            indexed_version=1,
+            n_chunks=1,
+            mapping_version=1,
+            indexed_mapping_version=1,
+        )
         session.add(material)
         await session.flush()
-        session.add_all([
-            db.Enrollment(class_id=room.id, student_id=controls["actor"].id),
-            db.MaterialConcept(material_id=material.id, content_version=1, mapping_version=1,
-                concept_id=concept.id, approved_by=teacher.id, is_primary=True),
-        ])
+        session.add_all(
+            [
+                db.Enrollment(class_id=room.id, student_id=controls["actor"].id),
+                db.MaterialConcept(
+                    material_id=material.id,
+                    content_version=1,
+                    mapping_version=1,
+                    concept_id=concept.id,
+                    approved_by=teacher.id,
+                    is_primary=True,
+                ),
+            ]
+        )
         await session.commit()
     original = graph.ainvoke
+
     async def attributed(state, config=None):
         final = await original(state, config)
         if not state.get("student_answer"):
             assert state["approved_material_concepts"][0]["id"] == str(concept.id)
             final["quiz_questions"][0]["concept_id"] = str(concept.id)
         return final
+
     monkeypatch.setattr(graph, "ainvoke", attributed)
-    response = await client.post("/quiz/start", json={
-        "class_id": str(room.id), "material_id": str(material.id), "n_questions": 1,
-    })
+    response = await client.post(
+        "/quiz/start",
+        json={
+            "class_id": str(room.id),
+            "material_id": str(material.id),
+            "n_questions": 1,
+        },
+    )
     assert response.status_code == 200, response.text
     started = response.json()
     async with factory() as session:
@@ -223,14 +305,17 @@ async def test_mapped_assessment_preserves_review_snapshot_and_updates_mastery_o
 
 async def test_failed_old_index_job_cannot_mark_new_mapping_failed(mapping_http, monkeypatch):
     from api import material_service
+
     f = mapping_http
     cid, mid = await material_for(f)
     path = f"/classes/{cid}/materials/{mid}/concepts"
     assert (await f.client.put(path, json=approval(f))).status_code == 200
+
     async def failed_provider(*args, **kwargs):
         response = await f.client.put(path, json=approval(f, mapping=1))
         assert response.status_code == 200, response.text
         raise RuntimeError("Simulated provider failure for obsolete mapping")
+
     monkeypatch.setattr(material_service, "async_session", f.sessions)
     monkeypatch.setattr(material_service, "build_material_records", failed_provider)
     await material_service.index_class_material(uuid.UUID(mid), 1)
@@ -240,18 +325,40 @@ async def test_failed_old_index_job_cannot_mark_new_mapping_failed(mapping_http,
         assert material.rag_status == "pending"
 
 
-async def test_teacher_proposal_uses_reviewed_question_specific_attribution(mapping_http, monkeypatch):
+async def test_teacher_proposal_uses_reviewed_question_specific_attribution(
+    mapping_http, monkeypatch
+):
     f = mapping_http
     cid, mid = await material_for(f)
-    assert (await f.client.put(f"/classes/{cid}/materials/{mid}/concepts", json=approval(f))).status_code == 200
+    assert (
+        await f.client.put(f"/classes/{cid}/materials/{mid}/concepts", json=approval(f))
+    ).status_code == 200
+
     async def generate(state):
         assert state["approved_material_concepts"][0]["id"] == str(f.concept.id)
-        return {"quiz_questions": [{"text": "Setengah berarti?", "options": ["A. Satu dari dua", "B. Dua dari dua"],
-            "expected_answer": "a", "explanation": "Satu bagian dari dua bagian sama besar.", "concept_id": str(f.concept.id)}]}
+        return {
+            "quiz_questions": [
+                {
+                    "text": "Setengah berarti?",
+                    "options": ["A. Satu dari dua", "B. Dua dari dua"],
+                    "expected_answer": "a",
+                    "explanation": "Satu bagian dari dua bagian sama besar.",
+                    "concept_id": str(f.concept.id),
+                }
+            ]
+        }
+
     monkeypatch.setattr(problem_generator, "problem_generator_node", generate)
-    response = await f.client.post("/teacher/quizzes/propose", json={
-        "class_id": cid, "material_id": mid, "n_questions": 1, "difficulty": "easy", "language": "id",
-    })
+    response = await f.client.post(
+        "/teacher/quizzes/propose",
+        json={
+            "class_id": cid,
+            "material_id": mid,
+            "n_questions": 1,
+            "difficulty": "easy",
+            "language": "id",
+        },
+    )
     assert response.status_code == 200, response.text
     result = response.json()
     assert result["review_required"] is True

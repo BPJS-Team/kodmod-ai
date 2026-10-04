@@ -1,7 +1,7 @@
-"""KM-STATIC-030 / 031 / 032 / 052 - dependency health.
+"""KM-STATIC-030 / 032 / 052 - dependency health.
 
 030: pip-audit - 0 un-waived vulnerabilities (waivers: .pip-audit-ignore).
-031: safety - cross-check, same policy.
+031: retired duplicate Safety check; pip-audit covers the complete test environment.
 032: optional non-default backends are not required on the text-mode path.
 052: requirements.txt core set == pyproject [project.dependencies].
 """
@@ -73,25 +73,6 @@ def test_pip_audit_no_unwaived_vulns() -> None:  # KM-STATIC-030
     assert not bad, (
         "un-waived vulnerabilities (add to .pip-audit-ignore with a date):\n" + "\n".join(bad)
     )
-
-
-@pytest.mark.skipif(resolve("safety", "safety") is None, reason="safety not installed")
-def test_safety_cross_check() -> None:  # KM-STATIC-031
-    proc = run([*resolve("safety", "safety"), "check", "--json"], timeout=600)  # type: ignore[misc]
-    if proc.returncode != 0 and "login" in (proc.stderr or "").lower():
-        pytest.skip("safety requires authentication in this environment")
-    try:
-        data = json.loads(proc.stdout or "{}")
-    except json.JSONDecodeError:
-        pytest.skip(f"safety produced no JSON:\n{out(proc)}")
-    vulns = data.get("vulnerabilities", []) if isinstance(data, dict) else data
-    waived = _waivers()
-    bad = [
-        f"{v.get('package_name')} {v.get('vulnerability_id')}"
-        for v in vulns
-        if str(v.get("vulnerability_id")) not in waived
-    ]
-    assert not bad, "un-waived vulnerabilities (safety):\n" + "\n".join(bad)
 
 
 @pytest.mark.parametrize("mod", OPTIONAL_BACKENDS)

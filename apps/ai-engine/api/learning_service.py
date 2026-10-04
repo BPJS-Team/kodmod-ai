@@ -8,6 +8,7 @@ import json
 import re
 import uuid
 from datetime import UTC, datetime
+from itertools import pairwise
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -31,30 +32,37 @@ guided_graph = build_guided_graph()
 
 def learning_units(content: str, *, limit: int = 2400) -> list[dict]:
     """Partition reviewed text in order; no loss or invented chapter hierarchy."""
-    units, position = [], 0
-    while position < len(content):
-        end = min(position + limit, len(content))
-        if end < len(content):
-            boundary = content.rfind("\n\n", position + limit // 3, end)
-            if boundary < 0:
-                boundary = content.rfind(" ", position + limit // 3, end)
-            if boundary >= 0:
-                end = boundary + (2 if content[boundary : boundary + 2] == "\n\n" else 1)
-        text = content[position:end]
-        first = text.strip().split("\n", 1)[0].strip()
+    if not content.strip():
+        raise HTTPException(409, "Materi belum memiliki teks yang dapat dipelajari.")
+    if limit < 1:
+        raise ValueError("Learning unit limit must be positive")
+    headings = re.compile(
+        r"^[ \t]*(?:#{1,6}[ \t]+\S[^\n]*|"
+        r"(?:bab|chapter|bagian|sub[ -]?bab)[ \t]+(?:\d+(?:\.\d+)*|[IVXLCDM]+)\b[^\n]*)$",
+        re.I | re.M,
+    )
+    starts = [0] + [match.start() for match in headings.finditer(content) if match.start() > 0]
+    starts.append(len(content))
+    units = []
+    for start, stop in pairwise(starts):
+        first = content[start:stop].strip().split("\n", 1)[0].strip()
         heading = (
-            first
+            re.sub(r"^#{1,6}\s+", "", first)
             if len(first) <= 110
-            and (
-                re.match(r"^(?:#{1,6}\s|bab\s|chapter\s|[A-Z]\.|\d+[.)]\s)", first, re.I)
-                or (first.isupper() and len(first) > 3)
-            )
+            and (headings.fullmatch(first) or (first.isupper() and len(first) > 3))
             else None
         )
-        units.append({"text": text, "title": heading})
-        position = end
-    if not units or not content.strip():
-        raise HTTPException(409, "Materi belum memiliki teks yang dapat dipelajari.")
+        position = start
+        while position < stop:
+            end = min(position + limit, stop)
+            if end < stop:
+                boundary = content.rfind("\n\n", position + limit // 3, end)
+                if boundary < 0:
+                    boundary = content.rfind(" ", position + limit // 3, end)
+                if boundary >= 0:
+                    end = boundary + (2 if content[boundary : boundary + 2] == "\n\n" else 1)
+            units.append({"text": content[position:end], "title": heading})
+            position = end
     return units
 
 
@@ -129,6 +137,7 @@ def unit_source(row, material, state):
 
 async def teach(session, row, material, student, state, action, question=""):
     from tools.provider_usage import usage_context
+
     history = (
         await session.scalars(
             select(InteractionLog)
@@ -138,17 +147,25 @@ async def teach(session, row, material, student, state, action, question=""):
         )
     ).all()
     unit = state["units"][state["unit_index"]]
-    with usage_context(actor_id=student.id, target_id=row.id, target_type="learning_session", language=state["language"]):
+    with usage_context(
+        actor_id=student.id,
+        target_id=row.id,
+        target_type="learning_session",
+        language=state["language"],
+    ):
         result = await guided_graph.ainvoke(
-        {
-            "action": action,
-            "question": question,
-            "unit_text": unit["text"],
-            "unit_title": unit["title"] or "",
-            "previous_explanation": state.get("text", ""),
-            "history": [{"role": log.role, "text": log.text} for log in reversed(history)],
-            "learning_profile": {**build_learning_profile(student), "language": state["language"]},
-        }
+            {
+                "action": action,
+                "question": question,
+                "unit_text": unit["text"],
+                "unit_title": unit["title"] or "",
+                "previous_explanation": state.get("text", ""),
+                "history": [{"role": log.role, "text": log.text} for log in reversed(history)],
+                "learning_profile": {
+                    **build_learning_profile(student),
+                    "language": state["language"],
+                },
+            }
         )
     text = result.get("accessible_response", "").strip()
     if not text:
@@ -181,6 +198,8 @@ async def start_lesson(session, student, body: LearningStart):
     # Serialize simultaneous start requests for this learner across devices.
     await session.scalar(select(User).where(User.id == student.id).with_for_update())
     context = await resolve_tutoring_context(session, body.class_id, body.material_id, student)
+    if context is None:
+        raise HTTPException(422, "Pilih kelas dan materi untuk mulai belajar.")
     material = await session.get(ClassMaterial, body.material_id)
     rows = (
         await session.scalars(

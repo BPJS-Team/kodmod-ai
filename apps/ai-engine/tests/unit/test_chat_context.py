@@ -17,12 +17,12 @@ from api.dependencies import db_session, require_student
 from api.routes import chat, voice
 from database.models import (
     Base,
-    MaterialImport,
     ClassMaterial,
     Classroom,
     Enrollment,
     InteractionLog,
     LearningSession,
+    MaterialImport,
     Subject,
     User,
 )
@@ -167,13 +167,21 @@ async def test_material_selection_is_saved_and_returned_in_session_context(scope
         "material_id": str(workspace.material.id),
         "subject_name": "Matematika",
         "material_title": "Pecahan",
+        "subject_id": None,
+        "mapping_version": 0,
+        "approved_material_concepts": [],
     }
     assert response.json().get("context") == expected
     session_id = response.json()["session_id"]
+    # Replay shows the stable selected material label. Approved concepts are
+    # resolved afresh before the next provider call, never trusted from history.
+    history_context = {
+        key: expected[key] for key in ("class_id", "material_id", "subject_name", "material_title")
+    }
     rows = (await workspace.client.get("/chat/sessions")).json()
-    assert rows[0]["context"] == expected
+    assert rows[0]["context"] == history_context
     detail = (await workspace.client.get(f"/chat/sessions/{session_id}")).json()
-    assert detail["context"] == expected
+    assert detail["context"] == history_context
 
 
 async def test_a_resumed_session_rechecks_revoked_class_access(scoped_chat):

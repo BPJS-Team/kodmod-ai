@@ -168,7 +168,13 @@ async def query(
             if key in doc and doc[key] is not None:
                 doc[key] = str(doc[key])
         doc["source"] = PurePosixPath((doc.get("source") or "Materi").replace("\\", "/")).name
-        doc["concept_ids"] = doc["accessibility_metadata"].get("approved_concept_ids", []) if class_id else [doc["concept_id"]] if doc.get("concept_id") else []
+        doc["concept_ids"] = (
+            doc["accessibility_metadata"].get("approved_concept_ids", [])
+            if class_id
+            else [doc["concept_id"]]
+            if doc.get("concept_id")
+            else []
+        )
         docs.append(doc)
     return docs
 

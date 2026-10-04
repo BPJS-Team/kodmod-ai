@@ -36,6 +36,7 @@ def _client():
     if settings.OPENAI_BASE_URL:
         opts["base_url"] = settings.OPENAI_BASE_URL
     from tools.provider_usage import MeasuredEmbeddingClient
+
     client = OpenAIEmbeddings(**opts)
     client.async_client = MeasuredEmbeddingClient(client.async_client, settings.EMBEDDING_MODEL)
     return client

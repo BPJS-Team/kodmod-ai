@@ -24,7 +24,7 @@ async def test_km_int_020_load_profile_fresh(make_student) -> None:  # type: ign
     assert profile["full_name"] == "Budi"
     assert profile["preferred_language"] == "id"
     assert profile["accessibility_profile"] == "blind"
-    assert profile["voice_settings"] == {}
+    assert "voice_settings" not in profile  # Speech preferences belong to the app settings.
     assert profile["mastery"] == {}
     assert profile["streak_days"] == 0
 

@@ -1,4 +1,5 @@
 """Pydantic schemas for learning sessions."""
+
 from __future__ import annotations
 
 import uuid

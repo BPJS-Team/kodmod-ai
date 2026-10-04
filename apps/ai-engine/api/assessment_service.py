@@ -12,6 +12,7 @@ import json
 import math
 import uuid
 from datetime import UTC, datetime
+from typing import Literal, cast
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -30,7 +31,7 @@ from database.models import (
     QuizSession,
     User,
 )
-from graphs.state import build_learning_profile, initial_state
+from graphs.state import KODMODState, build_learning_profile, initial_state
 from models.quiz import (
     QuizQuestionOut,
     QuizRecoveryResponse,
@@ -132,15 +133,25 @@ async def load_model(session: AsyncSession, student_id: uuid.UUID) -> tuple[Stud
 
 async def invoke(graph, state: dict, sid: uuid.UUID) -> dict:
     from tools.provider_usage import usage_context
-    with usage_context(target_id=sid, target_type="quiz_session", language=state.get("learning_profile", {}).get("language")):
+
+    with usage_context(
+        target_id=sid,
+        target_type="quiz_session",
+        language=state.get("learning_profile", {}).get("language"),
+    ):
         return await graph.ainvoke(
             state, config={"configurable": {"thread_id": f"assessment:{sid}:{uuid.uuid4()}"}}
         )
 
 
 async def start_assessment(
-    session: AsyncSession, graph, student: User, body: QuizStartRequest,
-    *, kind: str = "assessment", source_docs: list[dict] | None = None,
+    session: AsyncSession,
+    graph,
+    student: User,
+    body: QuizStartRequest,
+    *,
+    kind: Literal["assessment", "tutor"] = "assessment",
+    source_docs: list[dict] | None = None,
 ) -> QuizStartResponse:
     context = await resolve_tutoring_context(session, body.class_id, body.material_id, student)
     material = await session.get(ClassMaterial, body.material_id) if body.material_id else None
@@ -149,34 +160,42 @@ async def start_assessment(
         raise HTTPException(404, "Konsep tidak ditemukan.")
     sid = uuid.uuid4()
     state = initial_state(
-        str(sid), str(student.id), subject_id=str(concept.subject_id) if concept else None,
+        str(sid),
+        str(student.id),
+        subject_id=str(concept.subject_id) if concept else None,
         class_id=str(body.class_id) if body.class_id else None,
         material_id=str(body.material_id) if body.material_id else None,
     )
     model, _ = await load_model(session, student.id)
     state.update(
-        assessment_managed=True,
-        assessment_kind=kind,
-        material_version=material.content_version if material else None,
-        material_mapping_version=material.mapping_version if material else None,
-        approved_material_concepts=context.get("approved_material_concepts", []) if context else [],
-        quiz_source_docs=copy.deepcopy(source_docs or []),
-        intent="quiz",
-        quiz_n_questions=body.n_questions,
-        current_concept_id=str(concept.id) if concept else "",
-        current_topic=context["material_title"] if context else concept.name if concept else "",
-        current_difficulty=body.difficulty or "medium",
-        detected_language=body.language,
-        mastery_scores=dict(model._scores),
-        mastery_confidence=dict(model._confidence),
-        learning_profile={**build_learning_profile(student), "language": body.language},
+        KODMODState(
+            assessment_managed=True,
+            assessment_kind=kind,
+            material_version=material.content_version if material else None,
+            material_mapping_version=material.mapping_version if material else None,
+            approved_material_concepts=context.get("approved_material_concepts", [])
+            if context
+            else [],
+            quiz_source_docs=copy.deepcopy(source_docs or []),
+            intent="quiz",
+            quiz_n_questions=body.n_questions,
+            current_concept_id=str(concept.id) if concept else "",
+            current_topic=context["material_title"] if context else concept.name if concept else "",
+            current_difficulty=body.difficulty or "medium",
+            detected_language=body.language,
+            mastery_scores=dict(model._scores),
+            mastery_confidence=dict(model._confidence),
+            learning_profile={**build_learning_profile(student), "language": body.language},
+        )
     )
     if context:
         state["subject_id"] = context.get("subject_id")
         state["current_concept_id"] = ""
-        if body.concept_id and str(body.concept_id) not in {c["id"] for c in state["approved_material_concepts"]}:
+        if body.concept_id and str(body.concept_id) not in {
+            c["id"] for c in state["approved_material_concepts"]
+        }:
             raise HTTPException(422, "Konsep harus sudah disetujui untuk materi ini.")
-    final = await invoke(graph, state, sid)
+    final = await invoke(graph, dict(state), sid)
     questions = copy.deepcopy(final.get("quiz_questions", []))
     if len(questions) != body.n_questions:
         raise ValueError("Graph did not generate a valid quiz")
@@ -189,7 +208,8 @@ async def start_assessment(
                 raise ValueError("Question claims an unapproved material Concept")
             question["concept_id"] = str(cid) if allowed and cid else ""
         else:
-            question["concept_id"] = str(cid) if cid and await session.get(Concept, cid) else ""
+            known_concept = await session.get(Concept, cid) if cid is not None else None
+            question["concept_id"] = str(cid) if known_concept is not None else ""
     final.update(
         quiz_questions=questions,
         quiz_question=questions[0],
@@ -236,7 +256,10 @@ async def validate_assessment_source(session: AsyncSession, owned: QuizSession, 
     canonical = owned.assessment_state or {}
     if canonical.get("class_id") or canonical.get("material_id"):
         await resolve_tutoring_context(
-            session, as_uuid(canonical.get("class_id")), as_uuid(canonical.get("material_id")), student
+            session,
+            as_uuid(canonical.get("class_id")),
+            as_uuid(canonical.get("material_id")),
+            student,
         )
         material = await session.get(ClassMaterial, as_uuid(canonical.get("material_id")))
         if material is None or canonical.get("material_version") != material.content_version:
@@ -253,36 +276,53 @@ async def recover_assessment(
         raise HTTPException(404, "Sesi kuis tidak ditemukan.")
     if not owned.assessment_state:
         raise HTTPException(409, "Sesi lama belum mendukung pemulihan. Mulai latihan baru.")
+    if owned.status not in ("in_progress", "completed"):
+        raise HTTPException(409, "Sesi kuis ini tidak dapat dilanjutkan.")
     await validate_assessment_source(session, owned, student)
     state = owned.assessment_state
     index = int(state.get("current_question_index", 0))
     questions = state.get("quiz_questions", [])
     receipt = await session.scalar(
-        select(AssessmentSubmission).where(AssessmentSubmission.quiz_session_id == sid)
-        .order_by(AssessmentSubmission.attempt_index.desc()).limit(1)
+        select(AssessmentSubmission)
+        .where(AssessmentSubmission.quiz_session_id == sid)
+        .order_by(AssessmentSubmission.attempt_index.desc())
+        .limit(1)
     )
     return QuizRecoveryResponse(
-        quiz_session_id=sid, kind=state.get("assessment_kind", "assessment"),
-        status=owned.status, class_id=state.get("class_id"), material_id=state.get("material_id"),
+        quiz_session_id=sid,
+        kind=state.get("assessment_kind", "assessment"),
+        status=cast(Literal["in_progress", "completed"], owned.status),
+        class_id=state.get("class_id"),
+        material_id=state.get("material_id"),
         material_title=state.get("current_topic") or None,
-        language=state.get("detected_language", "id"), total_questions=owned.total_questions,
+        language=state.get("detected_language", "id"),
+        total_questions=owned.total_questions,
         answered_questions=min(index, owned.total_questions),
         current_question=question_out(questions[index], index)
-        if owned.status == "in_progress" and index < len(questions) else None,
-        last_result=QuizSubmitResponse.model_validate(receipt.response_payload) if receipt else None,
+        if owned.status == "in_progress" and index < len(questions)
+        else None,
+        last_result=QuizSubmitResponse.model_validate(receipt.response_payload)
+        if receipt
+        else None,
         started_at=owned.started_at,
     )
 
 
 async def active_assessments(session: AsyncSession, student: User, *, kind="assessment"):
-    rows = (await session.scalars(
-        select(QuizSession).where(QuizSession.student_id == student.id,
-                                  QuizSession.status == "in_progress")
-        .order_by(QuizSession.started_at.desc()).limit(50)
-    )).all()
+    rows = (
+        await session.scalars(
+            select(QuizSession)
+            .where(QuizSession.student_id == student.id, QuizSession.status == "in_progress")
+            .order_by(QuizSession.started_at.desc())
+            .limit(50)
+        )
+    ).all()
     result = []
     for row in rows:
-        if not row.assessment_state or row.assessment_state.get("assessment_kind", "assessment") != kind:
+        if (
+            not row.assessment_state
+            or row.assessment_state.get("assessment_kind", "assessment") != kind
+        ):
             continue
         try:
             result.append(await recover_assessment(session, student, row.id))

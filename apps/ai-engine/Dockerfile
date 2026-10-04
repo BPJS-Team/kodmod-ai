@@ -20,7 +20,6 @@ ARG INSTALL_RERANKER=false
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -38,8 +37,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy only the dep manifests first to maximise layer cache hits.
-COPY pyproject.toml requirements.txt ./
-RUN pip install --upgrade pip wheel setuptools \
+COPY requirements.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip pip install --upgrade pip wheel setuptools \
  && pip install -r requirements.txt
 
 # Now copy the source tree.

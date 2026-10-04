@@ -1,5 +1,7 @@
 # Review Antigravity dan mapping scope KODMOD
 
+> Status terbaru tersedia di [progres dan pengujian 5 Oktober 2026](scope-and-testing-2026-10-05.md). Angka 76% dan kondisi container dalam dokumen ini adalah snapshot sebelum paket penyelesaian berikutnya.
+
 Tanggal: 4 Oktober 2026. Baseline: `ec1fd0c`; perbaikan hasil review: `2d08f9d`. Perubahan UI Antigravity dan integrasi Tutor berada dalam checkout yang sama; review mencakup hasil gabungannya.
 
 Dokumen ini menggantikan ringkasan status lama untuk keputusan pekerjaan berikutnya. Pemeriksaan dilakukan melalui source, tes kode/API, PostgreSQL terisolasi, build, dan pemeriksaan container. Tidak melakukan klik browser atau menguji perangkat bantu milik pengguna.

@@ -20,9 +20,13 @@ pytestmark = pytest.mark.unit
 class MaterialImportTest(classroom_test.ClassroomRoutesTest):
     async def completed_preview(self, cid, response):
         from api import durable_jobs, material_worker
+
         self.assertEqual(response.status_code, 202, response.text)
         iid = response.json()["import_id"]
-        with patch.object(durable_jobs, "async_session", self.sessions), patch.object(material_worker, "async_session", self.sessions):
+        with (
+            patch.object(durable_jobs, "async_session", self.sessions),
+            patch.object(material_worker, "async_session", self.sessions),
+        ):
             job = await durable_jobs.claim()
             self.assertIsNotNone(job)
             await material_worker.run_job(job)
@@ -64,7 +68,12 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
             f"/classes/{cid}/materials/import", files={"file": ("scan.pdf", data.getvalue())}
         )
         from api import pdf_ocr
-        with patch.object(pdf_ocr, "recognize_page", return_value={"text": "Teks scan sudah dibaca", "confidence": 91}):
+
+        with patch.object(
+            pdf_ocr,
+            "recognize_page",
+            return_value={"text": "Teks scan sudah dibaca", "confidence": 91},
+        ):
             preview = await self.completed_preview(cid, response)
         self.assertEqual(preview["state"], "complete")
         self.assertEqual(preview["preview"]["pages"][0]["method"], "ocr")
@@ -339,7 +348,10 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
 
     async def test_saved_original_is_private_and_reviewed_source_cannot_cross_classes(self):
         cid = await self.create_class()
-        uploaded = await self.client.post(f"/classes/{cid}/materials/import", files={"file": ("../source.txt", b"Materi asli untuk ditinjau.")})
+        uploaded = await self.client.post(
+            f"/classes/{cid}/materials/import",
+            files={"file": ("../source.txt", b"Materi asli untuk ditinjau.")},
+        )
         preview = await self.completed_preview(cid, uploaded)
         iid = preview["import_id"]
         self.assertEqual(preview["filename"], "source.txt")
@@ -351,12 +363,23 @@ class MaterialImportTest(classroom_test.ClassroomRoutesTest):
         self.assertEqual(download.headers["cache-control"], "private, no-store")
         for actor, expected in [(self.other_teacher, 404), (self.student, 403)]:
             self.actor = actor
-            self.assertEqual((await self.client.get(f"/classes/{cid}/imports/{iid}")).status_code, expected)
-            self.assertEqual((await self.client.get(f"/classes/{cid}/imports/{iid}/original")).status_code, expected)
+            self.assertEqual(
+                (await self.client.get(f"/classes/{cid}/imports/{iid}")).status_code, expected
+            )
+            self.assertEqual(
+                (await self.client.get(f"/classes/{cid}/imports/{iid}/original")).status_code,
+                expected,
+            )
         self.actor = self.teacher
         other = await self.create_class()
-        body = {"title": "Hasil tinjauan", "content": "Teks telah diperbaiki guru.", "source_import_id": iid}
-        self.assertEqual((await self.client.post(f"/classes/{other}/materials", json=body)).status_code, 422)
+        body = {
+            "title": "Hasil tinjauan",
+            "content": "Teks telah diperbaiki guru.",
+            "source_import_id": iid,
+        }
+        self.assertEqual(
+            (await self.client.post(f"/classes/{other}/materials", json=body)).status_code, 422
+        )
         saved = await self.client.post(f"/classes/{cid}/materials", json=body)
         self.assertEqual(saved.status_code, 201, saved.text)
         self.assertEqual(saved.json()["source_import_id"], iid)

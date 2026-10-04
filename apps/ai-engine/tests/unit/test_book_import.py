@@ -1,4 +1,5 @@
 """Real PDF parsing with isolated synthetic documents, without providers or DB."""
+
 import io
 
 import pytest
@@ -13,19 +14,28 @@ pytestmark = pytest.mark.unit
 
 def pdf(texts, bookmarks=()):
     writer = PdfWriter()
-    font = writer._add_object(DictionaryObject({
-        NameObject("/Type"): NameObject("/Font"),
-        NameObject("/Subtype"): NameObject("/Type1"),
-        NameObject("/BaseFont"): NameObject("/Helvetica"),
-    }))
+    font = writer._add_object(
+        DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+    )
     for text in texts:
         page = writer.add_blank_page(width=300, height=300)
-        page[NameObject("/Resources")] = DictionaryObject({
-            NameObject("/Font"): DictionaryObject({NameObject("/F1"): font}),
-        })
+        page[NameObject("/Resources")] = DictionaryObject(
+            {
+                NameObject("/Font"): DictionaryObject({NameObject("/F1"): font}),
+            }
+        )
         stream = DecodedStreamObject()
-        stream.set_data(b"BT /F1 12 Tf 20 200 Td " + b" ".join(
-            b"(" + line.encode() + b") Tj 0 -14 Td" for line in text.split("\n")) + b" ET")
+        stream.set_data(
+            b"BT /F1 12 Tf 20 200 Td "
+            + b" ".join(b"(" + line.encode() + b") Tj 0 -14 Td" for line in text.split("\n"))
+            + b" ET"
+        )
         page[NameObject("/Contents")] = writer._add_object(stream)
     for title, page in bookmarks:
         writer.add_outline_item(title, page - 1)
@@ -51,7 +61,8 @@ def test_large_book_returns_reviewable_outline_without_saving_or_truncating():
     assert result["content"] == ""
     chapters = [section for section in result["sections"] if section["kind"] == "chapter"]
     assert [(chapter["title"], chapter["first"], chapter["last"]) for chapter in chapters] == [
-        ("Bab 1 Pecahan", 5, 85), ("Bab 2 Persamaan", 86, 160),
+        ("Bab 1 Pecahan", 5, 85),
+        ("Bab 2 Persamaan", 86, 160),
     ]
 
 
@@ -81,7 +92,8 @@ def test_multiline_chapter_covers_keep_the_title_and_first_page():
     texts[85] = "Bab 2\nMembangun Budaya\nTaat Hukum\nKEMENTERIAN PENDIDIKAN\nISBN: 123"
     result = extract_document(pdf(texts), "buku.pdf")
     assert [(section["first"], section["title"]) for section in result["sections"]] == [
-        (5, "Bab 1 · Eksponen dan Logaritma"), (86, "Bab 2 · Membangun Budaya Taat Hukum"),
+        (5, "Bab 1 · Eksponen dan Logaritma"),
+        (86, "Bab 2 · Membangun Budaya Taat Hukum"),
     ]
 
 
@@ -119,21 +131,31 @@ def test_pdf_total_page_limit_remains_bounded():
 
 def test_ocr_mixed_pdf_records_page_method_and_confidence_for_teacher_review(monkeypatch):
     from api import pdf_ocr
+
     seen = []
+
     def recognize(data, index):
         seen.append(index)
         return {"text": "Hasil scan pecahan", "confidence": 67.5}
+
     monkeypatch.setattr(pdf_ocr, "recognize_page", recognize)
-    result = extract_document(pdf(["Teks asli pada halaman pertama", ""]), "campuran.pdf", allow_ocr=True)
+    result = extract_document(
+        pdf(["Teks asli pada halaman pertama", ""]), "campuran.pdf", allow_ocr=True
+    )
     assert seen == [1]
-    assert [(page["page"], page["method"], page["confidence"]) for page in result["pages"]] == [(1, "native", None), (2, "ocr", 67.5)]
+    assert [(page["page"], page["method"], page["confidence"]) for page in result["pages"]] == [
+        (1, "native", None),
+        (2, "ocr", 67.5),
+    ]
     assert any("gambar" in warning for warning in result["warnings"])
 
 
 def test_long_scan_offers_ranges_before_attempting_ocr(monkeypatch):
     from api import pdf_ocr
+
     def forbidden(*args):
         raise AssertionError("An entire scan book must not be OCRed automatically")
+
     monkeypatch.setattr(pdf_ocr, "recognize_page", forbidden)
     result = extract_document(pdf([""] * 40), "scan-book.pdf", allow_ocr=True)
     assert result["preview_type"] == "book" and result["sections"]

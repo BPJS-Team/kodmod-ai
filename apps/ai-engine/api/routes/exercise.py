@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,12 +40,20 @@ async def generate_exercises(
 
     from agents.problem_generator import generate_questions_for_student
 
-    questions = await generate_questions_for_student(
-        student_id=student.id,
-        concept_id=payload.concept_id,
-        n=payload.n_questions,
-        difficulty_hint=payload.difficulty,
-    )
+    try:
+        questions = await generate_questions_for_student(
+            student_id=student.id,
+            concept_id=payload.concept_id,
+            n=payload.n_questions,
+            difficulty_hint=payload.difficulty,
+        )
+    except ValueError:
+        raise HTTPException(
+            409, "Pilih materi yang sudah tersedia untuk membuat latihan."
+        ) from None
+    except Exception:
+        logger.exception("Practice generation could not be completed")
+        raise HTTPException(503, "Latihan belum dapat dibuat. Coba lagi nanti.") from None
     return ExerciseGenerateResponse(
         exercises=questions,
         generated_at=datetime.now(UTC),

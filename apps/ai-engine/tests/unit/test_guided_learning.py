@@ -35,7 +35,9 @@ async def learning_http(monkeypatch):
         admin_engine = create_async_engine(url, poolclass=NullPool)
         async with admin_engine.begin() as connection:
             await connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        engine = create_async_engine(url, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}})
+        engine = create_async_engine(
+            url, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}}
+        )
     else:
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -44,7 +46,8 @@ async def learning_http(monkeypatch):
         "classrooms",
         "enrollments",
         "class_materials",
-        "material_imports", "background_jobs",
+        "material_imports",
+        "background_jobs",
         "class_activities",
         "audit_events",
         "provider_usage",
@@ -166,12 +169,17 @@ async def learning_http(monkeypatch):
 
     async def queued(session, material, **kwargs):
         return None
+
     monkeypatch.setattr(admin_materials, "enqueue_material", queued)
+
     async def unavailable_quota():
         return {"configured": True, "available": False}
+
     monkeypatch.setattr(admin_insights, "get_subscription_info", unavailable_quota)
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app, raise_app_exceptions=os.getenv("KODMOD_GUIDED_POSTGRES") == "1"),
+        transport=httpx.ASGITransport(
+            app=app, raise_app_exceptions=os.getenv("KODMOD_GUIDED_POSTGRES") == "1"
+        ),
         base_url="http://learning.test",
     ) as client:
         yield client, factory, controls, material, outsider, admin
@@ -289,11 +297,15 @@ async def test_three_question_mini_quiz_finishes_before_learning_resumes(learnin
         restored = (await client.get(path)).json()
         assert restored["phase"] == "quiz" and restored["quiz"]["answered_questions"] == index
         question = restored["quiz"]["current_question"]
-        response = await client.post("/quiz/submit", json={
-            "quiz_session_id": state["quiz"]["quiz_session_id"],
-            "question_id": question["question_id"], "submission_id": str(uuid.uuid4()),
-            "student_answer": "A",
-        })
+        response = await client.post(
+            "/quiz/submit",
+            json={
+                "quiz_session_id": state["quiz"]["quiz_session_id"],
+                "question_id": question["question_id"],
+                "submission_id": str(uuid.uuid4()),
+                "student_answer": "A",
+            },
+        )
         assert response.status_code == 200, response.text
         assert response.json()["quiz_complete"] == (index == 2)
     assert (await client.get(path)).json()["phase"] == "learning"
@@ -309,7 +321,9 @@ async def test_failed_commit_keeps_original_revision_and_retry_can_complete(lear
     async with factory() as session:
         row = await session.get(models.LearningSession, uuid.UUID(state["session_id"]))
         assert row.guided_state["revision"] == 0 and row.guided_state["unit_index"] == 0
-        assert await session.get(models.LearningActionReceipt, uuid.UUID(body["request_id"])) is None
+        assert (
+            await session.get(models.LearningActionReceipt, uuid.UUID(body["request_id"])) is None
+        )
     controls["fail_commit"] = False
     retried = await client.post(path + "/actions", json=body)
     assert retried.status_code == 200 and retried.json()["unit_index"] == 1
@@ -318,9 +332,13 @@ async def test_failed_commit_keeps_original_revision_and_retry_can_complete(lear
 async def test_initial_teaching_does_not_return_success_before_commit(learning_http):
     client, factory, controls, material, _, _ = learning_http
     controls["fail_commit"] = True
-    response = await client.post("/learning/start", json={
-        "class_id": str(material.class_id), "material_id": str(material.id),
-    })
+    response = await client.post(
+        "/learning/start",
+        json={
+            "class_id": str(material.class_id),
+            "material_id": str(material.id),
+        },
+    )
     assert response.status_code in (500, 503)
     async with factory() as session:
         assert await session.scalar(select(func.count()).select_from(models.LearningSession)) == 0
@@ -374,6 +392,26 @@ def test_unit_partition_preserves_all_reviewed_source_text():
     assert all(len(unit["text"]) <= 2400 for unit in units)
 
 
+def test_short_reviewed_subchapters_are_separate_learning_units():
+    content = (
+        "# Pengertian Pecahan\nBagian dari keseluruhan.\n\n## Pecahan Senilai\nNilainya sama.\n"
+    )
+    units = learning_service.learning_units(content)
+    assert len(units) == 2
+    assert [unit["title"] for unit in units] == ["Pengertian Pecahan", "Pecahan Senilai"]
+    assert "".join(unit["text"] for unit in units) == content
+
+
+def test_heading_partition_preserves_intro_long_sections_and_numbered_examples():
+    content = "Pengantar\n\nBab II Pecahan\n" + "Contoh pecahan. " * 500
+    content += "\n1. Contoh pertama\n2. Contoh kedua\n\nChapter 3 Fractions\nEquivalent fractions."
+    units = learning_service.learning_units(content)
+    assert "".join(unit["text"] for unit in units) == content
+    assert all(len(unit["text"]) <= 2400 for unit in units)
+    assert units[-1]["title"] == "Chapter 3 Fractions"
+    assert not any(unit["title"] in {"1. Contoh pertama", "2. Contoh kedua"} for unit in units)
+
+
 async def test_admin_usage_never_fabricates_tokens_or_request_latencies(learning_http):
     client, _, controls, _, _, admin = learning_http
     controls["actor"] = admin
@@ -385,23 +423,50 @@ async def test_admin_usage_never_fabricates_tokens_or_request_latencies(learning
     assert body["recent_requests"] == []
 
 
-async def test_teacher_proposal_uses_owned_material_and_remains_unpublished(learning_http, monkeypatch):
+async def test_teacher_proposal_uses_owned_material_and_remains_unpublished(
+    learning_http, monkeypatch
+):
     import json
 
     from agents import problem_generator
+
     client, factory, controls, material, _, _ = learning_http
     async with factory() as session:
         teacher = await session.scalar(select(models.User).where(models.User.role == "teacher"))
-    payload = {"class_id": str(material.class_id), "material_id": str(material.id), "n_questions": 1}
+    payload = {
+        "class_id": str(material.class_id),
+        "material_id": str(material.id),
+        "n_questions": 1,
+    }
     assert (await client.post("/teacher/quizzes/propose", json=payload)).status_code == 403
     controls["actor"] = teacher
     assert len((await client.get("/classes/teacher/materials")).json()) == 1
+
     class Generator:
         async def ainvoke(self, messages):
             assert "Pecahan senilai mempunyai nilai yang sama" in messages[1]["content"]
-            return SimpleNamespace(content=json.dumps({"questions": [{"text": "Apa arti pecahan senilai?",
-                "type": "mcq", "options": ["A. Nilai sama", "B. Penyebut sama", "C. Bilangan bulat", "D. Pembilang sama"],
-                "expected_answer": "A", "source_indices": [1], "explanation": "Pecahan senilai memiliki nilai sama."}]}))
+            return SimpleNamespace(
+                content=json.dumps(
+                    {
+                        "questions": [
+                            {
+                                "text": "Apa arti pecahan senilai?",
+                                "type": "mcq",
+                                "options": [
+                                    "A. Nilai sama",
+                                    "B. Penyebut sama",
+                                    "C. Bilangan bulat",
+                                    "D. Pembilang sama",
+                                ],
+                                "expected_answer": "A",
+                                "source_indices": [1],
+                                "explanation": "Pecahan senilai memiliki nilai sama.",
+                            }
+                        ]
+                    }
+                )
+            )
+
     monkeypatch.setattr(problem_generator, "get_quiz_llm", lambda: Generator())
     proposed = await client.post("/teacher/quizzes/propose", json=payload)
     assert proposed.status_code == 200, proposed.text

@@ -44,7 +44,7 @@ def test_routers_return_known_node_names() -> None:
     s["intent"] = "analytics"
     assert route_after_intent(s) == "analytics"
     s["intent"] = "stop"
-    assert route_after_intent(s) == "end_speak"
+    assert route_after_intent(s) == "end"
 
     s["quiz_score"] = 0.9
     assert route_after_scoring(s) in {"update_student_model", "quiz_analyzer"}

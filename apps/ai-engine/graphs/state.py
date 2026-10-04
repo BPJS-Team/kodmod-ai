@@ -107,12 +107,18 @@ class RetrievedDoc(TypedDict, total=False):
     score: float
     source: str
     concept_ids: list[str]
+    concept_id: str | None
+    class_id: str | None
+    material_id: str | None
+    material_title: str | None
+    section_title: str | None
 
 
 class LearningProfile(TypedDict, total=False):
     learning_style: Literal["auditory", "kinesthetic", "mixed"]
     preferred_pace: Literal["slow", "normal", "fast"]
     language: str
+    preferred_voice: str
     accessibility: dict[str, Any]  # screen_reader, contrast, font_scale, etc.
 
 
@@ -143,6 +149,8 @@ class KODMODState(TypedDict, total=False):
 
     # ---- Turn I/O ----------------------------------------------------------
     user_input: str  # the student's utterance, already text
+    transcribed_text: str  # server STT adapter output, before intent routing
+    audio_input_path: str  # private temporary path; never serialized in receipts
     detected_language: str
 
     # ---- Routing & intent --------------------------------------------------
@@ -246,6 +254,8 @@ def initial_state(
         teacher_id=teacher_id,
         request_id=str(uuid4()),
         user_input=user_input,
+        transcribed_text="",
+        audio_input_path="",
         detected_language="id",
         intent="unknown",
         intent_confidence=0.0,
@@ -265,6 +275,8 @@ def initial_state(
         assessment_managed=False,
         assessment_kind="assessment",
         material_version=None,
+        material_mapping_version=None,
+        approved_material_concepts=[],
         quiz_source_docs=[],
         quiz_mcq_only=False,
         quiz_n_questions=0,

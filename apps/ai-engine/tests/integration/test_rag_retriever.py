@@ -1,6 +1,6 @@
-"""Stage 3 §8 - rag/retriever.py + rag/ingestion.py (real pgvector, stub embeddings).
+"""Stage 3 Â§8 - rag/retriever.py + rag/ingestion.py (real pgvector, stub embeddings).
 
-Spec: docs/testplan/03-integration.md §8 (KM-INT-091..098).
+Spec: docs/testplan/03-integration.md Â§8 (KM-INT-091..098).
 """
 
 from __future__ import annotations
@@ -18,14 +18,23 @@ pytestmark = [pytest.mark.integration, pytest.mark.db, pytest.mark.asyncio(loop_
 CID = str(uuid.UUID("55555555-5555-5555-5555-5555555555aa"))
 
 
-def _rec(text: str, idx: int = 0, *, cid: str = CID, language: str = "id", src: str = "ret.md"):
+@pytest.fixture(autouse=True)
+def reviewed_concept_ids(concept_ids, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(sys.modules[__name__], "CID", str(concept_ids["pecahan"]))
+
+
+def _rec(
+    text: str, idx: int = 0, *, cid: str | None = None, language: str = "id", src: str = "ret.md"
+):
     return {
         "id": str(uuid.uuid4()),
         "text": text,
         "embedding": fake_embed_text_sync([text])[0],
         "source": src,
         "language": language,
-        "concept_id": cid,
+        "concept_id": cid or CID,
         "chunk_index": idx,
         "section_title": None,
         "accessibility_metadata": {},
@@ -45,7 +54,7 @@ async def test_km_int_091_rag_node_contract(clean_db) -> None:  # type: ignore[n
     from rag.stores import pgvector_store as store
 
     await store.upsert_chunks([_rec("pecahan adalah bagian dari keseluruhan", 0)])
-    state = {"transcribed_text": "apa itu pecahan", "current_concept_id": CID}
+    state = {"user_input": "apa itu pecahan", "current_concept_id": CID}
     out = await rag_retrieval_node(state)
 
     assert out.get("retrieved_docs")  # some grounding came back
@@ -81,7 +90,7 @@ async def test_km_int_093_retrieve_end_to_end(clean_db) -> None:  # type: ignore
     ]
     await store.upsert_chunks([_rec(t, i) for i, t in enumerate(texts)])
 
-    res = await retrieve("pecahan adalah bagian dari keseluruhan", top_k=6)
+    res = await retrieve("pecahan adalah bagian dari keseluruhan", top_k=6, use_reranker=True)
     assert res
     assert len(res) <= settings.RAG_RERANK_TOP_K
     assert res[0]["text"] == "pecahan adalah bagian dari keseluruhan"
@@ -97,7 +106,7 @@ async def test_km_int_094_reranker_passthrough(clean_db) -> None:  # type: ignor
     from rag.stores import pgvector_store as store
 
     await store.upsert_chunks([_rec(f"pecahan varian {i}", i) for i in range(6)])
-    res = await retriever.retrieve("pecahan varian 0", top_k=6)
+    res = await retriever.retrieve("pecahan varian 0", top_k=6, use_reranker=True)
     assert len(res) == settings.RAG_RERANK_TOP_K  # candidates[:rerank_top_k], order preserved
 
 
@@ -144,7 +153,9 @@ async def test_km_int_096_ingest_paths(clean_db, tmp_path) -> None:  # type: ign
             .all()
         )
     assert len(rows) == n
-    assert all(d == 1024 for d in rows)
+    from config.settings import settings
+
+    assert all(d == settings.EMBEDDING_DIM for d in rows)
 
 
 # --------------------------------------------------------------------------- #
@@ -162,10 +173,18 @@ def test_km_int_097_pdf_without_pypdf(monkeypatch, tmp_path) -> None:
 # --------------------------------------------------------------------------- #
 # KM-INT-098 - _store() selects the configured backend
 # --------------------------------------------------------------------------- #
-def test_km_int_098_store_backend_selection(monkeypatch) -> None:
+async def test_km_int_098_store_backend_selection(monkeypatch) -> None:
     from rag import retriever
 
-    monkeypatch.setattr(retriever.settings, "VECTOR_BACKEND", "pgvector")
-    assert retriever._store().__name__.endswith("pgvector_store")
+    called = []
+
+    async def query(embedding, **filters):
+        called.append(filters)
+        return []
+
+    monkeypatch.setattr(retriever.pgvector_store, "query", query)
+    # Classroom permissions live in PostgreSQL. A legacy Qdrant setting must
+    # not redirect retrieval away from the database that enforces them.
     monkeypatch.setattr(retriever.settings, "VECTOR_BACKEND", "qdrant")
-    assert retriever._store().__name__.endswith("qdrant_store")
+    assert await retriever.retrieve("pecahan", use_reranker=False) == []
+    assert len(called) == 1

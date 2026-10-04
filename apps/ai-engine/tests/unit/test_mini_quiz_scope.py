@@ -42,7 +42,9 @@ async def test_unmapped_classroom_mini_quiz_keeps_material_topic_without_concept
             "current_topic": requested_topic,
             "current_concept_id": stale_concept,
             "generated_response": "Satu per dua sama dengan dua per empat.",
-            "retrieved_docs": [{"material_title": "Pecahan senilai", "concept_ids": [stale_concept]}],
+            "retrieved_docs": [
+                {"material_title": "Pecahan senilai", "concept_ids": [stale_concept]}
+            ],
         }
     )
 
@@ -109,7 +111,12 @@ async def test_old_scoped_mini_quiz_uuid_never_updates_global_mastery(monkeypatc
         _confidence={existing_concept: 0.8},
         _attempts={existing_concept: 4},
     )
-    load, persist, store, clear = AsyncMock(return_value=model), AsyncMock(), AsyncMock(), AsyncMock()
+    load, persist, store, clear = (
+        AsyncMock(return_value=model),
+        AsyncMock(),
+        AsyncMock(),
+        AsyncMock(),
+    )
     monkeypatch.setattr(student_model.StudentModel, "load", load)
     monkeypatch.setattr(student_model.StudentModel, "persist", persist)
     monkeypatch.setattr("memory.short_term.store_quiz_session", store)

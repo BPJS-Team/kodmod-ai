@@ -107,7 +107,11 @@ async def list_concepts(
 ) -> list[Concept]:
     """The concepts taught in this subject."""
     await _subject_or_404(session, subject_id)
-    stmt = select(Concept).where(Concept.subject_id == subject_id, Concept.is_active.is_(True)).order_by(Concept.name)
+    stmt = (
+        select(Concept)
+        .where(Concept.subject_id == subject_id, Concept.is_active.is_(True))
+        .order_by(Concept.name)
+    )
     return list((await session.execute(stmt)).scalars().all())
 
 
@@ -176,7 +180,9 @@ async def delete_subject(
         await session.flush()
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(409, "Mata pelajaran sudah dipakai oleh kelas atau kuis. Riwayat tetap disimpan.") from None
+        raise HTTPException(
+            409, "Mata pelajaran sudah dipakai oleh kelas atau kuis. Riwayat tetap disimpan."
+        ) from None
     for path in stored:
         delete_upload(path)
 
@@ -218,10 +224,14 @@ async def retire_concept(
     """Retire future attribution while preserving reviewed historical evidence."""
     subject = await _subject_or_404(session, subject_id)
     if actor.role != "admin" and subject.created_by != actor.id:
-        raise HTTPException(403, "Hanya pembuat mata pelajaran atau admin yang bisa menonaktifkan konsep.")
-    concept = await session.scalar(select(Concept).where(
-        Concept.id == concept_id, Concept.subject_id == subject_id
-    ).with_for_update())
+        raise HTTPException(
+            403, "Hanya pembuat mata pelajaran atau admin yang bisa menonaktifkan konsep."
+        )
+    concept = await session.scalar(
+        select(Concept)
+        .where(Concept.id == concept_id, Concept.subject_id == subject_id)
+        .with_for_update()
+    )
     if concept is None:
         raise HTTPException(404, "Konsep tidak ditemukan.")
     concept.is_active = False
@@ -328,6 +338,7 @@ async def upload_document(
     await session.flush()
     await session.refresh(doc)
     from api.durable_jobs import enqueue
+
     await enqueue(session, "document_index", doc.id, {}, f"document:{doc.id}")
     await session.commit()
     return doc

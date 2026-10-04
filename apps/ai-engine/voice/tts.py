@@ -23,6 +23,7 @@ The Accessibility Agent emits lightweight `<break time="..."/>` markers.
 Each backend converts them to its native syntax (Azure has SSML; Piper
 ignores them; ElevenLabs supports them via the `text` parameter).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -53,19 +54,17 @@ except OSError:
 # LangGraph node
 # ---------------------------------------------------------------------------
 
+
 async def tts_node(state: KODMODState) -> dict[str, Any]:
-    text = (
-        state.get("accessible_response")
-        or state.get("generated_response")
-        or ""
-    ).strip()
+    text = (state.get("accessible_response") or state.get("generated_response") or "").strip()
 
     if not text:
         return {"audio_response_path": "", "next_action": "end", "last_node": "tts"}
 
     profile = state.get("learning_profile", {})
     path = await synthesise_to_file(
-        text, voice=profile.get("preferred_voice"),
+        text,
+        voice=profile.get("preferred_voice"),
         language=profile.get("language", "id"),
         scope="user:" + str(state.get("student_id", "internal")),
     )
@@ -82,10 +81,12 @@ async def tts_node(state: KODMODState) -> dict[str, Any]:
 # Engines
 # ---------------------------------------------------------------------------
 
+
 @lru_cache(maxsize=4)
 def _piper_voice(model_name: str):
     """Lazy-load a Piper voice model."""
     from piper import PiperVoice
+
     voices_dir = Path("/opt/piper/voices")
     return PiperVoice.load(voices_dir / f"{model_name}.onnx")
 
@@ -98,12 +99,14 @@ async def _piper_tts(text: str, voice: str) -> Path:
         v = _piper_voice(voice_id)
         with open(out, "wb") as f:
             v.synthesize(_strip_ssml(text), f)
+
     await asyncio.get_running_loop().run_in_executor(None, _run)
     return out
 
 
 async def _azure_tts(text: str, voice: str) -> Path:
     import azure.cognitiveservices.speech as speechsdk
+
     out = OUTPUT_DIR / f"tts-{uuid4().hex}.wav"
     cfg = speechsdk.SpeechConfig(
         subscription=settings.AZURE_TTS_KEY or "",
@@ -119,6 +122,7 @@ async def _azure_tts(text: str, voice: str) -> Path:
 
     def _run():
         synth.speak_ssml_async(ssml).get()
+
     await asyncio.get_running_loop().run_in_executor(None, _run)
     return out
 
@@ -128,7 +132,11 @@ async def _cached_elevenlabs(text: str, voice: str, language: str, scope: str):
     if not plain or len(plain) > 5000:
         raise ValueError("Speech text must contain 1 to 5000 characters.")
     return await cached_audio(
-        OUTPUT_DIR / "speech-cache", plain, voice=voice, language=language, scope=scope,
+        OUTPUT_DIR / "speech-cache",
+        plain,
+        voice=voice,
+        language=language,
+        scope=scope,
         generate=lambda: elevenlabs.synthesise(plain, voice_id=voice),
     )
 
@@ -140,12 +148,18 @@ async def _elevenlabs_tts(text: str, voice: str) -> Path:
 
 async def _coqui_tts(text: str, voice: str) -> Path:
     from TTS.api import TTS
+
     out = OUTPUT_DIR / f"tts-{uuid4().hex}.wav"
     tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
+
     def _run():
-        tts.tts_to_file(text=_strip_ssml(text), file_path=str(out),
-                        speaker_wav=voice if voice.endswith(".wav") else None,
-                        language="id")
+        tts.tts_to_file(
+            text=_strip_ssml(text),
+            file_path=str(out),
+            speaker_wav=voice if voice.endswith(".wav") else None,
+            language="id",
+        )
+
     await asyncio.get_running_loop().run_in_executor(None, _run)
     return out
 
@@ -156,19 +170,18 @@ async def _coqui_tts(text: str, voice: str) -> Path:
 
 _SSML_BREAK_RE = re.compile(r'<break\s+time="(\d+)(ms|s)"\s*/?\s*>', re.IGNORECASE)
 
+
 def _strip_ssml(text: str) -> str:
     return _SSML_BREAK_RE.sub(" ", text).strip()
 
 
 def _to_ssml(text: str, voice: str) -> str:
-    body = _SSML_BREAK_RE.sub(
-        lambda m: f'<break time="{m.group(1)}{m.group(2)}"/>', text
-    )
+    body = _SSML_BREAK_RE.sub(lambda m: f'<break time="{m.group(1)}{m.group(2)}"/>', text)
     return (
         f'<speak version="1.0" xml:lang="id-ID" '
         f'xmlns="http://www.w3.org/2001/10/synthesis">'
         f'<voice name="{voice}"><prosody rate="0.95">{body}</prosody></voice>'
-        f'</speak>'
+        f"</speak>"
     )
 
 
@@ -211,7 +224,10 @@ async def synthesise_bytes(
     """Synthesise text and return raw audio bytes (mp3/wav depending on backend)."""
     if settings.TTS_BACKEND == "elevenlabs":
         audio, _ = await _cached_elevenlabs(
-            text, voice or settings.ELEVENLABS_TTS_VOICE_ID, language, scope,
+            text,
+            voice or settings.ELEVENLABS_TTS_VOICE_ID,
+            language,
+            scope,
         )
         return audio
     path = await synthesise_to_file(text, voice=voice, rate=rate)

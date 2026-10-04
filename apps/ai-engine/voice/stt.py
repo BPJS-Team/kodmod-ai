@@ -2,8 +2,8 @@
 KODMOD AI - Speech-to-Text Pipeline
 ====================================
 
-LangGraph entry node. Reads `state["audio_input_path"]` (an S3/MinIO/local
-URI containing the inbound audio chunk) and returns transcribed text plus a
+LangGraph entry node. Reads `state["audio_input_path"]` (a private local file
+or trusted HTTP URI containing the inbound audio chunk) and returns transcribed text plus a
 detected language code.
 
 Backends
@@ -18,6 +18,7 @@ For partial transcripts during live voice input, see
 `voice/streaming.py::StreamingSTT` which emits incremental results to the
 WebSocket independently of the LangGraph turn boundary.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -38,9 +39,11 @@ log = logging.getLogger(__name__)
 # Model loading
 # ---------------------------------------------------------------------------
 
+
 @lru_cache(maxsize=1)
 def _faster_whisper_model():
     from faster_whisper import WhisperModel
+
     size = settings.STT_MODEL
     device = settings.STT_DEVICE
     if device == "auto":
@@ -59,6 +62,7 @@ def _faster_whisper_model():
 # LangGraph node
 # ---------------------------------------------------------------------------
 
+
 async def stt_node(state: KODMODState) -> dict[str, Any]:
     """Transcribe state['audio_input_path'] to state['transcribed_text']."""
     path = state.get("audio_input_path", "")
@@ -72,15 +76,7 @@ async def stt_node(state: KODMODState) -> dict[str, Any]:
             "last_node": "stt",
         }
 
-    backend = settings.STT_BACKEND
-    if backend in {"openai", "openai-whisper"}:
-        text, lang = await _openai_stt(path)
-    elif backend == "deepgram":
-        text, lang = await _deepgram_stt(path)
-    elif backend == "elevenlabs":
-        text, lang = await _elevenlabs_stt(path)
-    else:
-        text, lang = await _fw_stt(path)
+    text, lang = await _transcribe_path(path, language=state.get("detected_language"))
 
     log.info("STT: %d chars (lang=%s)", len(text), lang)
     return {
@@ -95,11 +91,12 @@ async def stt_node(state: KODMODState) -> dict[str, Any]:
 # Backend implementations
 # ---------------------------------------------------------------------------
 
+
 async def _fw_stt(path: str) -> tuple[str, str]:
     model = _faster_whisper_model()
 
     def _run() -> tuple[str, str]:
-        local_path = _ensure_local(path)
+        local_path = path
         segments, info = model.transcribe(
             local_path,
             beam_size=5,
@@ -114,11 +111,14 @@ async def _fw_stt(path: str) -> tuple[str, str]:
 
 async def _openai_stt(path: str) -> tuple[str, str]:
     from openai import AsyncOpenAI
+
     client = AsyncOpenAI()
-    local_path = _ensure_local(path)
+    local_path = path
     with open(local_path, "rb") as f:
         result = await client.audio.transcriptions.create(
-            model="whisper-1", file=f, response_format="verbose_json",
+            model="whisper-1",
+            file=f,
+            response_format="verbose_json",
         )
     return result.text, result.language
 
@@ -126,12 +126,16 @@ async def _openai_stt(path: str) -> tuple[str, str]:
 async def _deepgram_stt(path: str) -> tuple[str, str]:
     """Used mostly via the streaming path, but also exposed here for batch."""
     from deepgram import DeepgramClient, PrerecordedOptions
+
     dg = DeepgramClient(settings.DEEPGRAM_API_KEY)
-    local_path = _ensure_local(path)
+    local_path = path
     with open(local_path, "rb") as f:
         payload = {"buffer": f.read()}
     options = PrerecordedOptions(
-        model="nova-2", language="multi", smart_format=True, punctuate=True,
+        model="nova-2",
+        language="multi",
+        smart_format=True,
+        punctuate=True,
     )
     resp = await dg.listen.asyncrest.v("1").transcribe_file(payload, options)
     transcript = resp["results"]["channels"][0]["alternatives"][0]["transcript"]
@@ -141,7 +145,7 @@ async def _deepgram_stt(path: str) -> tuple[str, str]:
 
 async def _elevenlabs_stt(path: str, *, language: str | None = None) -> tuple[str, str]:
     """Transcribe a local audio file through ElevenLabs Scribe."""
-    local_path = _ensure_local(path)
+    local_path = path
     file_path = Path(local_path)
     result = await elevenlabs.transcribe(
         file_path.read_bytes(),
@@ -156,33 +160,38 @@ async def _elevenlabs_stt(path: str, *, language: str | None = None) -> tuple[st
 # I/O helpers
 # ---------------------------------------------------------------------------
 
-def _ensure_local(uri: str) -> str:
-    """Download remote URIs to a temp file and return a local path."""
-    if uri.startswith(("http://", "https://", "s3://", "minio://")):
+
+async def _transcribe_path(path: str, *, language: str | None = None) -> tuple[str, str]:
+    if path.startswith(("http://", "https://")):
+        import tempfile
+
         from voice.streaming import fetch_audio
-        return fetch_audio(uri)
-    return uri
 
-
-# ---------------------------------------------------------------------------
-# Public helpers - used by tools/voice_tool.py and voice/streaming.py
-# ---------------------------------------------------------------------------
-async def transcribe_path(path, *, language: str | None = None) -> str:
-    """Transcribe an audio file at the given path. Backend chosen by settings."""
-    from pathlib import Path as _Path
-
-    p = str(path) if isinstance(path, _Path) else path
+        data = await fetch_audio(path)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as audio:
+            audio.write(data)
+            temporary = Path(audio.name)
+        try:
+            return await _transcribe_path(str(temporary), language=language)
+        finally:
+            temporary.unlink(missing_ok=True)
+    if path.startswith(("s3://", "minio://")):
+        raise ValueError("Resolve object storage to a private local file before transcription")
     backend = settings.STT_BACKEND
     if backend == "faster-whisper":
-        text, _lang = await _fw_stt(p)
-    elif backend in {"openai", "openai-whisper"}:
-        text, _lang = await _openai_stt(p)
-    elif backend == "deepgram":
-        text, _lang = await _deepgram_stt(p)
-    elif backend == "elevenlabs":
-        text, _lang = await _elevenlabs_stt(p, language=language)
-    else:  # pragma: no cover
-        raise ValueError(f"Unknown STT_BACKEND: {backend}")
+        return await _fw_stt(path)
+    if backend in {"openai", "openai-whisper"}:
+        return await _openai_stt(path)
+    if backend == "deepgram":
+        return await _deepgram_stt(path)
+    if backend == "elevenlabs":
+        return await _elevenlabs_stt(path, language=language)
+    raise ValueError(f"Unknown STT_BACKEND: {backend}")
+
+
+async def transcribe_path(path: str | Path, *, language: str | None = None) -> str:
+    """Transcribe local or HTTP audio; remote temporary files never outlive the call."""
+    text, _ = await _transcribe_path(str(path), language=language)
     return text
 
 

@@ -99,11 +99,13 @@ async def test_km_int_005_curriculum_chunks_ddl(db_engine) -> None:  # type: ign
             .scalars()
             .all()
         )
-    assert dims == 1024  # vector(1024)
+    from config.settings import settings
+
+    assert dims == settings.EMBEDDING_DIM
     joined = " ".join(idx).lower()
     assert "hnsw" in joined and "vector_cosine_ops" in joined
     assert any("concept_id" in d for d in idx)
-    assert any("source" in d for d in idx)
+    assert any("material_id" in d for d in idx)  # Reviewed sources are indexed by object identity.
 
 
 async def test_km_int_006_extensions_enabled(db_engine) -> None:  # type: ignore[no-untyped-def]
@@ -248,10 +250,15 @@ def test_km_int_011_no_sql_schema_bootstrap() -> None:
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2]
-    assert not (root / "database" / "schema.sql").exists()
-
-    for name in ("docker-compose.yml", "docker-compose.test.yml", "docker-compose.prod.yml"):
-        compose = (root / "docker" / name).read_text(encoding="utf-8")
+    # schema.sql remains a historical reference. Alembic owns runtime upgrades.
+    paths = [
+        root / "docker" / "docker-compose.test.yml",
+        root.parent.parent / "docker-compose.yml",
+        root.parent.parent / "infra" / "docker" / "docker-compose.prod.yml",
+    ]
+    for path in paths:
+        name = path.name
+        compose = path.read_text(encoding="utf-8")
         for line in compose.splitlines():
             code = line.split("#", 1)[0]
             assert "schema.sql" not in code, f"{name}: schema.sql wired into compose: {line!r}"

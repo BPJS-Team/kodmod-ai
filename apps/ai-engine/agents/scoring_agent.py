@@ -29,11 +29,22 @@ import logging
 import re
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 from config.settings import settings
 from graphs.state import KODMODState, QuizAttempt, QuizQuestion
 from tools.llm_client import get_scoring_llm, language_instruction
 
 log = logging.getLogger(__name__)
+
+
+class RubricGrade(BaseModel):
+    """Provider quality is validated before emitting or persisting an attempt."""
+
+    score: float = Field(ge=0, le=1, strict=True, allow_inf_nan=False)
+    confidence: float = Field(ge=0, le=1, strict=True, allow_inf_nan=False)
+    feedback: str = Field(min_length=1, max_length=2000)
+    missed_keywords: list[str] = Field(default_factory=list, max_length=30)
 
 
 RUBRIC_PROMPT = """\
@@ -77,8 +88,9 @@ async def scoring_node(state: KODMODState) -> dict[str, Any]:
     # ---- Path 1: MCQ → exact letter match, else rubric grading -----------
     if qtype == "mcq":
         options = question.get("options", [])
-        score, feedback = _score_mcq(student_answer, expected, options,
-                                     state.get("learning_profile", {}).get("language"))
+        score, feedback = _score_mcq(
+            student_answer, expected, options, state.get("learning_profile", {}).get("language")
+        )
         if score is not None:
             attempt = _build_attempt(question, student_answer, score, feedback)
             return await _emit(state, attempt)
@@ -100,8 +112,9 @@ async def scoring_node(state: KODMODState) -> dict[str, Any]:
 _MCQ_LEADING_LETTER = re.compile(r"^\s*([a-dA-D])\b")
 
 
-def _score_mcq(student_answer: str, expected: str, options: list[str],
-               language: str | None = None) -> tuple[float | None, str]:
+def _score_mcq(
+    student_answer: str, expected: str, options: list[str], language: str | None = None
+) -> tuple[float | None, str]:
     """Grade an MCQ answer. Returns ``(None, "")`` when the answer's shape is
     genuinely ambiguous, so the caller can fall back to LLM rubric grading
     instead of defaulting to wrong.
@@ -165,7 +178,11 @@ async def _score_with_rubric(
     )
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": RUBRIC_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+            {
+                "role": "system",
+                "content": RUBRIC_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {"role": "user", "content": payload},
         ]
     )
@@ -174,26 +191,18 @@ async def _score_with_rubric(
         cleaned = (
             raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         )
-        result = json.loads(cleaned)
-    except json.JSONDecodeError:
-        log.warning("Rubric JSON parse failed; defaulting to 0.0")
-        result = {
-            "score": 0.0,
-            "is_correct": False,
-            "confidence": 0.3,
-            "feedback": ("Sorry, your answer could not be assessed yet."
-                         if state.get("learning_profile", {}).get("language") == "en"
-                         else "Maaf, sistem belum bisa menilai jawaban itu."),
-            "missed_keywords": [],
-        }
+        result = RubricGrade.model_validate(json.loads(cleaned))
+    except (ValueError, TypeError, AttributeError):
+        log.warning("Scoring response did not satisfy grading contract")
+        raise ValueError("Scoring response did not satisfy grading contract") from None
 
     attempt = _build_attempt(
         question,
         student_answer,
-        float(result.get("score", 0.0)),
-        result.get("feedback", ""),
-        confidence=float(result.get("confidence", 0.7)),
-        missed=result.get("missed_keywords", []),
+        result.score,
+        result.feedback,
+        confidence=result.confidence,
+        missed=result.missed_keywords,
     )
     return await _emit(state, attempt)
 
@@ -250,9 +259,11 @@ async def _emit(state: KODMODState, attempt: QuizAttempt) -> dict[str, Any]:
         attempt["score"] < settings.QUIZ_PASS_THRESHOLD
         and question_attempts >= settings.QUIZ_MAX_ATTEMPTS_PER_QUESTION
     ):
-        feedback = ("That's okay, let's move on to the next question."
-                    if state.get("learning_profile", {}).get("language") == "en"
-                    else "Tidak apa-apa, kita lanjut ke soal berikutnya.")
+        feedback = (
+            "That's okay, let's move on to the next question."
+            if state.get("learning_profile", {}).get("language") == "en"
+            else "Tidak apa-apa, kita lanjut ke soal berikutnya."
+        )
         attempt = {**attempt, "feedback": feedback}
 
     attempts = [*state.get("quiz_attempts", []), attempt]

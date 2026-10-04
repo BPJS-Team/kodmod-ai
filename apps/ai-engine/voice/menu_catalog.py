@@ -1,11 +1,14 @@
 """Finite public menu catalog. Never accept guest-provided synthesis text."""
+
 MENU_AUDIO = {
     "welcome": (
         "Selamat datang di KODMOD. Pilih suara KODMOD atau suara perangkat. Tekan contoh suara untuk mendengarkan. Pembaca menu dapat dimatikan. Suara Tutor tetap aktif saat belajar.",
         "Welcome to KODMOD. Choose the KODMOD voice or your device voice. Press preview to listen. You can turn menu reading off. Your Tutor still speaks while you learn.",
     ),
-    "preview": ("Halo, ini suara KODMOD. Saya akan menemanimu belajar, satu langkah demi satu langkah.",
-                "Hello, this is the KODMOD voice. I will help you learn, one step at a time."),
+    "preview": (
+        "Halo, ini suara KODMOD. Saya akan menemanimu belajar, satu langkah demi satu langkah.",
+        "Hello, this is the KODMOD voice. I will help you learn, one step at a time.",
+    ),
     "home": ("Beranda", "Home"),
     "about": ("Tentang KODMOD", "About KODMOD"),
     "how": ("Cara belajar", "How to learn"),
@@ -32,8 +35,14 @@ MENU_AUDIO = {
     "sound": ("Pengaturan suara dan bahasa", "Voice and language settings"),
     "sound-on": ("Suara menu aktif", "Menu voice is on"),
     "sound-off": ("Suara menu mati", "Menu voice is off"),
-    "language": ("Bahasa. Pilih Bahasa Indonesia atau Inggris.", "Language. Choose Indonesian or English."),
+    "language": (
+        "Bahasa. Pilih Bahasa Indonesia atau Inggris.",
+        "Language. Choose Indonesian or English.",
+    ),
     "navigation": ("Buka navigasi", "Open navigation"),
-    "language-changed": ("Bahasa telah berubah ke Bahasa Indonesia.", "Language changed to English."),
+    "language-changed": (
+        "Bahasa telah berubah ke Bahasa Indonesia.",
+        "Language changed to English.",
+    ),
     "logout": ("Keluar dari akun", "Sign out"),
 }

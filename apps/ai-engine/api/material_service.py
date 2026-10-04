@@ -72,11 +72,15 @@ async def resolve_tutoring_context(
         "material_title": material.title if material else None,
         "subject_id": str(classroom.subject_id) if classroom.subject_id else None,
         "mapping_version": material.mapping_version if material else None,
-        "approved_material_concepts": await current_concepts(session, material, classroom) if material else [],
+        "approved_material_concepts": await current_concepts(session, material, classroom)
+        if material
+        else [],
     }
 
 
-async def index_class_material(material_id: uuid.UUID, version: int, *, expected_mapping=None, lease=None) -> None:
+async def index_class_material(
+    material_id: uuid.UUID, version: int, *, expected_mapping=None, lease=None
+) -> None:
     """Publish an index atomically; outdated jobs never replace newer content."""
     mapping_version = None
     try:
@@ -90,11 +94,17 @@ async def index_class_material(material_id: uuid.UUID, version: int, *, expected
                 return
             if lease:
                 from api.durable_jobs import assert_lease
+
                 await assert_lease(session, *lease)
             classroom = await session.get(Classroom, row.class_id)
             if classroom is None or classroom.is_archived:
                 return
-            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == row.mapping_version and row.n_chunks > 0:
+            if (
+                row.rag_status == "ready"
+                and row.indexed_version == version
+                and row.indexed_mapping_version == row.mapping_version
+                and row.n_chunks > 0
+            ):
                 return
             row.rag_status = "processing"
             row.rag_error = None
@@ -102,13 +112,19 @@ async def index_class_material(material_id: uuid.UUID, version: int, *, expected
             provenance = {}
             if row.source_import_id:
                 from database.models import BackgroundJob, MaterialImport
+
                 artifact = await session.get(MaterialImport, row.source_import_id)
                 imported = await session.get(BackgroundJob, artifact.job_id) if artifact else None
                 if artifact and imported and imported.result:
-                    provenance = {"source_import_id": str(artifact.id), "source_sha256": artifact.sha256,
+                    provenance = {
+                        "source_import_id": str(artifact.id),
+                        "source_sha256": artifact.sha256,
                         "page_range": imported.result.get("page_range"),
-                        "extraction_methods": sorted({p["method"] for p in imported.result.get("pages", [])}),
-                        "teacher_reviewed": True}
+                        "extraction_methods": sorted(
+                            {p["method"] for p in imported.result.get("pages", [])}
+                        ),
+                        "teacher_reviewed": True,
+                    }
             mapping_version = row.mapping_version
             concepts = await current_concepts(session, row, classroom)
             await session.commit()
@@ -128,14 +144,24 @@ async def index_class_material(material_id: uuid.UUID, version: int, *, expected
             row = await session.scalar(
                 select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
             )
-            if row is None or row.content_version != version or row.mapping_version != mapping_version or not row.published:
+            if (
+                row is None
+                or row.content_version != version
+                or row.mapping_version != mapping_version
+                or not row.published
+            ):
                 return
             classroom = await session.get(Classroom, row.class_id)
             if classroom is None or classroom.is_archived:
                 return
             if lease:
                 await assert_lease(session, *lease)
-            if row.rag_status == "ready" and row.indexed_version == version and row.indexed_mapping_version == mapping_version and row.n_chunks > 0:
+            if (
+                row.rag_status == "ready"
+                and row.indexed_version == version
+                and row.indexed_mapping_version == mapping_version
+                and row.n_chunks > 0
+            ):
                 return
             await replace_material_chunks(session, material_id, version, records)
             row.indexed_version = version
@@ -154,7 +180,12 @@ async def index_class_material(material_id: uuid.UUID, version: int, *, expected
                 row = await session.scalar(
                     select(ClassMaterial).where(ClassMaterial.id == material_id).with_for_update()
                 )
-                if row is not None and row.content_version == version and (mapping_version is None or row.mapping_version == mapping_version) and row.rag_status != "ready":
+                if (
+                    row is not None
+                    and row.content_version == version
+                    and (mapping_version is None or row.mapping_version == mapping_version)
+                    and row.rag_status != "ready"
+                ):
                     row.rag_status = "failed" if row.published else "pending"
                     row.rag_error = "Indeks AI belum berhasil dibuat. Periksa koneksi lalu gunakan Proses ulang."
                     await session.commit()

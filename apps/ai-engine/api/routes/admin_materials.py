@@ -46,6 +46,7 @@ async def list_materials(
     actor=Depends(require_admin),
     session=Depends(db_session),
 ):
+    """List classroom materials and processing state for administrators."""
     query = catalog_query()
     if search.strip():
         # User text remains a literal substring, not a wildcard expression.
@@ -72,7 +73,21 @@ async def list_materials(
 async def material_for(session, material_id, *, lock=False):
     query = catalog_query().where(ClassMaterial.id == material_id)
     if lock:
-        query = query.with_for_update(of=ClassMaterial)
+        class_id = await session.scalar(
+            select(ClassMaterial.class_id).where(ClassMaterial.id == material_id)
+        )
+        classroom_id = (
+            await session.scalar(
+                select(Classroom.id).where(Classroom.id == class_id).with_for_update()
+            )
+            if class_id
+            else None
+        )
+        if classroom_id is None:
+            raise HTTPException(404, "Materi tidak ditemukan.")
+        # Teacher changes also lock classroom -> material. ClassActivity's FK
+        # must not make an admin holding the material wait for its classroom.
+        query = query.with_for_update(of=ClassMaterial).execution_options(populate_existing=True)
     row = (await session.execute(query)).one_or_none()
     if row is None:
         raise HTTPException(404, "Materi tidak ditemukan.")
@@ -83,6 +98,7 @@ async def material_for(session, material_id, *, lock=False):
 async def read_material(
     material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)
 ):
+    """Inspect reviewed material content and provenance."""
     return catalog_item(*await material_for(session, material_id), content=True)
 
 
@@ -94,11 +110,16 @@ async def update_material(
     actor=Depends(require_admin),
     session=Depends(db_session),
 ):
+    """Revise or archive reviewed material with a content version check."""
     material, classroom, teacher = await material_for(session, material_id, lock=True)
     await source_for(session, classroom.id, body.source_import_id)
     if classroom.is_archived:
         raise HTTPException(409, "Buka arsip kelas sebelum mengubah materi.")
-    if material.content != body.content or material.source_filename != body.source_filename or material.source_import_id != body.source_import_id:
+    if (
+        material.content != body.content
+        or material.source_filename != body.source_filename
+        or material.source_import_id != body.source_import_id
+    ):
         material.content_version += 1
         material.n_chunks = 0
         material.rag_status, material.rag_error = "pending", None
@@ -106,7 +127,11 @@ async def update_material(
         setattr(material, key, value)
     if not material.published:
         material.rag_status = "pending"
-    elif material.indexed_version == material.content_version and material.indexed_mapping_version == material.mapping_version and material.n_chunks > 0:
+    elif (
+        material.indexed_version == material.content_version
+        and material.indexed_mapping_version == material.mapping_version
+        and material.n_chunks > 0
+    ):
         material.rag_status = "ready"
     record(session, classroom, actor, "material.admin-updated", material.id)
     await session.flush()
@@ -123,10 +148,16 @@ async def reindex_material(
     actor=Depends(require_admin),
     session=Depends(db_session),
 ):
+    """Queue durable indexing for the current material version."""
     material, classroom, teacher = await material_for(session, material_id, lock=True)
     if classroom.is_archived or not material.published:
         raise HTTPException(409, "Materi harus terbit di kelas aktif sebelum diproses.")
-    if material.rag_status != "ready" or material.indexed_version != material.content_version or material.indexed_mapping_version != material.mapping_version or material.n_chunks <= 0:
+    if (
+        material.rag_status != "ready"
+        or material.indexed_version != material.content_version
+        or material.indexed_mapping_version != material.mapping_version
+        or material.n_chunks <= 0
+    ):
         material.rag_status, material.rag_error = "pending", None
         record(session, classroom, actor, "material.admin-index-requested", material.id)
         await enqueue_material(session, material, retry=True)
@@ -135,19 +166,39 @@ async def reindex_material(
 
 
 @router.get("/materials/{material_id}/source")
-async def inspect_source(material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)):
+async def inspect_source(
+    material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)
+):
+    """Inspect private source metadata and page extraction provenance."""
     material, _, _ = await material_for(session, material_id)
-    artifact = await session.get(MaterialImport, material.source_import_id) if material.source_import_id else None
+    artifact = (
+        await session.get(MaterialImport, material.source_import_id)
+        if material.source_import_id
+        else None
+    )
     if artifact is None:
         raise HTTPException(404, "Materi ini belum memiliki berkas sumber.")
     return await import_out(session, artifact)
 
 
 @router.get("/materials/{material_id}/original")
-async def download_source(material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)):
+async def download_source(
+    material_id: uuid.UUID, actor=Depends(require_admin), session=Depends(db_session)
+):
+    """Download an original source through administrator authorization."""
     from fastapi.responses import FileResponse
+
     material, _, _ = await material_for(session, material_id)
-    artifact = await session.get(MaterialImport, material.source_import_id) if material.source_import_id else None
+    artifact = (
+        await session.get(MaterialImport, material.source_import_id)
+        if material.source_import_id
+        else None
+    )
     if artifact is None:
         raise HTTPException(404, "Materi ini belum memiliki berkas sumber.")
-    return FileResponse(original_path(artifact), filename=artifact.filename, media_type="application/octet-stream", headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+    return FileResponse(
+        original_path(artifact),
+        filename=artifact.filename,
+        media_type="application/octet-stream",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )

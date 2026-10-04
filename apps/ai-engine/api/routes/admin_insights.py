@@ -56,9 +56,9 @@ async def overview(session: AsyncSession = Depends(db_session)) -> dict:
     quiz_sessions = await _count(session, QuizSession)
     voice_enabled = settings.TTS_BACKEND == "elevenlabs" or settings.STT_BACKEND == "elevenlabs"
     voice_configured = (
-        (settings.TTS_BACKEND != "elevenlabs" or bool(settings.ELEVENLABS_API_KEY and settings.ELEVENLABS_TTS_VOICE_ID))
-        and (settings.STT_BACKEND != "elevenlabs" or bool(settings.ELEVENLABS_API_KEY))
-    )
+        settings.TTS_BACKEND != "elevenlabs"
+        or bool(settings.ELEVENLABS_API_KEY and settings.ELEVENLABS_TTS_VOICE_ID)
+    ) and (settings.STT_BACKEND != "elevenlabs" or bool(settings.ELEVENLABS_API_KEY))
 
     return {
         "generated_at": datetime.now(UTC).isoformat(),
@@ -128,17 +128,17 @@ async def activity(
                 .limit(limit)
             )
         ).all()
-        for row, actor_name, actor_role, class_name in class_rows:
+        for activity, actor_name, actor_role, class_name in class_rows:
             events.append(
                 {
-                    "id": str(row.id),
+                    "id": str(activity.id),
                     "type": "class_activity",
                     "category": "classroom",
-                    "action": row.action,
+                    "action": activity.action,
                     "actor_name": actor_name or "Pengguna dihapus",
                     "actor_role": actor_role,
                     "target_name": class_name,
-                    "occurred_at": row.created_at.isoformat() if row.created_at else None,
+                    "occurred_at": activity.created_at.isoformat() if activity.created_at else None,
                 }
             )
 
@@ -152,20 +152,18 @@ async def activity(
                 .limit(limit)
             )
         ).all()
-        for row, student_name in session_rows:
+        for lesson, student_name in session_rows:
             events.append(
                 {
-                    "id": str(row.id),
+                    "id": str(lesson.id),
                     "type": "learning_session",
                     "category": "learning",
-                    "action": "session.ended" if row.ended_at else "session.started",
+                    "action": "session.ended" if lesson.ended_at else "session.started",
                     "actor_name": student_name,
                     "actor_role": "student",
-                    "target_name": row.title or "Sesi tanpa judul",
-                    "occurred_at": (
-                        row.ended_at or row.started_at
-                    ).isoformat()
-                    if (row.ended_at or row.started_at)
+                    "target_name": lesson.title or "Sesi tanpa judul",
+                    "occurred_at": (lesson.ended_at or lesson.started_at).isoformat()
+                    if (lesson.ended_at or lesson.started_at)
                     else None,
                 }
             )
@@ -180,20 +178,18 @@ async def activity(
                 .limit(limit)
             )
         ).all()
-        for row, student_name in quiz_rows:
+        for quiz, student_name in quiz_rows:
             events.append(
                 {
-                    "id": str(row.id),
+                    "id": str(quiz.id),
                     "type": "quiz_session",
                     "category": "quiz",
-                    "action": f"quiz.{row.status}",
+                    "action": f"quiz.{quiz.status}",
                     "actor_name": student_name,
                     "actor_role": "student",
                     "target_name": "Latihan adaptif",
-                    "occurred_at": (
-                        row.ended_at or row.started_at
-                    ).isoformat()
-                    if (row.ended_at or row.started_at)
+                    "occurred_at": (quiz.ended_at or quiz.started_at).isoformat()
+                    if (quiz.ended_at or quiz.started_at)
                     else None,
                 }
             )
@@ -208,16 +204,23 @@ async def activity(
 
 
 @router.get("/insights/ai-usage")
-async def ai_usage(session: AsyncSession = Depends(db_session),
-    days: int = Query(7, ge=1, le=90), page: int = Query(1, ge=1, le=10000), limit: int = Query(20, ge=1, le=100),
+async def ai_usage(
+    session: AsyncSession = Depends(db_session),
+    days: int = Query(7, ge=1, le=90),
+    page: int = Query(1, ge=1, le=10000),
+    limit: int = Query(20, ge=1, le=100),
     provider: Literal["openai", "elevenlabs"] | None = None,
     status: Literal["success", "error", "cancelled", "cache_hit"] | None = None,
-    search: str = Query("", max_length=120)) -> dict:
+    search: str = Query("", max_length=120),
+) -> dict:
     """Live provider quota and configuration; unknown metrics stay unknown."""
     quota = await get_subscription_info()
     available = bool(quota.get("available"))
     from api.provider_insights import measured_usage
-    measured = await measured_usage(session, days=days, page=page, limit=limit, provider=provider, status=status, search=search)
+
+    measured = await measured_usage(
+        session, days=days, page=page, limit=limit, provider=provider, status=status, search=search
+    )
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "elevenlabs": {

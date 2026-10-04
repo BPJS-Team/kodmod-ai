@@ -143,13 +143,15 @@ def question_out(question: QuizDraftQuestion, *, staff=False):
         "concept_id": question.concept_id,
     }
     if staff:
-        return StaffQuestion(
-            **safe,
-            correct_option_id=question.correct_option_id,
-            explanation=question.explanation,
-            difficulty=question.difficulty,
+        return StaffQuestion.model_validate(
+            {
+                **safe,
+                "correct_option_id": question.correct_option_id,
+                "explanation": question.explanation,
+                "difficulty": question.difficulty,
+            }
         )
-    return StudentQuestion(**safe)
+    return StudentQuestion.model_validate(safe)
 
 
 def event(session, version, actor, kind, note=""):

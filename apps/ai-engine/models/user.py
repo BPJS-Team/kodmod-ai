@@ -17,6 +17,8 @@ SelfServeRole = Literal["student", "teacher"]
 
 Username = Annotated[str, Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9._-]+$")]
 Password = Annotated[str, Field(min_length=MIN_PASSWORD_LENGTH, max_length=72)]
+DisplayName = Annotated[str, Field(min_length=1, max_length=200, pattern=r"^[^\x00]*$")]
+GradeLevel = Annotated[str, Field(max_length=50, pattern=r"^[^\x00]*$")]
 
 
 class UserOut(BaseModel):
@@ -39,15 +41,16 @@ class UserOut(BaseModel):
 class RegisterRequest(BaseModel):
     username: Username
     password: Password
-    full_name: str = Field(min_length=1, max_length=200)
+    full_name: DisplayName
     role: SelfServeRole
-    grade_level: str | None = None
+    grade_level: GradeLevel | None = None
     preferred_language: Literal["id", "en"] = "id"
 
     @field_validator("username")
     @classmethod
     def _lower(cls, v: str) -> str:
         return v.lower()
+
 
 class LoginRequest(BaseModel):
     username: Username
@@ -74,8 +77,8 @@ class ChangePasswordRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     """Self-service edits. Role and username are not changeable here."""
 
-    full_name: str | None = Field(default=None, min_length=1, max_length=200)
-    grade_level: str | None = None
+    full_name: DisplayName | None = None
+    grade_level: GradeLevel | None = None
     preferred_language: Literal["id", "en"] | None = None
     accessibility_profile: Literal["blind", "low_vision", "standard"] | None = None
 
@@ -86,9 +89,9 @@ class AdminCreateUserRequest(BaseModel):
 
     username: Username
     password: Password
-    full_name: str = Field(min_length=1, max_length=200)
+    full_name: DisplayName
     role: Role
-    grade_level: str | None = None
+    grade_level: GradeLevel | None = None
     preferred_language: Literal["id", "en"] = "id"
 
     @field_validator("username")
@@ -98,7 +101,7 @@ class AdminCreateUserRequest(BaseModel):
 
 
 class AdminUpdateUserRequest(BaseModel):
-    full_name: str | None = Field(default=None, min_length=1, max_length=200)
+    full_name: DisplayName | None = None
     role: Role | None = None
     is_active: bool | None = None
     new_password: Password | None = None

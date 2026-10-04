@@ -3,6 +3,7 @@
 Run in the API container after configuring ElevenLabs. Repeating the command
 reuses matching cached audio; it never generates private Tutor responses.
 """
+
 import argparse
 import asyncio
 import json
@@ -14,13 +15,17 @@ from voice.tts import synthesise_bytes
 async def warm(languages, keys=None):
     selected = list(dict.fromkeys(keys or MENU_AUDIO))
     languages = list(dict.fromkeys(languages))
-    if any(language not in {"id", "en"} for language in languages) or any(key not in MENU_AUDIO for key in selected):
+    if any(language not in {"id", "en"} for language in languages) or any(
+        key not in MENU_AUDIO for key in selected
+    ):
         raise ValueError("Only supported languages and catalog keys can be prepared.")
     prepared, failed = 0, []
     for language in languages:
         for key in selected:
             try:
-                audio = await synthesise_bytes(MENU_AUDIO[key][language == "en"], language=language, scope="public-menu")
+                audio = await synthesise_bytes(
+                    MENU_AUDIO[key][language == "en"], language=language, scope="public-menu"
+                )
                 if not audio:
                     raise ValueError("Empty audio")
                 prepared += 1

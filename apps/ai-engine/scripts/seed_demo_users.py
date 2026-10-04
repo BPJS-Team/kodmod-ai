@@ -24,7 +24,7 @@ DEMO_USERS = (
     ("guru.demo", "Demo Guru", "teacher"),
     ("admin.demo", "Demo Admin", "admin"),
 )
-DEFAULT_DEMO_PASSWORD = "password"
+DEFAULT_DEMO_PASSWORD = "password"  # noqa: S105 - opt-in local demo accounts only
 
 
 async def _seed() -> int:
@@ -34,9 +34,7 @@ async def _seed() -> int:
     try:
         async with async_session() as session:
             usernames = [username for username, _, _ in DEMO_USERS]
-            result = await session.execute(
-                select(User).where(User.username.in_(usernames))
-            )
+            result = await session.execute(select(User).where(User.username.in_(usernames)))
             existing = {user.username: user for user in result.scalars().all()}
 
             conflicts = [

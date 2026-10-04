@@ -60,7 +60,7 @@ def test_km_contract_002_register_request_rejects(field: str, value: str) -> Non
     }
     payload[field] = value
     with pytest.raises(ValidationError):
-        RegisterRequest(**payload)
+        RegisterRequest.model_validate(payload)
 
 
 # --------------------------------------------------------------------------- #
@@ -114,14 +114,14 @@ def test_km_contract_005_quiz_start_request_bounds() -> None:
     assert ok.n_questions == 1
     assert QuizStartRequest(n_questions=20).n_questions == 20
     with pytest.raises(ValidationError):
-        QuizStartRequest(student_id=sid)
+        QuizStartRequest.model_validate({"student_id": sid})
 
     for bad in (0, 21, -1):
         with pytest.raises(ValidationError):
             QuizStartRequest(n_questions=bad)
 
     with pytest.raises(ValidationError):
-        QuizStartRequest(difficulty="trivial")
+        QuizStartRequest.model_validate({"difficulty": "trivial"})
 
 
 def test_km_contract_006_quiz_start_response_shape() -> None:
@@ -226,7 +226,7 @@ def test_km_contract_010_content_retrieve_response() -> None:
 def test_km_contract_011_exercise_generate_round_trip() -> None:
     from models.content import ExerciseGenerateRequest, ExerciseGenerateResponse
 
-    req = ExerciseGenerateRequest(student_id=uuid.uuid4(), n_questions=3, difficulty="medium")
+    req = ExerciseGenerateRequest(n_questions=3, difficulty="medium")
     assert req.n_questions == 3
     resp = ExerciseGenerateResponse(exercises=[{"q": "1+1?"}], generated_at=datetime.now(UTC))
     assert resp.exercises[0]["q"] == "1+1?"

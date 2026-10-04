@@ -30,12 +30,14 @@ router = APIRouter(tags=["quiz"])
 
 @router.get("/active", response_model=list[QuizRecoveryResponse])
 async def active_quizzes(student: User = Depends(require_student)):
+    """List the student independent assessments that can be resumed."""
     async with async_session() as session:
         return await active_assessments(session, student)
 
 
 @router.get("/sessions/{session_id}", response_model=QuizRecoveryResponse)
 async def recover_quiz(session_id: uuid.UUID, student: User = Depends(require_student)):
+    """Recover the owned durable assessment question and accepted progress."""
     async with async_session() as session:
         return await recover_assessment(session, student, session_id)
 

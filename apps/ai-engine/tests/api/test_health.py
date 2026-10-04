@@ -35,10 +35,9 @@ async def test_km_api_005_version(client) -> None:  # type: ignore[no-untyped-de
         "name",
         "version",
         "env",
-        "llm_provider",
-        "vector_backend",
-        "stt_backend",
-        "tts_backend",
+        "tutor_model",
+        "embedding_model",
+        "embedding_dim",
     ):
         assert key in body
     assert body["env"] == "test"

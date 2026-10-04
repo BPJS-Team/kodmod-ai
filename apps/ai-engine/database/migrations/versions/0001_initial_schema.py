@@ -58,9 +58,15 @@ def _baseline_metadata() -> sa.MetaData:
         if table.name in BASELINE_TABLES and table.name not in changed_tables:
             table.to_metadata(metadata)
     sa.Table(
-        "concepts", metadata,
+        "concepts",
+        metadata,
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("subject_id", UUID(as_uuid=True), sa.ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "subject_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("subjects.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(200), nullable=False),
         sa.Column("slug", sa.String(200), nullable=False, unique=True),
         sa.Column("description", sa.Text()),

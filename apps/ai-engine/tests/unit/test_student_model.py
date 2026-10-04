@@ -1,4 +1,5 @@
 """Unit tests for analytics/student_model.StudentModel BKT logic."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

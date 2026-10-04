@@ -105,6 +105,7 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         from config.settings import settings
+
         self.upload_dir = tempfile.TemporaryDirectory(prefix="kodmod-test-imports-")
         self.addCleanup(self.upload_dir.cleanup)
         self.upload_patch = patch.object(settings, "UPLOAD_DIR", Path(self.upload_dir.name))

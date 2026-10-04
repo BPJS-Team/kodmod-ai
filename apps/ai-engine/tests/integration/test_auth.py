@@ -18,7 +18,7 @@ from database.models import User
 from models.user import LoginRequest, RegisterRequest
 from tests.conftest import TEST_PASSWORD
 
-pytestmark = [pytest.mark.integration, pytest.mark.db]
+pytestmark = [pytest.mark.integration, pytest.mark.db, pytest.mark.asyncio(loop_scope="session")]
 
 
 def _register_body(**overrides) -> RegisterRequest:

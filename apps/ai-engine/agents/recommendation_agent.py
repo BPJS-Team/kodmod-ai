@@ -68,7 +68,11 @@ async def recommendation_node(state: KODMODState) -> dict[str, Any]:
     llm = get_recommendation_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": SYSTEM_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {"role": "user", "content": user_block},
         ]
     )

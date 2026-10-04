@@ -98,7 +98,8 @@ async def assessment_http(monkeypatch):
         "classrooms",
         "enrollments",
         "class_materials",
-        "material_imports", "background_jobs",
+        "material_imports",
+        "background_jobs",
         "subjects",
         "concepts",
         "quiz_sessions",
@@ -336,7 +337,15 @@ async def test_real_graph_remediation_and_completion_share_the_canonical_transac
     from tools.rag_tool import RAGTool
 
     client, factory, _, _, concept, _ = assessment_http
-    monkeypatch.setattr(RAGTool, "retrieve", AsyncMock(return_value=[{"text": "Satu per dua ditambah satu per dua adalah satu. Dua per dua adalah satu."}]))
+    monkeypatch.setattr(
+        RAGTool,
+        "retrieve",
+        AsyncMock(
+            return_value=[
+                {"text": "Satu per dua ditambah satu per dua adalah satu. Dua per dua adalah satu."}
+            ]
+        ),
+    )
 
     # The managed graph must never write evidence outside the REST transaction.
     def forbidden(*args, **kwargs):
@@ -409,16 +418,30 @@ async def test_legacy_session_requires_restart_without_invoking_graph(assessment
 async def test_unmapped_class_scope_never_persists_global_concept_evidence(assessment_http):
     client, factory, controls, _, concept, _ = assessment_http
     async with factory() as session:
-        room = models.Classroom(id=uuid.uuid4(), teacher_id=controls["actor"].id,
-                                name="Test", subject="Matematika")
+        room = models.Classroom(
+            id=uuid.uuid4(), teacher_id=controls["actor"].id, name="Test", subject="Matematika"
+        )
         session.add(room)
         await session.flush()
-        material = models.ClassMaterial(id=uuid.uuid4(), class_id=room.id, title="Pecahan",
-                                         content="Pecahan senilai", published=True,
-                                         rag_status="ready", content_version=1, indexed_version=1, n_chunks=1)
-        session.add_all([material, models.Enrollment(class_id=room.id, student_id=controls["actor"].id)])
+        material = models.ClassMaterial(
+            id=uuid.uuid4(),
+            class_id=room.id,
+            title="Pecahan",
+            content="Pecahan senilai",
+            published=True,
+            rag_status="ready",
+            content_version=1,
+            indexed_version=1,
+            n_chunks=1,
+        )
+        session.add_all(
+            [material, models.Enrollment(class_id=room.id, student_id=controls["actor"].id)]
+        )
         await session.commit()
-    opened = await client.post("/quiz/start", json={"class_id": str(room.id), "material_id": str(material.id), "n_questions": 1})
+    opened = await client.post(
+        "/quiz/start",
+        json={"class_id": str(room.id), "material_id": str(material.id), "n_questions": 1},
+    )
     assert opened.status_code == 200, opened.text
     started = opened.json()
     response = await client.post("/quiz/submit", json=submission(started))
@@ -450,7 +473,9 @@ async def test_assessment_start_uses_graph_learning_profile_schema(assessment_ht
     assert graph.saved["learning_profile"] == expected
     assert graph.saved["detected_language"] == language
     async with factory() as session:
-        quiz_session = await session.get(models.QuizSession, uuid.UUID(response.json()["quiz_session_id"]))
+        quiz_session = await session.get(
+            models.QuizSession, uuid.UUID(response.json()["quiz_session_id"])
+        )
         assert quiz_session.assessment_state["learning_profile"] == expected
 
 

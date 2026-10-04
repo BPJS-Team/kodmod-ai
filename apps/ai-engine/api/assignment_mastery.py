@@ -16,10 +16,12 @@ async def apply_assignment_mastery(session, assignment, attempt, questions, answ
     version = await session.get(QuizDraftVersion, assignment.version_id)
     for question in mapped:
         answer = answers[question.id]
-        existing = await session.scalar(select(AssignmentMasteryEvent.id).where(
-            AssignmentMasteryEvent.answer_id == answer.id,
-            AssignmentMasteryEvent.concept_id == question.concept_id,
-        ))
+        existing = await session.scalar(
+            select(AssignmentMasteryEvent.id).where(
+                AssignmentMasteryEvent.answer_id == answer.id,
+                AssignmentMasteryEvent.concept_id == question.concept_id,
+            )
+        )
         if existing:
             continue
         key = str(question.concept_id)
@@ -31,15 +33,27 @@ async def apply_assignment_mastery(session, assignment, attempt, questions, answ
             row = MasteryScore(student_id=attempt.student_id, concept_id=question.concept_id)
             rows[key] = row
             session.add(row)
-        row.mastery, row.confidence, row.n_attempts = model._scores[key], model._confidence[key], model._attempts[key]
+        row.mastery, row.confidence, row.n_attempts = (
+            model._scores[key],
+            model._confidence[key],
+            model._attempts[key],
+        )
         row.last_seen = model._last_practiced[key]
-        session.add(AssignmentMasteryEvent(
-            answer_id=answer.id, student_id=attempt.student_id, concept_id=question.concept_id,
-            score=score, mastery_before=before, mastery_after=row.mastery,
-            source_snapshot={
-                "assignment_id": str(assignment.id), "version_id": str(assignment.version_id),
-                "question_id": str(question.id), "subject_id": str(version.subject_id),
-                "reviewed_version": version.version,
-            },
-        ))
+        session.add(
+            AssignmentMasteryEvent(
+                answer_id=answer.id,
+                student_id=attempt.student_id,
+                concept_id=question.concept_id,
+                score=score,
+                mastery_before=before,
+                mastery_after=row.mastery,
+                source_snapshot={
+                    "assignment_id": str(assignment.id),
+                    "version_id": str(assignment.version_id),
+                    "question_id": str(question.id),
+                    "subject_id": str(version.subject_id),
+                    "reviewed_version": version.version,
+                },
+            )
+        )
     await session.flush()

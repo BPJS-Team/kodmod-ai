@@ -137,9 +137,14 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
             material_id=state.get("material_id"),
             student_id=state.get("student_id"),
         )
-    docs = state.get("quiz_source_docs") or await RAGTool().retrieve(
-        query=f"{topic} learning material questions", k=6, filters=filters or None,
-    )
+    docs: list[dict] = state.get("quiz_source_docs") or [
+        dict(doc)
+        for doc in await RAGTool().retrieve(
+            query=f"{topic} learning material questions",
+            k=6,
+            filters=filters or None,
+        )
+    ]
     docs = [doc for doc in docs if str(doc.get("text", "")).strip()][:6]
     if not docs:
         raise ValueError("No approved source available for quiz generation")
@@ -148,9 +153,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
             (str(doc["material_title"]).strip() for doc in docs if doc.get("material_title")),
             topic,
         )
-    context_block = (
-        "\n".join(f"[{i + 1}] {d.get('text', '')[:4000]}" for i, d in enumerate(docs))
-    )
+    context_block = "\n".join(f"[{i + 1}] {d.get('text', '')[:4000]}" for i, d in enumerate(docs))
 
     user_block = (
         f"<topic>{topic}</topic>\n"
@@ -168,33 +171,66 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
 
     llm = get_quiz_llm()
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+            + language_instruction(state.get("learning_profile", {}).get("language")),
+        },
         {"role": "user", "content": user_block},
     ]
     if state.get("quiz_mcq_only"):
-        messages[0]["content"] += "\nFor this teacher draft, EVERY question must be MCQ, with exactly four A/B/C/D choices, an answer letter, and a source-based explanation."
+        messages[0]["content"] += (
+            "\nFor this teacher draft, EVERY question must be MCQ, with exactly four A/B/C/D choices, an answer letter, and a source-based explanation."
+        )
     generated = None
     for attempt in range(2):
         response = await llm.ainvoke(messages)
         raw = response.content if hasattr(response, "content") else str(response)
         try:
-            candidate = validate_generated_questions(raw, n_questions, len(docs), require_sources=classroom_scope, only_mcq=bool(state.get("quiz_mcq_only")))
-            if classroom_scope and approved and any(q.concept_id and q.concept_id not in allowed_concepts for q in candidate):
+            candidate = validate_generated_questions(
+                raw,
+                n_questions,
+                len(docs),
+                require_sources=classroom_scope,
+                only_mcq=bool(state.get("quiz_mcq_only")),
+            )
+            if (
+                classroom_scope
+                and approved
+                and any(q.concept_id and q.concept_id not in allowed_concepts for q in candidate)
+            ):
                 raise ValueError("Question claims an unapproved Concept")
             generated = candidate
             break
         except (ValueError, TypeError, AttributeError):
-            log.warning("Quiz generation did not satisfy the source/quality contract, attempt=%s", attempt + 1)
-            messages = [*messages[:2], {"role": "user", "content": "Regenerate the entire set. Use exactly the requested count, unique questions, real expected answers, valid options and source_indices. JSON only."}]
+            log.warning(
+                "Quiz generation did not satisfy the source/quality contract, attempt=%s",
+                attempt + 1,
+            )
+            messages = [
+                *messages[:2],
+                {
+                    "role": "user",
+                    "content": "Regenerate the entire set. Use exactly the requested count, unique questions, real expected answers, valid options and source_indices. JSON only.",
+                },
+            ]
     if generated is None:
         raise ValueError("Quiz generation failed the quality contract after retry")
-    questions: list[QuizQuestion] = [QuizQuestion(
-        question_id=str(uuid4()), text=q.text, type=q.type, options=q.options,
-        expected_answer=q.expected_answer, rubric=q.rubric, concept_id=(q.concept_id if approved else "") if classroom_scope else concept_id,
-        difficulty=cast(DifficultyLevel, q.difficulty or difficulty),
-        source_indices=q.source_indices,
-        explanation=q.explanation,
-    ) for q in generated]
+    questions: list[QuizQuestion] = [
+        QuizQuestion(
+            question_id=str(uuid4()),
+            text=q.text,
+            type=q.type,
+            options=q.options,
+            expected_answer=q.expected_answer,
+            rubric=q.rubric,
+            concept_id=(q.concept_id if approved else "") if classroom_scope else concept_id,
+            difficulty=cast(DifficultyLevel, q.difficulty or difficulty),
+            source_indices=q.source_indices,
+            explanation=q.explanation,
+        )
+        for q in generated
+    ]
     log.info("Problem generator produced %d questions on concept=%s", len(questions), concept_id)
 
     quiz_session_id = f"quiz-{uuid4().hex[:10]}"
@@ -288,7 +324,14 @@ def validate_generated_questions(raw, count, source_count, *, require_sources=Tr
         identity = " ".join(q.text.casefold().split())
         if not identity or identity in seen or not q.expected_answer:
             raise ValueError("Empty or duplicate question/answer")
-        if q.expected_answer.casefold() in {"(open-ended)", "open-ended", "...", "tbd", "placeholder", "n/a"}:
+        if q.expected_answer.casefold() in {
+            "(open-ended)",
+            "open-ended",
+            "...",
+            "tbd",
+            "placeholder",
+            "n/a",
+        }:
             raise ValueError("Placeholder answer is not gradable")
         if require_sources and not q.source_indices:
             raise ValueError("Missing source attribution")
@@ -308,6 +351,7 @@ def validate_generated_questions(raw, count, source_count, *, require_sources=Tr
         seen.add(identity)
         result.append(q)
     return result
+
 
 _DIFFICULTY_LADDER: list[DifficultyLevel] = ["beginner", "easy", "medium", "hard", "expert"]
 

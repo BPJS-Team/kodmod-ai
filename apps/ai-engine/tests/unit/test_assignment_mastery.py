@@ -13,12 +13,20 @@ from tests.editorial_test import editorial_http as editorial_http
 
 
 @pytest.mark.parametrize("fail_once", [False, True])
-async def test_reviewed_formal_question_updates_mastery_once_and_rolls_back_on_failure(editorial_http, monkeypatch, fail_once):
+async def test_reviewed_formal_question_updates_mastery_once_and_rolls_back_on_failure(
+    editorial_http, monkeypatch, fail_once
+):
     client, factory, actors, subject, _, headers = editorial_http
     async with factory.kw["bind"].begin() as connection:
-        await connection.run_sync(lambda c: db.Base.metadata.create_all(c, tables=[
-            db.MasteryScore.__table__, db.AssignmentMasteryEvent.__table__,
-        ]))
+        await connection.run_sync(
+            lambda c: db.Base.metadata.create_all(
+                c,
+                tables=[
+                    db.MasteryScore.__table__,
+                    db.AssignmentMasteryEvent.__table__,
+                ],
+            )
+        )
     async with factory() as session:
         concept = db.Concept(subject_id=subject.id, name="Pecahan", slug="formal-pecahan")
         session.add(concept)
@@ -37,21 +45,28 @@ async def test_reviewed_formal_question_updates_mastery_once_and_rolls_back_on_f
     body = {"expected_revision": attempt["revision"]}
     original = service.commit
     if fail_once:
+
         async def fail_commit(session):
             await session.rollback()
             raise HTTPException(503, "Test write failure")
+
         monkeypatch.setattr(service, "commit", fail_commit)
         assert (await client.post(path, json=body, headers=request_headers)).status_code == 503
         async with factory() as session:
             assert await session.scalar(select(func.count()).select_from(db.MasteryScore)) == 0
-            assert await session.scalar(select(func.count()).select_from(db.AssignmentMasteryEvent)) == 0
+            assert (
+                await session.scalar(select(func.count()).select_from(db.AssignmentMasteryEvent))
+                == 0
+            )
         monkeypatch.setattr(service, "commit", original)
     first = await client.post(path, json=body, headers=request_headers)
     replay = await client.post(path, json=body, headers=request_headers)
     assert first.status_code == replay.status_code == 200
     assert first.json() == replay.json()
     async with factory() as session:
-        score = await session.scalar(select(db.MasteryScore).where(db.MasteryScore.student_id == actors["student"].id))
+        score = await session.scalar(
+            select(db.MasteryScore).where(db.MasteryScore.student_id == actors["student"].id)
+        )
         assert score is not None and score.concept_id == concept.id
         assert score.n_attempts == 1
         evidence = list(await session.scalars(select(db.AssignmentMasteryEvent)))

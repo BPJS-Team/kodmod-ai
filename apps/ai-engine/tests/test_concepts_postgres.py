@@ -18,14 +18,19 @@ from api.dependencies import current_user, db_session
 from api.routes import classrooms
 from database import models as db
 
-pytestmark = pytest.mark.skipif(os.getenv("KODMOD_CONCEPTS_POSTGRES") != "1", reason="Dedicated PostgreSQL required")
+pytestmark = pytest.mark.skipif(
+    os.getenv("KODMOD_CONCEPTS_POSTGRES") != "1", reason="Dedicated PostgreSQL required"
+)
 DSN = "postgresql+asyncpg://kodmod:kodmod@127.0.0.1:5434/kodmod_test"
 
 
 def test_concept_migration_preserves_legacy_material_and_roundtrips():
     prefix = "concepts_migration_"
     name = prefix + uuid.uuid4().hex
-    admin = create_engine("postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/kodmod_test", isolation_level="AUTOCOMMIT")
+    admin = create_engine(
+        "postgresql+psycopg://kodmod:kodmod@127.0.0.1:5434/kodmod_test",
+        isolation_level="AUTOCOMMIT",
+    )
     engine = None
     try:
         with admin.connect() as conn:
@@ -36,18 +41,54 @@ def test_concept_migration_preserves_legacy_material_and_roundtrips():
             config.attributes["connection"] = conn
             command.upgrade(config, "0008_audit_events")
             actor_id, room_id, mid = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-            conn.execute(db.User.__table__.insert().values(id=actor_id, username="legacy-teacher", password_hash="test-only", role="teacher", full_name="Legacy"))
-            conn.execute(text("INSERT INTO classrooms (id, teacher_id, name, subject, description, is_archived, created_at) VALUES (:id, :teacher, 'Legacy class', 'Matematika', '', false, NOW())"), {"id": room_id, "teacher": actor_id})
-            conn.execute(text("INSERT INTO class_materials (id, class_id, title, content, published, created_at) VALUES (:id, :room, 'Legacy material', 'Existing reviewed text', true, NOW())"), {"id": mid, "room": room_id})
+            conn.execute(
+                db.User.__table__.insert().values(
+                    id=actor_id,
+                    username="legacy-teacher",
+                    password_hash="test-only",
+                    role="teacher",
+                    full_name="Legacy",
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO classrooms (id, teacher_id, name, subject, description, is_archived, created_at) VALUES (:id, :teacher, 'Legacy class', 'Matematika', '', false, NOW())"
+                ),
+                {"id": room_id, "teacher": actor_id},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO class_materials (id, class_id, title, content, published, created_at) VALUES (:id, :room, 'Legacy material', 'Existing reviewed text', true, NOW())"
+                ),
+                {"id": mid, "room": room_id},
+            )
             command.upgrade(config, "head")
-            row = conn.execute(text("SELECT content, mapping_version, indexed_mapping_version FROM class_materials WHERE id=:id"), {"id": mid}).one()
+            row = conn.execute(
+                text(
+                    "SELECT content, mapping_version, indexed_mapping_version FROM class_materials WHERE id=:id"
+                ),
+                {"id": mid},
+            ).one()
             assert tuple(row) == ("Existing reviewed text", 0, 0)
-            assert conn.scalar(text("SELECT subject_id FROM classrooms WHERE id=:id"), {"id": room_id}) is None
-            assert {"material_concepts", "assignment_mastery_events"}.issubset(inspect(conn).get_table_names())
-            assert conn.scalar(text("SELECT count(*) FROM background_jobs WHERE target_id=:id"), {"id": mid}) == 1
+            assert (
+                conn.scalar(text("SELECT subject_id FROM classrooms WHERE id=:id"), {"id": room_id})
+                is None
+            )
+            assert {"material_concepts", "assignment_mastery_events"}.issubset(
+                inspect(conn).get_table_names()
+            )
+            assert (
+                conn.scalar(
+                    text("SELECT count(*) FROM background_jobs WHERE target_id=:id"), {"id": mid}
+                )
+                == 1
+            )
             command.downgrade(config, "0008_audit_events")
             command.upgrade(config, "head")
-            assert conn.scalar(text("SELECT content FROM class_materials WHERE id=:id"), {"id": mid}) == "Existing reviewed text"
+            assert (
+                conn.scalar(text("SELECT content FROM class_materials WHERE id=:id"), {"id": mid})
+                == "Existing reviewed text"
+            )
     finally:
         if engine:
             engine.dispose()
@@ -63,26 +104,50 @@ async def mapping_pg(monkeypatch):
     control = create_async_engine(DSN, poolclass=NullPool)
     async with control.begin() as conn:
         await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
-    engine = create_async_engine(DSN, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}})
-    names = {"users", "subjects", "concepts", "classrooms", "enrollments", "class_materials", "class_activities", "material_concepts", "material_imports", "background_jobs"}
+    engine = create_async_engine(
+        DSN, poolclass=NullPool, connect_args={"server_settings": {"search_path": schema}}
+    )
+    names = {
+        "users",
+        "subjects",
+        "concepts",
+        "classrooms",
+        "enrollments",
+        "class_materials",
+        "class_activities",
+        "material_concepts",
+        "material_imports",
+        "background_jobs",
+    }
     try:
         async with engine.begin() as conn:
-            await conn.run_sync(lambda c: db.Base.metadata.create_all(c, tables=[t for t in db.Base.metadata.sorted_tables if t.name in names]))
+            await conn.run_sync(
+                lambda c: db.Base.metadata.create_all(
+                    c, tables=[t for t in db.Base.metadata.sorted_tables if t.name in names]
+                )
+            )
         factory = async_sessionmaker(engine, expire_on_commit=False)
         async with factory() as session:
-            actor = db.User(username="owner", full_name="Owner", role="teacher", password_hash="test-only")
+            actor = db.User(
+                username="owner", full_name="Owner", role="teacher", password_hash="test-only"
+            )
             one, two = db.Subject(name="Matematika"), db.Subject(name="Biologi")
             session.add_all([actor, one, two])
             await session.flush()
-            room = db.Classroom(name="Class", subject=one.name, subject_id=one.id, teacher_id=actor.id)
+            room = db.Classroom(
+                name="Class", subject=one.name, subject_id=one.id, teacher_id=actor.id
+            )
             concept = db.Concept(name="Pecahan", slug="pecahan", subject_id=one.id)
             session.add_all([room, concept])
             await session.flush()
-            material = db.ClassMaterial(class_id=room.id, title="Pecahan", content="Pecahan senilai.", published=False)
+            material = db.ClassMaterial(
+                class_id=room.id, title="Pecahan", content="Pecahan senilai.", published=False
+            )
             session.add(material)
             await session.commit()
         app = FastAPI()
         app.include_router(classrooms.router, prefix="/classes")
+
         async def transaction():
             async with factory() as session:
                 try:
@@ -91,9 +156,12 @@ async def mapping_pg(monkeypatch):
                 except Exception:
                     await session.rollback()
                     raise
+
         app.dependency_overrides[current_user] = lambda: actor
         app.dependency_overrides[db_session] = transaction
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://mapping.test") as client:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://mapping.test"
+        ) as client:
             yield client, factory, room, material, concept, two
     finally:
         await engine.dispose()
@@ -106,8 +174,12 @@ async def mapping_pg(monkeypatch):
 async def test_concurrent_mapping_approvals_accept_one_review(mapping_pg):
     client, factory, room, material, concept, _ = mapping_pg
     path = f"/classes/{room.id}/materials/{material.id}/concepts"
-    body = {"expected_content_version": 1, "expected_mapping_version": 0,
-            "concept_ids": [str(concept.id)], "primary_concept_id": str(concept.id)}
+    body = {
+        "expected_content_version": 1,
+        "expected_mapping_version": 0,
+        "concept_ids": [str(concept.id)],
+        "primary_concept_id": str(concept.id),
+    }
     one, two = await asyncio.gather(client.put(path, json=body), client.put(path, json=body))
     assert sorted([one.status_code, two.status_code]) == [200, 409]
     async with factory() as session:
@@ -119,9 +191,15 @@ async def test_concurrent_mapping_approvals_accept_one_review(mapping_pg):
 async def test_subject_change_serializes_with_review_and_never_keeps_wrong_concept(mapping_pg):
     client, factory, room, material, concept, other = mapping_pg
     path = f"/classes/{room.id}/materials/{material.id}/concepts"
-    body = {"expected_content_version": 1, "expected_mapping_version": 0, "concept_ids": [str(concept.id)]}
+    body = {
+        "expected_content_version": 1,
+        "expected_mapping_version": 0,
+        "concept_ids": [str(concept.id)],
+    }
     reviewed, changed = await asyncio.gather(
-        client.put(path, json=body), client.patch(f"/classes/{room.id}", json={"subject_id": str(other.id)}))
+        client.put(path, json=body),
+        client.patch(f"/classes/{room.id}", json={"subject_id": str(other.id)}),
+    )
     assert reviewed.status_code in {200, 409}
     assert changed.status_code == 200, changed.text
     assert (await client.get(path)).json()["concepts"] == []

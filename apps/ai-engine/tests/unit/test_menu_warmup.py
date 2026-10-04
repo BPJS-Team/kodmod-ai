@@ -22,7 +22,9 @@ async def test_warmup_uses_only_shared_catalog_and_deduplicates_keys(monkeypatch
     assert len(requests) == 4
 
 
-async def test_warmup_keeps_successful_items_and_reports_failures_without_provider_details(monkeypatch):
+async def test_warmup_keeps_successful_items_and_reports_failures_without_provider_details(
+    monkeypatch,
+):
     async def audio(text, **kwargs):
         if text == "Home":
             raise RuntimeError("sensitive-provider-detail")

@@ -102,7 +102,7 @@ async def test_km_sec_009_idor_student_spoken(client, student_factory) -> None: 
     _a, tok = await student_factory()
     victim, _v = await student_factory()
     r = await client.get(
-        f"/analytics/student/{victim.id}/spoken", headers={"Authorization": f"Bearer {tok}"}
+        f"/teacher/students/{victim.id}", headers={"Authorization": f"Bearer {tok}"}
     )
     assert r.status_code == 403
 
@@ -120,7 +120,9 @@ async def test_km_sec_010_idor_student_profile(client, student_factory) -> None:
     r = await client.get(
         f"/student/{victim.id}/profile", headers={"Authorization": f"Bearer {atk_tok}"}
     )
-    assert r.status_code in {401, 403}
+    assert r.status_code == 404
+    own = await client.get("/student/me/profile", headers={"Authorization": f"Bearer {atk_tok}"})
+    assert own.status_code == 200 and own.json()["account"]["full_name"] == "Penyerang"
 
 
 # --------------------------------------------------------------------------- #
@@ -140,7 +142,7 @@ async def test_km_sec_011_exercise_generate_ignores_a_forged_owner(  # type: ign
         headers={"Authorization": f"Bearer {tok}"},
         json={"student_id": str(victim.id), "concept_id": concept_ids["pecahan"], "n_questions": 1},
     )
-    assert r.status_code == 200
+    assert r.status_code == 409
     assert str(victim.id) not in r.text
 
 
@@ -148,7 +150,7 @@ async def test_km_sec_011_exercise_generate_ignores_a_forged_owner(  # type: ign
 # KM-SEC-012 - IDOR on /quiz/*
 # --------------------------------------------------------------------------- #
 async def test_km_sec_012_quiz_start_ignores_a_forged_owner(  # type: ignore[no-untyped-def]
-    client, student_factory, concept_ids
+    client, student_factory, material_source_factory
 ) -> None:
     """The quiz session belongs to the token holder, never to a body field."""
     from sqlalchemy import text
@@ -157,17 +159,24 @@ async def test_km_sec_012_quiz_start_ignores_a_forged_owner(  # type: ignore[no-
 
     _atk, tok = await student_factory()
     victim, _v = await student_factory()
+    source = await material_source_factory(_atk)
     r = await client.post(
         "/quiz/start",
         headers={"Authorization": f"Bearer {tok}"},
         json={
             "student_id": str(victim.id),
-            "concept_id": concept_ids["pecahan"],
+            **source,
             "n_questions": 1,
             "difficulty": "easy",
         },
     )
-    assert r.status_code == 200
+    assert r.status_code == 422
+    r = await client.post(
+        "/quiz/start",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={**source, "n_questions": 1, "difficulty": "easy"},
+    )
+    assert r.status_code == 200, r.text
     session_id = r.json()["quiz_session_id"]
 
     async with async_session() as s:
@@ -177,7 +186,7 @@ async def test_km_sec_012_quiz_start_ignores_a_forged_owner(  # type: ignore[no-
                 {"id": session_id},
             )
         ).scalar_one()
-    assert str(owner) != str(victim.id)
+    assert owner == _atk.id and owner != victim.id
 
 
 # --------------------------------------------------------------------------- #
@@ -194,12 +203,13 @@ _ALLOWLIST = {
     ("POST", "/auth/register"),
     ("POST", "/auth/login"),
     ("GET", "/auth/username-available"),
+    ("GET", "/voice/profile"),
+    ("GET", "/voice/menu/{key}"),
+    ("MOUNT", "/metrics"),
 }
 # Deliberately unauthenticated but not part of the product surface: Prometheus
 # is expected to be network-restricted at deploy time.
-_KNOWN_GAPS = {
-    ("MOUNT", "/metrics"),
-}
+_KNOWN_GAPS: set[tuple[str, str]] = set()
 
 
 def _unauth_routes() -> set[tuple[str, str]]:
@@ -209,7 +219,7 @@ def _unauth_routes() -> set[tuple[str, str]]:
     out: set[tuple[str, str]] = set()
     for methods, path, route in iter_routes(app):
         deps = route_dependency_names(route)
-        authed = "current_student" in deps or "current_teacher" in deps
+        authed = any(name == "current_user" or name.startswith("require_") for name in deps)
         if authed:
             continue
         for m in methods:

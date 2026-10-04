@@ -26,7 +26,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from sqlalchemy import func, select
 
@@ -143,7 +143,7 @@ class StudentAggregator:
         avg_score = (sum(a.score for a in attempts) / n_attempts) if n_attempts else 0.0
         accuracy = (n_correct / n_attempts) if n_attempts else 0.0
 
-        mastery = [
+        mastery: list[dict[str, Any]] = [
             {
                 "concept_id": str(m.concept_id),
                 "concept_name": c.name,

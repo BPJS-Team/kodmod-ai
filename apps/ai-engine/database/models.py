@@ -73,12 +73,18 @@ class Base(DeclarativeBase):
 
 class ProviderUsage(Base):
     """One measured provider call or cache reuse, with no content payload."""
+
     __tablename__ = "provider_usage"
     __table_args__ = (
         CheckConstraint("provider IN ('openai','elevenlabs')", name="ck_provider_usage_provider"),
-        CheckConstraint("status IN ('success','error','cancelled','cache_hit')", name="ck_provider_usage_status"),
+        CheckConstraint(
+            "status IN ('success','error','cancelled','cache_hit')", name="ck_provider_usage_status"
+        ),
         CheckConstraint("latency_ms >= 0", name="ck_provider_usage_latency"),
-        CheckConstraint("input_tokens >= 0 AND output_tokens >= 0 AND total_tokens >= 0 AND characters >= 0 AND audio_bytes >= 0 AND audio_seconds >= 0 AND estimated_cost_usd >= 0", name="ck_provider_usage_units"),
+        CheckConstraint(
+            "input_tokens >= 0 AND output_tokens >= 0 AND total_tokens >= 0 AND characters >= 0 AND audio_bytes >= 0 AND audio_seconds >= 0 AND estimated_cost_usd >= 0",
+            name="ck_provider_usage_units",
+        ),
         Index("ix_provider_usage_created", "created_at"),
         Index("ix_provider_usage_filter", "provider", "status", "created_at"),
     )
@@ -221,8 +227,12 @@ class ClassMaterial(Base):
 class MaterialImport(Base):
     __tablename__ = "material_imports"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    class_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="CASCADE"), index=True)
-    uploaded_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"))
+    class_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="CASCADE"), index=True
+    )
+    uploaded_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
     filename: Mapped[str] = mapped_column(String(300))
     stored_path: Mapped[str] = mapped_column(String(1000))
     sha256: Mapped[str] = mapped_column(String(64))
@@ -234,7 +244,10 @@ class MaterialImport(Base):
 class BackgroundJob(Base):
     __tablename__ = "background_jobs"
     __table_args__ = (
-        CheckConstraint("state IN ('pending','running','retry','complete','failed')", name="ck_background_jobs_state"),
+        CheckConstraint(
+            "state IN ('pending','running','retry','complete','failed')",
+            name="ck_background_jobs_state",
+        ),
         Index("ix_background_jobs_claim", "state", "available_at", "lease_expires_at"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -251,7 +264,9 @@ class BackgroundJob(Base):
     available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     error_message: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
 
 
 class MaterialProgress(Base):
@@ -352,9 +367,17 @@ class MaterialConcept(Base):
     )
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     __table_args__ = (
-        CheckConstraint("mapping_version >= 1 AND content_version >= 1", name="ck_material_concept_versions"),
-        Index("uq_material_primary_concept", "material_id", "mapping_version",
-              unique=True, postgresql_where=text("is_primary"), sqlite_where=text("is_primary = 1")),
+        CheckConstraint(
+            "mapping_version >= 1 AND content_version >= 1", name="ck_material_concept_versions"
+        ),
+        Index(
+            "uq_material_primary_concept",
+            "material_id",
+            "mapping_version",
+            unique=True,
+            postgresql_where=text("is_primary"),
+            sqlite_where=text("is_primary = 1"),
+        ),
     )
 
 
@@ -500,7 +523,9 @@ class LearningSession(Base):
 
 class LearningActionReceipt(Base):
     __tablename__ = "learning_action_receipts"
-    __table_args__ = (UniqueConstraint("session_id", "revision", name="uq_learning_action_revision"),)
+    __table_args__ = (
+        UniqueConstraint("session_id", "revision", name="uq_learning_action_revision"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     session_id: Mapped[uuid.UUID] = mapped_column(

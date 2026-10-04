@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 
 @router.post("/start", response_model=LearningOut)
 async def start(body: LearningStart, student=Depends(require_student), session=Depends(db_session)):
+    """Start or resume guided teaching from a published classroom material."""
     try:
         result = await start_lesson(session, student, body)
         await session.commit()
@@ -30,10 +31,19 @@ async def start(body: LearningStart, student=Depends(require_student), session=D
 
 @router.get("/active", response_model=list[LearningOut])
 async def active(student=Depends(require_student), session=Depends(db_session)):
-    rows = (await session.scalars(select(LearningSession).where(
-        LearningSession.student_id == student.id, LearningSession.ended_at.is_(None),
-        LearningSession.guided_state.is_not(None)
-    ).order_by(LearningSession.started_at.desc()).limit(50))).all()
+    """List the student unfinished guided learning sessions."""
+    rows = (
+        await session.scalars(
+            select(LearningSession)
+            .where(
+                LearningSession.student_id == student.id,
+                LearningSession.ended_at.is_(None),
+                LearningSession.guided_state.is_not(None),
+            )
+            .order_by(LearningSession.started_at.desc())
+            .limit(50)
+        )
+    ).all()
     outputs = []
     for row in rows:
         try:
@@ -45,21 +55,35 @@ async def active(student=Depends(require_student), session=Depends(db_session)):
 
 
 @router.get("/sessions/{session_id}", response_model=LearningOut)
-async def recover(session_id: uuid.UUID, student=Depends(require_student), session=Depends(db_session)):
+async def recover(
+    session_id: uuid.UUID, student=Depends(require_student), session=Depends(db_session)
+):
+    """Recover a guided lesson and its separate Tutor mini quiz."""
     from api.learning_service import owned_lesson
+
     row, material = await owned_lesson(session, session_id, student)
     return await lesson_out(session, row, student, material)
 
 
 @router.post("/sessions/{session_id}/actions", response_model=LearningOut)
-async def action(session_id: uuid.UUID, body: LearningAction, request: Request,
-                 student=Depends(require_student), session=Depends(db_session)):
+async def action(
+    session_id: uuid.UUID,
+    body: LearningAction,
+    request: Request,
+    student=Depends(require_student),
+    session=Depends(db_session),
+):
+    """Apply a revision checked idempotent teaching question or mini quiz action."""
     try:
-        result = await apply_learning_action(session, request.app.state.graph, student, session_id, body)
+        result = await apply_learning_action(
+            session, request.app.state.graph, student, session_id, body
+        )
         await session.commit()
         return result
     except HTTPException:
         raise
     except Exception:
         log.exception("Could not apply guided action %s", body.request_id)
-        raise HTTPException(503, "Tindakan belum dapat dipastikan. Coba kirim ulang tindakan yang sama.") from None
+        raise HTTPException(
+            503, "Tindakan belum dapat dipastikan. Coba kirim ulang tindakan yang sama."
+        ) from None

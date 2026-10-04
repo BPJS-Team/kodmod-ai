@@ -14,12 +14,13 @@ from agents.problem_generator import (
     _infer_concept,
     validate_generated_questions,
 )
+from graphs.state import EmotionalState, KODMODState
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.mark.parametrize("emotion", ["fatigued", "frustrated"])
-def test_decide_n_questions_short_when_low_energy(emotion: str) -> None:  # KM-UNIT-050
+def test_decide_n_questions_short_when_low_energy(emotion: EmotionalState) -> None:  # KM-UNIT-050
     assert _decide_n_questions({"emotional_state": emotion}) == 3
 
 
@@ -28,7 +29,7 @@ def test_decide_n_questions_long_when_motivated() -> None:  # KM-UNIT-051
 
 
 @pytest.mark.parametrize("state", [{"emotional_state": "neutral"}, {}])
-def test_decide_n_questions_default(state: dict) -> None:  # KM-UNIT-052
+def test_decide_n_questions_default(state: KODMODState) -> None:  # KM-UNIT-052
     assert _decide_n_questions(state) == 5
 
 

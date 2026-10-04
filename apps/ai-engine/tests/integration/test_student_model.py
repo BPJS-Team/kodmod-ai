@@ -20,7 +20,7 @@ async def test_km_int_060_load_reads_mastery_rows(make_student, concept_ids, see
     cid = concept_ids["pecahan"]
     await seed_mastery(st.id, {cid: 0.6}, n_attempts=4, confidence=0.7)
 
-    m = await StudentModel.load(st.id)
+    m = await StudentModel.load(str(st.id))
     assert m._scores[str(cid)] == pytest.approx(0.6)
     assert m._confidence[str(cid)] == pytest.approx(0.7)
     assert m._attempts[str(cid)] == 4
@@ -43,14 +43,14 @@ async def test_km_int_060b_load_applies_decay_for_stale_practice(
     stale = datetime.now(UTC) - timedelta(days=30)
     await seed_mastery(st.id, {cid: 0.8}, last_seen=stale)
 
-    m = await StudentModel.load(st.id)
+    m = await StudentModel.load(str(st.id))
     assert m._scores[str(cid)] == pytest.approx(0.8 - DAILY_DECAY * 30)
 
 
 async def test_km_int_061_load_empty_student() -> None:
     from analytics.student_model import StudentModel
 
-    m = await StudentModel.load(uuid.uuid4())
+    m = await StudentModel.load(str(uuid.uuid4()))
     assert await m.mastery_scores() == {}
     assert m.overall_mastery() == 0.0
 
@@ -62,11 +62,11 @@ async def test_km_int_062_update_persist_round_trip(make_student, concept_ids) -
     st = await make_student()
     cid = str(concept_ids["pecahan"])
 
-    m = await StudentModel.load(st.id)
+    m = await StudentModel.load(str(st.id))
     m.update(cid, 1.0)
     await m.persist()
 
-    reloaded = await StudentModel.load(st.id)
+    reloaded = await StudentModel.load(str(st.id))
     assert reloaded._scores[cid] == pytest.approx(m._scores[cid])
 
     async with async_session() as s:
@@ -88,7 +88,7 @@ async def test_km_int_063_persist_sets_attempts_and_last_seen(make_student, conc
 
     st = await make_student()
     cid = str(concept_ids["pecahan"])
-    m = await StudentModel.load(st.id)
+    m = await StudentModel.load(str(st.id))
     m.update(cid, 0.8)
     m.update(cid, 0.9)
     await m.persist()
@@ -115,7 +115,7 @@ async def test_km_int_064_mastery_scores_is_async_copy(
     st = await make_student()
     cid = concept_ids["pecahan"]
     await seed_mastery(st.id, {cid: 0.5})
-    m = await StudentModel.load(st.id)
+    m = await StudentModel.load(str(st.id))
     scores = await m.mastery_scores()
     scores["x"] = 1.0
     assert "x" not in m._scores  # returned a copy

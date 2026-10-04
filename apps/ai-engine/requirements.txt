@@ -30,6 +30,7 @@ rank-bm25>=0.2.2
 pypdf>=4.3
 pypdfium2>=4.30
 Pillow>=10.4
+fonttools>=4.53
 defusedxml>=0.7.1
 numpy>=1.26
 

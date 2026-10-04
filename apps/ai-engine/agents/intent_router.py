@@ -159,7 +159,11 @@ async def intent_router_node(state: KODMODState) -> dict:
     llm = get_router_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": SYSTEM_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {"role": "user", "content": text},
         ]
     )
@@ -185,7 +189,7 @@ async def intent_router_node(state: KODMODState) -> dict:
         decision.reasoning,
     )
 
-    out: dict = {
+    out = {
         "intent": decision.intent,
         "intent_confidence": decision.confidence,
         "user_input": text,

@@ -26,7 +26,8 @@ async def audit_http():
         "classrooms",
         "enrollments",
         "class_materials",
-        "material_imports", "background_jobs",
+        "material_imports",
+        "background_jobs",
         "class_activities",
         "audit_events",
         "subjects",
@@ -143,7 +144,15 @@ async def test_admin_user_crud_records_audit_events(audit_http):
 
     # 4. Check audit events in DB
     async with factory() as session:
-        events = (await session.execute(select(models.AuditEvent).order_by(models.AuditEvent.created_at.asc()))).scalars().all()
+        events = (
+            (
+                await session.execute(
+                    select(models.AuditEvent).order_by(models.AuditEvent.created_at.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
         actions = [e.action for e in events]
         assert "user.created" in actions
         assert "user.deactivated" in actions
@@ -156,9 +165,14 @@ async def test_admin_user_crud_records_audit_events(audit_http):
 
 async def test_password_reset_does_not_report_unchanged_role_as_a_change(audit_http):
     client, factory, _, _, student = audit_http
-    response = await client.patch(f"/admin/users/{student.id}", json={
-        "full_name": student.full_name, "role": student.role, "new_password": "replacement-test-123",
-    })
+    response = await client.patch(
+        f"/admin/users/{student.id}",
+        json={
+            "full_name": student.full_name,
+            "role": student.role,
+            "new_password": "replacement-test-123",
+        },
+    )
     assert response.status_code == 200
     async with factory() as session:
         event = await session.scalar(select(models.AuditEvent))
@@ -183,7 +197,15 @@ async def test_admin_invitation_crud_records_audit_events(audit_http):
     assert res.status_code == 204
 
     async with factory() as session:
-        events = (await session.execute(select(models.AuditEvent).order_by(models.AuditEvent.created_at.asc()))).scalars().all()
+        events = (
+            (
+                await session.execute(
+                    select(models.AuditEvent).order_by(models.AuditEvent.created_at.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
         actions = [e.action for e in events]
         assert "invitation.created" in actions
         assert "invitation.revoked" in actions

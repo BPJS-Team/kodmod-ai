@@ -1,4 +1,5 @@
 """Mock only the paid provider; exercise actual files and concurrent callers."""
+
 import asyncio
 import sys
 
@@ -45,7 +46,7 @@ async def test_cache_separates_language_profile_and_private_scope(tmp_path, monk
 
 async def test_workers_share_cache_and_restart_reuses_it(tmp_path):
     # Each child has its own event loop and module state. Only files are shared.
-    script = '''
+    script = """
 import asyncio, sys
 from pathlib import Path
 from config.settings import settings
@@ -59,12 +60,17 @@ async def fake(text, **kwargs):
     return b"ID3-worker-audio"
 tts.elevenlabs.synthesise = fake
 print(asyncio.run(tts.synthesise_bytes("Worker test" )).decode())
-'''
+"""
 
     async def worker():
-        process = await asyncio.create_subprocess_exec(sys.executable, "-c", script, str(tmp_path),
-                                                      stdout=asyncio.subprocess.PIPE,
-                                                      stderr=asyncio.subprocess.PIPE)
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-c",
+            script,
+            str(tmp_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
         out, err = await process.communicate()
         assert process.returncode == 0, err.decode()
         assert out.strip() == b"ID3-worker-audio"
