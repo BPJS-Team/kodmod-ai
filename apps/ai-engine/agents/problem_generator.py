@@ -83,15 +83,20 @@ OUTPUT - JSON ONLY:
 
 async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     requested_topic = (state.get("current_topic") or "").strip()
-    concept_id = state.get("current_concept_id") or ""
+    classroom_scope = bool(state.get("class_id") or state.get("material_id"))
     subject_id = state.get("subject_id")
-    if not concept_id and requested_topic:
-        concept_id = await _resolve_concept_id(requested_topic, subject_id) or ""
-    if not concept_id:
-        concept_id = _infer_concept(state)
+    # Classroom materials have no approved curriculum mapping yet. A prior
+    # Concept or a global name match cannot establish what this material tests.
+    concept_id = ""
+    if not classroom_scope:
+        concept_id = state.get("current_concept_id") or ""
+        if not concept_id and requested_topic:
+            concept_id = await _resolve_concept_id(requested_topic, subject_id) or ""
+        if not concept_id:
+            concept_id = _infer_concept(state)
     # Human-readable topic for the LLM. `concept_id` is often a UUID or "general",
     # which tells the model nothing - prefer an explicit topic label.
-    topic = requested_topic or concept_id
+    topic = requested_topic or ("materi kelas" if classroom_scope else concept_id)
     difficulty: DifficultyLevel = state.get("current_difficulty", "medium")
     mastery = state.get("mastery_scores", {})
     mastery_confidence = state.get("mastery_confidence", {})
@@ -119,7 +124,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         filters["concept_id"] = concept_id
     if subject_id:
         filters["subject_id"] = subject_id
-    if state.get("class_id") or state.get("material_id"):
+    if classroom_scope:
         filters.update(
             class_id=state.get("class_id"),
             material_id=state.get("material_id"),
@@ -131,6 +136,11 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         k=6,
         filters=filters or None,
     )
+    if classroom_scope and not requested_topic:
+        topic = next(
+            (str(doc["material_title"]).strip() for doc in docs if doc.get("material_title")),
+            topic,
+        )
     context_block = (
         "\n".join(f"[{i + 1}] {d.get('text', '')[:300]}" for i, d in enumerate(docs[:6]))
         or "(curriculum context unavailable - fall back to general knowledge)"
@@ -166,10 +176,9 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         log.error("Problem generator JSON parse failed")
         parsed = {"questions": []}
 
-    # Prefer the real curriculum id from state - the LLM's free-text
-    # `concept_id` ("pecahan") is not a UUID and would break mastery
-    # persistence downstream (`CAST(:cid AS uuid)`).
-    resolved_cid = state.get("current_concept_id") or concept_id
+    # Attribution comes from the resolved scope, never from generated metadata
+    # or a stale classroom Concept in state.
+    resolved_cid = concept_id
 
     questions: list[QuizQuestion] = []
     for q in parsed.get("questions", []):
@@ -188,7 +197,9 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
 
     if not questions:
         log.warning("No questions produced; emitting one fallback")
-        questions = [_fallback_question(resolved_cid, difficulty)]
+        questions = [
+            _fallback_question(resolved_cid, difficulty, topic=topic if classroom_scope else None)
+        ]
 
     # Pad with open-ended fallbacks if the model under-delivered (it is prompted
     # for `n_questions`). When the caller asked for an explicit length, honour it
@@ -196,13 +207,15 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     target_n = n_questions if requested_n >= 1 else max(n_questions, 3)
     questions = questions[:target_n]
     while len(questions) < target_n:
-        questions.append(_fallback_question(resolved_cid, difficulty))
+        questions.append(
+            _fallback_question(resolved_cid, difficulty, topic=topic if classroom_scope else None)
+        )
 
     log.info("Problem generator produced %d questions on concept=%s", len(questions), resolved_cid)
 
     quiz_session_id = f"quiz-{uuid4().hex[:10]}"
     session_id = state.get("session_id")
-    if session_id:
+    if session_id and not state.get("assessment_managed"):
         try:
             from memory.short_term import store_quiz_session
 
@@ -333,14 +346,17 @@ def _infer_concept(state: KODMODState) -> str:
     return min(scores.items(), key=lambda kv: kv[1])[0]
 
 
-def _fallback_question(concept_id: str, difficulty: DifficultyLevel) -> QuizQuestion:
+def _fallback_question(
+    concept_id: str, difficulty: DifficultyLevel, *, topic: str | None = None
+) -> QuizQuestion:
+    label = topic or concept_id
     return QuizQuestion(
         question_id=str(uuid4()),
-        text=f"Coba jelaskan dengan kalimatmu sendiri: apa yang kamu pahami tentang {concept_id}?",
+        text=f"Coba jelaskan dengan kalimatmu sendiri: apa yang kamu pahami tentang {label}?",
         type="explain",
         options=[],
         expected_answer="(open-ended)",
-        rubric={"keywords": [concept_id], "min_keywords": 1},
+        rubric={"keywords": [label], "min_keywords": 1},
         concept_id=concept_id,
         difficulty=difficulty,
     )

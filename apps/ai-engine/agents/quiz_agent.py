@@ -146,7 +146,18 @@ Output JSON ONLY:
 async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     """Generate a single quick-check question after a tutoring explanation."""
     last_explanation = state.get("generated_response", "")
-    concept_id = state.get("current_concept_id", "")
+    classroom_scope = bool(state.get("class_id") or state.get("material_id"))
+    # Class materials cannot provide curriculum evidence until their mapping
+    # is approved. Keep the explanation's topic separate from Concept identity.
+    concept_id = "" if classroom_scope else state.get("current_concept_id", "")
+    topic = (state.get("current_topic") or "").strip()
+    if classroom_scope and not topic:
+        material_titles = (
+            str(doc.get("material_title") or "").strip()
+            for doc in state.get("retrieved_docs", [])
+        )
+        topic = next((title for title in material_titles if title), "materi kelas")
+    topic_context = f"Topic: {topic}" if classroom_scope else f"Concept: {concept_id}"
 
     llm = get_quiz_llm()
     response = await llm.ainvoke(
@@ -155,7 +166,7 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
             {
                 "role": "user",
                 "content": (
-                    f"Concept: {concept_id}\n"
+                    f"{topic_context}\n"
                     f"Tutor's explanation just given:\n---\n{last_explanation}\n---"
                 ),
             },
@@ -203,7 +214,7 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
         "last_node": "mini_quiz",
     }
     session_id = state.get("session_id")
-    if session_id:
+    if session_id and not state.get("assessment_managed"):
         try:
             from memory.short_term import store_quiz_session
 
