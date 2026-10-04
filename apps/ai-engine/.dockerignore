@@ -5,6 +5,8 @@
 .venv/
 venv/
 .runtime/
+data/uploads/
+data/audio/
 reports/
 htmlcov/
 .coverage

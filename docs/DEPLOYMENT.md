@@ -1,177 +1,118 @@
-# KODMOD AI - Deployment Guide
+# Menjalankan KODMOD dengan Docker dan deploy ke VPS
 
-This document walks through three deployment topologies, ordered by
-complexity:
+## Runtime yang dipakai
 
-1. **Local dev**           - single-node docker-compose
-2. **Single-server prod**  - docker-compose.prod with Caddy + monitoring
-3. **Kubernetes**          - sketch of the manifests for scale
+Semua proses aplikasi berjalan dalam Docker: **Next.js web → FastAPI/LangGraph → PostgreSQL + pgvector dan Redis**. Service `migrate` menjalankan Alembic sekali sebelum API mulai. OpenAI dan ElevenLabs tetap layanan eksternal yang dipanggil oleh backend. Browser dan screen reader perangkat berjalan di perangkat pengguna.
 
----
+Image default menggunakan OpenAI LLM/embedding dan ElevenLabs STT/TTS. Tidak membutuhkan CUDA, GPU, Whisper lokal, Qdrant, ataupun download model reranker. LangChain dan LangGraph tetap terpasang. Docker lokal menjalankan hasil build, sehingga perubahan source perlu rebuild; ini bukan server hot reload.
 
-## 1. Local Dev
+## Lokal Windows, Docker Centre yang sudah ada
+
+Dari `C:\laragon\www\kodmod`, setelah Docker Desktop aktif:
+
+```powershell
+pwsh -NoProfile -File .\scripts\docker.ps1 up
+pwsh -NoProfile -File .\scripts\docker.ps1 status
+```
+
+Alias dari root repository: `npm run docker:up`, `npm run docker:status`,
+`npm run docker:logs`, dan `npm run docker:down`. Di Windows alias memakai
+script Docker Centre yang sama, sehingga tidak membuat project/database duplikat.
+
+Script memakai project `kodmod-centre` dan override di `F:\Docker_Centre\kodmod` jika konfigurasi tersebut menunjuk checkout ini. Data PostgreSQL, Redis, audio, dan unggahan tetap di direktori `data` Docker Centre. Script akan menolak checkout yang berbeda agar tidak memakai database proyek lain tanpa sengaja. `F:\Docker_Centre\kodmod\docker.ps1 up` juga memanggil script repository ini.
+
+- Web: `http://localhost:3100`.
+- API lokal: `http://127.0.0.1:8109`; probes `/live` dan `/ready`.
+- PostgreSQL: `127.0.0.1:5433`; Redis: `127.0.0.1:6379`.
+- Antarkontainer memakai `ai-engine:8000`, `postgres:5432`, dan `redis:6379`.
+- Migrasi otomatis menuju `0005_assessment_submissions`. Tidak memakai `database/schema.sql` lama.
+- `down` menghentikan stack dan mempertahankan data. Jangan menambahkan `-v` untuk database yang diperlukan.
+
+Perintah lain: `build`, `logs`, `migrate`, `infra` (hanya database/cache), dan `qdrant` (opsional). `api` menjadi alias `up` untuk kompatibilitas script lama.
+
+Tanpa Docker Centre, dari root repository:
 
 ```bash
-git clone <repo> kodmod-ai && cd kodmod-ai
-cp .env.example .env
-# fill in ANTHROPIC_API_KEY (or your provider)
-
-cd docker
-docker compose up -d            # postgres + redis + api
-docker compose logs -f api
+cp apps/ai-engine/.env.example apps/ai-engine/.env
+# Isi konfigurasi backend dahulu.
+docker compose up -d --build --wait
+docker compose ps --all
 ```
 
-The first run will:
-- create the schema from `database/schema.sql`
-- pull faster-whisper large-v3 (~1.5 GB) on first STT call
+Docker lokal membutuhkan `.env` backend. API key tidak dimasukkan ke image maupun web. Isi `OPENAI_API_KEY`, enam `LLM_*_MODEL`, `ELEVENLABS_API_KEY`, dan `JWT_SECRET` acak yang kuat. Pilih ID model yang tersedia pada akun OpenAI. Preset Bian, Multilingual v2, serta Scribe v2 sudah disediakan. Jangan mengganti `.env` lokal yang sudah berisi key dengan file contoh.
 
-Seed curriculum + ingest sample docs:
+### Akun admin pertama
+
+Tidak ada akun dummy bawaan pada database nyata. Jalankan interaktif, lalu buat pengguna/undangan melalui dashboard admin:
+
+```powershell
+npm run docker:admin
+```
+
+Perintah tersebut memakai username `admin` dan meminta password dua kali.
+Untuk username berbeda, jalankan perintah lengkap berikut:
+
+```powershell
+# Docker Centre:
+& "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe" compose `
+  --project-name kodmod-centre --env-file F:\Docker_Centre\kodmod\.env `
+  -f docker-compose.yml -f F:\Docker_Centre\kodmod\compose.override.yaml `
+  exec ai-engine python -m scripts.create_admin --username admin
+```
+
+Password diminta di terminal dan tidak ditulis pada command. Script ini juga mereset password jika username tersebut sudah merupakan admin; gunakan username yang dimaksud. Setelah itu buka `/masuk`.
+
+## VPS Linux
+
+Konfigurasi utama: `infra/docker/docker-compose.prod.yml`. Entry lama `apps/ai-engine/docker/docker-compose.prod.yml` hanya meneruskan ke konfigurasi tersebut.
+
+1. Pasang Docker Engine dan Compose plugin sesuai dokumentasi distro VPS, lalu clone repository ke direktori deploy.
+2. Arahkan DNS domain ke IP VPS. Buka port TCP 80/443 dan port SSH yang dipakai. Jika ada AAAA, pastikan IPv6 benar-benar menuju VPS.
+3. Dari root repository, salin `.env.example` ke `.env` serta contoh backend ke `apps/ai-engine/.env`. Jangan membawa kredensial demo/database lokal ke VPS.
+4. Isi root `.env`: `APP_DOMAIN` (tanpa `https://`), `ACME_EMAIL`, dan `DB_PASSWORD` unik. Generate password berbentuk hex agar aman dipakai pada URL database. Backend membaca password database yang sama dari Compose override; root `.env` menjadi sumbernya.
+5. Isi backend `.env`: `JWT_SECRET` acak minimal 32 byte, API key provider, dan enam ID model. Gunakan `STT_BACKEND=elevenlabs`, `TTS_BACKEND=elevenlabs`, serta `CHECKPOINTER=postgres`. Lindungi kedua file: `chmod 600 .env apps/ai-engine/.env`.
+6. Validasi dan jalankan:
 
 ```bash
-docker compose exec api python -m scripts.seed_curriculum
-docker compose exec api python -m scripts.ingest_documents \
-    --path data/curriculum/biology --concept-slug fotosintesis
+docker compose --env-file .env -f infra/docker/docker-compose.prod.yml config --quiet
+docker compose --env-file .env -f infra/docker/docker-compose.prod.yml up -d --build --wait
+docker compose --env-file .env -f infra/docker/docker-compose.prod.yml ps --all
+docker compose --env-file .env -f infra/docker/docker-compose.prod.yml exec ai-engine python -m scripts.create_admin --username admin
 ```
 
-Open `http://localhost:8000/docs` for the OpenAPI UI.
+Hanya Caddy yang membuka port host 80/443. Database, Redis, API, dan web memakai jaringan internal. Caddy mengurus sertifikat HTTPS, meneruskan halaman dan `/api/*` ke Next.js, serta `/ws/*` ke FastAPI. Cookie sesi pada VPS memakai `Secure`; override `SESSION_COOKIE_SECURE=false` hanya digunakan Docker lokal HTTP.
 
----
+Image frontend memakai Next.js standalone dengan tracing monorepo. `API_ORIGIN=http://ai-engine:8000` sama saat build/runtime karena fallback rewrite dikompilasi saat build. Ganti alamat itu hanya dengan rebuild. Browser tetap memakai URL aplikasi `/api`; tidak memerlukan alamat container atau provider key.
 
-## 2. Single-server Prod (small school / pilot)
+Belum ada deploy VPS nyata pada tahap ini. Domain, DNS, TLS, backup/restore di mesin tujuan, serta kapasitas CPU/RAM perlu diverifikasi ketika VPS tersedia. Mulai dengan satu instance API; ukur memori, latency dan konkurensi sebelum menambah replika. Worker ingestion durable dan observabilitas lengkap masih scope berikutnya.
 
-Hardware target: 1× server with 8 vCPU, 32 GB RAM, 1× NVIDIA L4 (or
-similar) GPU for STT/embedder. NVMe SSD ≥ 200 GB.
+### Backup dan pembaruan
+
+Simpan backup di luar VPS, termasuk database, volume `kodmod-audio`/`kodmod-uploads`, serta konfigurasi privat secara terpisah. Jangan menyimpan backup berisi data siswa dalam Git.
+
+Contoh dump PostgreSQL dari root repository, dengan direktori backup yang sudah dibatasi aksesnya:
 
 ```bash
-cd docker
-docker compose -f docker-compose.prod.yml --env-file ../.env up -d
+docker compose --env-file .env -f infra/docker/docker-compose.prod.yml exec -T postgres \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > /secure-backup/kodmod.dump
 ```
 
-Stack:
-- 3 replicas of the API container (load-balanced by Caddy).
-- PostgreSQL + pgvector (4 GB memory, retention indefinite).
-- Redis with LRU cap.
-- Caddy (auto HTTPS).
-- Prometheus + Grafana.
+Uji restore pada database terpisah sebelum mengandalkan backup. Untuk snapshot audio/unggahan yang konsisten, hentikan web/API sebentar sebelum menyalin volume. `docker compose down` mempertahankan named volumes; penghapusan volume menghapus data.
 
-### TLS / domain
+Sebelum update: backup, review migration, simpan commit/image tag sebelumnya, lalu `git pull --ff-only` dan jalankan `up -d --build --wait` dengan konfigurasi produksi yang sama. Gunakan `KODMOD_TAG` unik untuk menyimpan image rilis; default `vps` akan ditimpa build berikutnya. Jangan menjalankan migrasi downgrade otomatis sebagai rollback pada database siswa.
 
-Edit `docker/Caddyfile` and replace `kodmod.example.com`. Caddy will
-provision certificates on first request.
+### Reranker lokal opsional
 
-### Backups
+Jika dibutuhkan, set `INSTALL_RERANKER=true` dan `RAG_RERANK_ENABLED=true` pada env Compose, lalu rebuild API. Ini memasang PyTorch CPU dan sentence-transformers; pemakaian pertama mengunduh model dan meningkatkan kebutuhan disk/memori. Varian ini belum diuji build pada delivery Docker default. Untuk lingkungan Python native: `pip install -e ".[dev,reranker]"`. RAG tanpa reranker tetap memakai OpenAI embeddings dan pgvector similarity retrieval.
 
-Schedule `pg_dump` to S3 / object storage:
+## Acceptance setelah stack sehat
 
-```bash
-docker exec kodmod-postgres pg_dump -U kodmod kodmod | gzip > backup-$(date +%F).sql.gz
-```
+Pemeriksaan HTTP dasar yang dapat diulang: `node scripts/check-docker.mjs`
+dari root. Default memakai web 3100/API 8109; untuk host lain atur
+`DOCKER_WEB_ORIGIN` dan `DOCKER_API_ORIGIN`. Script hanya membaca halaman,
+aset, probes dan penolakan akses tanpa login, tanpa membuat akun atau memanggil provider.
+Hasil delivery lokal: [validasi Docker](docker-validation-2026-10-04.md).
 
-For RAG-side recoverability, keep the source corpus on object storage
-so re-ingestion is always possible - vector data should be considered
-**derived**, not primary.
+Healthcheck membuktikan proses/jaringan dasar, bukan kualitas tutoring. Lakukan login admin→buat guru/siswa→kelas→unggah materi teks→review/terbit→tunggu indeks ready→Tutor dengan sumber→kuis adaptif→riwayat/analitik. Uji Bian TTS, Scribe STT, izin mikrofon, cache suara, retry provider, serta satu suara aktif. Uji NVDA, TalkBack/VoiceOver, keyboard dan low vision pada perangkat nyata. PDF scan belum didukung OCR; kuis resmi guru beserta review/publikasi/penugasan belum tersedia.
 
----
-
-## 3. Kubernetes Sketch
-
-```yaml
-# api-deployment.yaml (excerpt)
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: kodmod-api }
-spec:
-  replicas: 4
-  selector: { matchLabels: { app: kodmod-api } }
-  template:
-    metadata: { labels: { app: kodmod-api } }
-    spec:
-      containers:
-        - name: api
-          image: ghcr.io/kodmod/api:0.1.0
-          envFrom: [{ secretRef: { name: kodmod-env } }]
-          ports: [{ containerPort: 8000 }]
-          resources:
-            requests: { cpu: "1", memory: "2Gi" }
-            limits:   { cpu: "2", memory: "4Gi" }
-          readinessProbe:
-            httpGet: { path: /health/ready, port: 8000 }
-            initialDelaySeconds: 10
-          livenessProbe:
-            httpGet: { path: /health/live,  port: 8000 }
-          volumeMounts:
-            - { name: audio, mountPath: /var/lib/kodmod/audio }
-      volumes:
-        - name: audio
-          persistentVolumeClaim: { claimName: kodmod-audio-pvc }
-```
-
-Recommended:
-- **PostgreSQL**: managed (RDS / Cloud SQL) with pgvector extension enabled.
-- **Redis**: managed (ElastiCache / Memorystore) - single shard is fine.
-- **Vector store**: scale out by switching `VECTOR_BACKEND=qdrant` and
-  pointing at a managed Qdrant cluster.
-- **STT GPU pool**: deploy `faster-whisper` workers as a dedicated pool
-  with NVIDIA device plugin and a node selector. Use HTTP RPC if the
-  pool is separate from the API pods.
-
-### Autoscaling
-
-HPA on CPU + WS connection count (custom metric). API is mostly I/O bound
-once warm; CPU saturates under STT bursts. Plan capacity by
-**concurrent voice sessions × 1 STT-worker-second per 10 s of audio**.
-
----
-
-## 4. Operational Runbooks
-
-### Hot rollouts
-
-1. Bump `APP_VERSION` in `config/settings.py`.
-2. Push a new image tag.
-3. `kubectl rollout restart deployment/kodmod-api` - old pods drain in
-   max 30 s (graceful WS close).
-
-### Schema migrations
-
-```bash
-alembic revision --autogenerate -m "add column foo"
-alembic upgrade head
-```
-
-Migrations are idempotent and forward-only by default. For destructive
-changes (column drops, type changes), follow a 3-step expand-migrate-contract
-pattern across two releases.
-
-### Disaster recovery
-
-- **Lost vector index**: re-ingest from object storage with
-  `scripts/ingest_documents.py`.
-- **Lost OLTP**: restore latest `pg_dump`. Mastery scores can also be
-  re-derived from `quiz_attempts` if necessary
-  (see `analytics/student_model.py::StudentModel.recompute_from_history`).
-- **Lost Redis**: harmless. Cold start re-fills in seconds.
-
-### Observability checklist
-
-- LangSmith: every session traced with `session_id` tag.
-- Prometheus scrape every 15 s; Grafana dashboards in `docker/grafana/`.
-- Log shipping: any JSON-aware aggregator (Loki / ELK / Datadog).
-
----
-
-## 5. Cost Notes (rough order of magnitude)
-
-For 1,000 active students, ~10 sessions/student/week, avg 8 min/session:
-
-| Item                  | Sized for                | Monthly approx. |
-|-----------------------|--------------------------|-----------------|
-| LLM (mixed Sonnet/Opus, hybrid w/ local 7B for router) | ~250 M tokens | mid 4-figure USD |
-| TTS (Piper local)     | bundled in container     | $0 marginal     |
-| STT GPU pool          | 1× L4 at 30% utilisation | low 3-figure USD |
-| Postgres + pgvector   | 16 GB instance           | low 3-figure USD |
-| Redis                 | 1 GB instance            | $20-50          |
-| Object storage        | < 100 GB                 | $5-20           |
-
-Use `LLM_*_MODEL` env vars to swap to local models (Llama 3 / Qwen)
-when running on-prem and reduce LLM cost to electricity only.
+Sumber konfigurasi: [Next.js standalone](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [Docker Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/), [Compose production](https://docs.docker.com/compose/how-tos/production/).

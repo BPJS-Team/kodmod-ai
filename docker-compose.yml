@@ -1,22 +1,43 @@
-# KODMOD AI - infrastruktur pengembangan lokal.
-#   docker compose up -d            → postgres + redis
-#   docker compose --profile api up → sekalian jalankan ai-engine di container
-#   docker compose --profile qdrant up -d → tambah Qdrant (opsional)
+# Full local runtime. Docker Centre on Windows uses scripts/docker.ps1.
+# Local services use built images; edit source, then rebuild with `up`.
+name: kodmod
+
+x-api: &api
+  image: kodmod/ai-engine:${KODMOD_TAG:-local}
+  build:
+    context: ./apps/ai-engine
+    args:
+      INSTALL_RERANKER: ${INSTALL_RERANKER:-false}
+  env_file: ./apps/ai-engine/.env
+  environment: &api-environment
+    API_HOST: 0.0.0.0
+    API_PORT: 8000
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_USER: kodmod
+    DB_PASSWORD: kodmod
+    DB_NAME: kodmod
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    QDRANT_URL: http://qdrant:6333
+    AUDIO_DIR: /var/lib/kodmod/audio
+    UPLOAD_DIR: /var/lib/kodmod/uploads
+    RAG_RERANK_ENABLED: ${RAG_RERANK_ENABLED:-false}
+  volumes:
+    - kodmod-audio:/var/lib/kodmod/audio
+    - kodmod-uploads:/var/lib/kodmod/uploads
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: kodmod-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: kodmod
       POSTGRES_PASSWORD: kodmod
       POSTGRES_DB: kodmod
-    ports:
-      - "5433:5432"
-    volumes:
-      - kodmod-pgdata:/var/lib/postgresql/data
-    # Apply the current schema with Alembic after PostgreSQL is ready.
-    # The archived schema.sql predates the users/class-materials schema.
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5433}:5432"]
+    volumes: ["kodmod-pgdata:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kodmod -d kodmod"]
       interval: 5s
@@ -26,48 +47,58 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kodmod-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - kodmod-redisdata:/data
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:${REDIS_PORT:-6379}:6379"]
+    volumes: ["kodmod-redisdata:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  migrate:
+    <<: *api
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    restart: "no"
+    healthcheck: { disable: true }
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  ai-engine:
+    <<: *api
+    container_name: kodmod-ai-engine
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    ports: ["127.0.0.1:${API_PORT:-8109}:8000"]
+
+  web:
+    image: kodmod/web:${KODMOD_TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_ORIGIN: http://ai-engine:8000
+    restart: unless-stopped
+    init: true
+    environment:
+      API_ORIGIN: http://ai-engine:8000
+      NODE_ENV: production
+      # Explicit server-only override for local HTTP; VPS sets this to true.
+      SESSION_COOKIE_SECURE: "false"
+    depends_on:
+      ai-engine: { condition: service_healthy }
+    ports: ["127.0.0.1:${WEB_PORT:-3100}:3000"]
+
   qdrant:
     image: qdrant/qdrant:v1.10.1
     container_name: kodmod-qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - kodmod-qdrantdata:/qdrant/storage
+    restart: unless-stopped
     profiles: ["qdrant"]
-
-  ai-engine:
-    build:
-      context: ./apps/ai-engine
-      dockerfile: Dockerfile
-    container_name: kodmod-ai-engine
-    profiles: ["api"]
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-    env_file:
-      - ./apps/ai-engine/.env
-    environment:
-      API_HOST: 0.0.0.0
-      API_PORT: 8000
-      DB_HOST: postgres
-      DB_PORT: 5432
-      REDIS_HOST: redis
-    ports:
-      - "8109:8000"
-    volumes:
-      - kodmod-audio:/var/lib/kodmod/audio
-      - kodmod-uploads:/var/lib/kodmod/uploads
+    ports: ["127.0.0.1:6333:6333", "127.0.0.1:6334:6334"]
+    volumes: ["kodmod-qdrantdata:/qdrant/storage"]
 
 volumes:
   kodmod-pgdata:

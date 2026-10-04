@@ -6,9 +6,8 @@
 #   1. `builder`  - installs deps into a venv (cacheable layer)
 #   2. `runtime`  - slim final image with the venv copied in
 #
-# CPU-only image by default. For GPU inference (faster-whisper on cuda),
-# build the variant with `--build-arg BASE_IMAGE=nvidia/cuda:12.4.1-runtime-ubuntu22.04`
-# and add torch with the matching cuda wheel.
+# Default runtime uses OpenAI embeddings/LLM and ElevenLabs STT/TTS.
+# Install the optional CPU cross-encoder with INSTALL_RERANKER=true.
 # ============================================================================
 
 ARG BASE_IMAGE=python:3.11-slim-bookworm
@@ -17,6 +16,7 @@ ARG APP_UID=1001
 
 # ------------------------------------------------------------------- builder --
 FROM ${BASE_IMAGE} AS builder
+ARG INSTALL_RERANKER=false
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -44,6 +44,12 @@ RUN pip install --upgrade pip wheel setuptools \
 
 # Now copy the source tree.
 COPY . /build
+RUN if [ "$INSTALL_RERANKER" = "true" ]; then \
+      pip install 'torch>=2.4' --index-url https://download.pytorch.org/whl/cpu \
+      && pip install 'sentence-transformers>=3.0'; \
+    fi \
+ && pip check \
+ && python -c "import fastapi, langchain, langgraph, defusedxml, api.main"
 
 # ------------------------------------------------------------------ runtime --
 FROM ${BASE_IMAGE} AS runtime
@@ -80,9 +86,9 @@ USER ${APP_USER}
 
 EXPOSE 8000
 
-# Healthcheck hits the readiness endpoint.
+# Readiness requires the database and Redis; /live alone is insufficient.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -fsS http://localhost:8000/health/live || exit 1
+    CMD python -c "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=4)); assert r['status']=='ready' and r['checks']['redis']=='ok'"
 
 # tini is PID 1 so SIGTERM propagates cleanly to uvicorn.
 ENTRYPOINT ["/usr/bin/tini", "--"]

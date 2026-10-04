@@ -29,7 +29,7 @@ kodmod-ai/
 ├── docs/               Arsitektur, API, aksesibilitas, deployment
 ├── infra/docker/       Compose produksi, Caddy, Prometheus
 ├── assets/logo/        Aset merek
-├── docker-compose.yml  Infrastruktur pengembangan lokal
+├── docker-compose.yml  Runtime Docker lokal (web, API, database, Redis)
 └── Makefile            Kumpulan perintah sehari-hari
 ```
 
@@ -39,7 +39,7 @@ kodmod-ai/
 |---|---|---|
 | Practices & Tutoring | Tutor Agent | Penjelasan gaya Socratic, berbasis RAG kurikulum |
 | Quiz / Assessment | Scoring Agent, Quiz Analyzer | Menilai penalaran, menjelaskan di mana letak salahnya |
-| Content & Exercise | Problem Generator | Bikin soal non-visual, tervalidasi guru |
+| Content & Exercise | Problem Generator | Bikin latihan non-visual; workflow review kuis guru masih direncanakan |
 | Analytics & Reporting | Learning Analytics Agent | Dasbor buat siswa dan guru |
 
 Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -58,6 +58,29 @@ Detail tiap cluster ada di [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | Antarmuka | Next.js App Router, React 19, Tailwind v4, TypeScript |
 
 ## Cara menjalankan
+
+**Full Docker (Windows dengan Docker Centre yang sudah disiapkan):**
+
+```powershell
+pwsh -NoProfile -File .\scripts\docker.ps1 up
+pwsh -NoProfile -File .\scripts\docker.ps1 status
+```
+
+Alias: `npm run docker:up`, `npm run docker:status`, dan `npm run docker:down`.
+
+Buka `http://localhost:3100`. Web, AI engine, PostgreSQL/pgvector dan Redis
+berjalan dalam container; migrasi Alembic dijalankan otomatis sebelum API.
+Data Docker Centre tetap di `F:\Docker_Centre\kodmod\data`. Provider key
+dibaca dari `apps/ai-engine/.env`, hanya pada backend. OpenAI dan ElevenLabs
+adalah layanan eksternal. Build lokal memakai image hasil kompilasi; jalankan
+`up` kembali setelah perubahan source.
+
+Tanpa Docker Centre: `docker compose up -d --build --wait` dari root setelah
+mengisi `.env` backend. Panduan akun admin, data persisten, backup, dan **VPS
+dengan Caddy/HTTPS**: [Deployment](docs/DEPLOYMENT.md).
+Status fitur beserta batas validasi: [Scope Oktober 2026](docs/SCOPE-STATUS-2026-10-04.md).
+
+**Pengembangan native dengan hot reload (opsional):**
 
 ```bash
 make infra-up     # nyalain Postgres (pgvector) + Redis
@@ -85,7 +108,7 @@ python -m pip install -e ".[dev]"
 Setelah Docker Desktop aktif, jalankan `docker compose up -d postgres redis`
 dari root repository. Infrastruktur KODMOD memakai port host PostgreSQL `5433`
 dan Redis `6379`. Setelah PostgreSQL siap, jalankan `python -m alembic upgrade head`
-dari `apps/ai-engine` untuk migrasi sampai `0004_class_material_rag`. Jangan menjalankan
+dari `apps/ai-engine` untuk migrasi sampai `0005_assessment_submissions`. Jangan menjalankan
 `database/schema.sql`, karena file tersebut merupakan referensi schema lama.
 Di terminal backend jalankan `python -m scripts.dev_server`
 dari `apps/ai-engine`; di terminal lain dari root jalankan `npm run dev:web`.
@@ -134,7 +157,7 @@ Pada `http://127.0.0.1:3110/masuk`, akun fixture adalah `admin.test`, `guru.test
 
 Fixture siswa sudah menyediakan dua kelas, tiga materi contoh, kontrak Tutor REST sederhana, dan latihan mini-kuis deterministik. Login sebagai `siswa.test` untuk mencoba pustaka, filter, pembaca, bookmark, tanda selesai, `/siswa/tutor`, dan `/siswa/latihan`. Jika fixture sudah berjalan saat kode diperbarui, hentikan lalu mulai ulang agar data/alur terbaru dimuat. Fixture mendukung tampilan kelas guru, tetapi mutasi pengelolaan kelas guru masih memerlukan backend nyata. Tidak ada panggilan AI atau suara berbayar dari fixture.
 
-Backend nyata memerlukan migrasi sampai `0004_class_material_rag` (`python -m alembic upgrade head` dari `apps/ai-engine`, pada database pengembangan yang dituju). Materi terbit yang sudah ada akan berstatus `pending`; guru dapat memakai **Siapkan untuk Tutor** tanpa mengubah isi materi. Isi seluruh `LLM_*_MODEL`, `OPENAI_API_KEY`, dan konfigurasi ElevenLabs pada `.env` backend untuk uji provider nyata. Detail tahap ini: [materi kelas dan Tutor](docs/plans/2026-10-04-learning-flow-milestone.md).
+Backend nyata memerlukan migrasi sampai `0005_assessment_submissions` (`python -m alembic upgrade head` dari `apps/ai-engine`, pada database pengembangan yang dituju). Materi terbit yang sudah ada akan berstatus `pending`; guru dapat memakai **Siapkan untuk Tutor** tanpa mengubah isi materi. Isi seluruh `LLM_*_MODEL`, `OPENAI_API_KEY`, dan konfigurasi ElevenLabs pada `.env` backend untuk uji provider nyata. Detail tahap ini: [materi kelas dan Tutor](docs/plans/2026-10-04-learning-flow-milestone.md).
 
 ```bash
 node --test apps/web/tests/access.test.mjs

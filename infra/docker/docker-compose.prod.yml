@@ -1,88 +1,104 @@
+# VPS: one Compose project, only Caddy exposes public ports.
+name: kodmod
+
+x-api: &api
+  image: kodmod/ai-engine:${KODMOD_TAG:-vps}
+  build:
+    context: ../../apps/ai-engine
+    args:
+      INSTALL_RERANKER: ${INSTALL_RERANKER:-false}
+  env_file: ../../apps/ai-engine/.env
+  environment:
+    ENV: prod
+    DEBUG: "false"
+    LOG_JSON: "true"
+    API_HOST: 0.0.0.0
+    API_PORT: 8000
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_USER: ${DB_USER:-kodmod}
+    DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the root .env}
+    DB_NAME: ${DB_NAME:-kodmod}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    AUDIO_DIR: /var/lib/kodmod/audio
+    UPLOAD_DIR: /var/lib/kodmod/uploads
+    CORS_ALLOW_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN in the root .env}
+    RAG_RERANK_ENABLED: ${RAG_RERANK_ENABLED:-false}
+  volumes:
+    - kodmod-audio:/var/lib/kodmod/audio
+    - kodmod-uploads:/var/lib/kodmod/uploads
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    volumes:
-      - kodmod-pgdata:/var/lib/postgresql/data
-      - ./pg_init:/docker-entrypoint-initdb.d:ro
+      POSTGRES_USER: ${DB_USER:-kodmod}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the root .env}
+      POSTGRES_DB: ${DB_NAME:-kodmod}
+    volumes: ["kodmod-pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 4g
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    restart: always
-    command: ["redis-server", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru"]
-    volumes:
-      - kodmod-redisdata:/data
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["kodmod-redisdata:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      retries: 5
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  api:
-    image: ${KODMOD_IMAGE:-kodmod/api:latest}
-    restart: always
+  migrate:
+    <<: *api
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    restart: "no"
+    healthcheck: { disable: true }
     depends_on:
       postgres: { condition: service_healthy }
-      redis:    { condition: service_healthy }
-    env_file: .env
+
+  ai-engine:
+    <<: *api
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  web:
+    image: kodmod/web:${KODMOD_TAG:-vps}
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_ORIGIN: http://ai-engine:8000
+    restart: unless-stopped
+    init: true
     environment:
-      DB_HOST: postgres
-      REDIS_HOST: redis
-      ENV: prod
-      LOG_JSON: "true"
-    volumes:
-      - kodmod-audio:/var/lib/kodmod/audio
-      - kodmod-uploads:/var/lib/kodmod/uploads
-    deploy:
-      replicas: 3
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          memory: 6g
+      NODE_ENV: production
+      SESSION_COOKIE_SECURE: "true"
+      API_ORIGIN: http://ai-engine:8000
+    depends_on:
+      ai-engine: { condition: service_healthy }
 
   caddy:
     image: caddy:2-alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in the root .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in the root .env}
+    ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - kodmod-caddydata:/data
       - kodmod-caddyconfig:/config
     depends_on:
-      - api
-
-  prometheus:
-    image: prom/prometheus:latest
-    restart: always
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - kodmod-prom:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=30d'
-
-  grafana:
-    image: grafana/grafana:latest
-    restart: always
-    depends_on: [prometheus]
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
-    volumes:
-      - kodmod-grafana:/var/lib/grafana
+      web: { condition: service_healthy }
 
 volumes:
   kodmod-pgdata:
@@ -91,5 +107,3 @@ volumes:
   kodmod-uploads:
   kodmod-caddydata:
   kodmod-caddyconfig:
-  kodmod-prom:
-  kodmod-grafana:

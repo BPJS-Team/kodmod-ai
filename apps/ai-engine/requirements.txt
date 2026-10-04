@@ -25,9 +25,10 @@ alembic>=1.13
 redis[hiredis]>=5.0
 pgvector>=0.3.0
 
-sentence-transformers>=3.0
+# Local cross-encoder is optional: install the [reranker] extra when enabled.
 rank-bm25>=0.2.2
 pypdf>=4.3
+defusedxml>=0.7.1
 numpy>=1.26
 
 httpx>=0.27
