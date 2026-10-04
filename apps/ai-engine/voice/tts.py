@@ -36,6 +36,7 @@ from uuid import uuid4
 from config.settings import settings
 from graphs.state import KODMODState
 from voice import elevenlabs
+from voice.audio_cache import cached_audio
 
 log = logging.getLogger(__name__)
 
@@ -62,19 +63,12 @@ async def tts_node(state: KODMODState) -> dict[str, Any]:
     if not text:
         return {"audio_response_path": "", "next_action": "end", "last_node": "tts"}
 
-    backend = settings.TTS_BACKEND
-    voice = state.get("learning_profile", {}).get("preferred_voice") or (
-        settings.ELEVENLABS_TTS_VOICE_ID if backend == "elevenlabs" else settings.TTS_VOICE
+    profile = state.get("learning_profile", {})
+    path = await synthesise_to_file(
+        text, voice=profile.get("preferred_voice"),
+        language=profile.get("language", "id"),
+        scope="user:" + str(state.get("student_id", "internal")),
     )
-
-    if backend == "azure":
-        path = await _azure_tts(text, voice)
-    elif backend == "elevenlabs":
-        path = await _elevenlabs_tts(text, voice)
-    elif backend == "coqui":
-        path = await _coqui_tts(text, voice)
-    else:
-        path = await _piper_tts(text, voice)
 
     log.info("TTS: %d chars → %s", len(text), path)
     return {
@@ -129,14 +123,19 @@ async def _azure_tts(text: str, voice: str) -> Path:
     return out
 
 
-async def _elevenlabs_tts(text: str, voice: str) -> Path:
-    out = OUTPUT_DIR / f"tts-{uuid4().hex}.mp3"
-    audio = await elevenlabs.synthesise(
-        _strip_ssml(text),
-        voice_id=voice or settings.ELEVENLABS_TTS_VOICE_ID,
+async def _cached_elevenlabs(text: str, voice: str, language: str, scope: str):
+    plain = " ".join(_strip_ssml(text).split())
+    if not plain or len(plain) > 5000:
+        raise ValueError("Speech text must contain 1 to 5000 characters.")
+    return await cached_audio(
+        OUTPUT_DIR / "speech-cache", plain, voice=voice, language=language, scope=scope,
+        generate=lambda: elevenlabs.synthesise(plain, voice_id=voice),
     )
-    out.write_bytes(audio)
-    return out
+
+
+async def _elevenlabs_tts(text: str, voice: str) -> Path:
+    _, path = await _cached_elevenlabs(text, voice, "id", "internal")
+    return path
 
 
 async def _coqui_tts(text: str, voice: str) -> Path:
@@ -180,6 +179,8 @@ async def synthesise_to_file(
     *,
     voice: str | None = None,
     rate: float = 1.0,
+    language: str = "id",
+    scope: str = "internal",
 ) -> Path:
     """Synthesise text to an audio file and return its path."""
     backend = settings.TTS_BACKEND
@@ -192,7 +193,8 @@ async def synthesise_to_file(
     if backend == "azure":
         return await _azure_tts(text, voice)
     if backend == "elevenlabs":
-        return await _elevenlabs_tts(plain, voice)
+        _, path = await _cached_elevenlabs(plain, voice, language, scope)
+        return path
     if backend == "coqui":
         return await _coqui_tts(plain, voice)
     raise ValueError(f"Unknown TTS_BACKEND: {backend}")
@@ -203,13 +205,15 @@ async def synthesise_bytes(
     *,
     voice: str | None = None,
     rate: float = 1.0,
+    language: str = "id",
+    scope: str = "internal",
 ) -> bytes:
     """Synthesise text and return raw audio bytes (mp3/wav depending on backend)."""
     if settings.TTS_BACKEND == "elevenlabs":
-        return await elevenlabs.synthesise(
-            _strip_ssml(text),
-            voice_id=voice or settings.ELEVENLABS_TTS_VOICE_ID,
+        audio, _ = await _cached_elevenlabs(
+            text, voice or settings.ELEVENLABS_TTS_VOICE_ID, language, scope,
         )
+        return audio
     path = await synthesise_to_file(text, voice=voice, rate=rate)
     try:
         return Path(path).read_bytes()

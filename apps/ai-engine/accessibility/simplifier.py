@@ -61,7 +61,7 @@ async def simplify_with_llm(
     system = _SYSTEM_PROMPT
     if language == "en":
         system = system.replace("Bahasa Indonesia yang sederhana", "simple English")
-    system += language_instruction()
+    system += language_instruction(language)
 
     user_prompt = (
         f"Maksimum kata per kalimat: {max_sentence_words}.\n"

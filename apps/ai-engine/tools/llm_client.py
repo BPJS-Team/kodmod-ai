@@ -31,7 +31,7 @@ class ModelNotConfiguredError(RuntimeError):
     """Raised when a role's model id was never supplied via the environment."""
 
 
-def language_instruction() -> str:
+def language_instruction(language: str | None = None) -> str:
     """Appended to the end of every agent's system prompt.
 
     Read fresh on every call (never baked into a module-level prompt
@@ -41,8 +41,9 @@ def language_instruction() -> str:
     whatever language the input, retrieved curriculum, or few-shot examples
     happen to be in.
     """
+    target = {"id": "Bahasa Indonesia", "en": "English"}.get(language, settings.GRAPH_LANGUAGE)
     return (
-        f"\n\nIMPORTANT: Always respond in {settings.GRAPH_LANGUAGE}, no matter what "
+        f"\n\nIMPORTANT: Always respond in {target}, no matter what "
         "language the student's input, the curriculum context, or any examples above "
         "are written in."
     )

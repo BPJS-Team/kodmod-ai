@@ -161,7 +161,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     llm = get_quiz_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": SYSTEM_PROMPT + language_instruction()},
+            {"role": "system", "content": SYSTEM_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
             {"role": "user", "content": user_block},
         ]
     )

@@ -206,7 +206,7 @@ async def generate_insights(
             else "You are a warm educator. Polish the following summary to be more "
             "encouraging. Add no new information. Maximum 3 sentences. No markdown."
         )
-        sys += language_instruction()
+        sys += language_instruction(language)
         resp = await llm.ainvoke([SystemMessage(content=sys), HumanMessage(content=spoken)])
         polished = resp.content if hasattr(resp, "content") else str(resp)
         return {"spoken": polished.strip(), "structured": structured}

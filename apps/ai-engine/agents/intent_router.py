@@ -159,7 +159,7 @@ async def intent_router_node(state: KODMODState) -> dict:
     llm = get_router_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": SYSTEM_PROMPT + language_instruction()},
+            {"role": "system", "content": SYSTEM_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
             {"role": "user", "content": text},
         ]
     )

@@ -180,6 +180,10 @@ class Settings(BaseSettings):
 
     AUDIO_DIR: Path = Path("/var/lib/kodmod/audio")
     MAX_AUDIO_SECONDS: int = 120
+    SPEECH_CACHE_TTL_DAYS: int = Field(default=30, ge=1, le=365)
+    SPEECH_CACHE_MAX_MB: int = Field(default=1024, ge=1)
+    PUBLIC_SPEECH_DAILY_CHARACTERS: int = Field(default=10000, ge=1)
+    PRIVATE_SPEECH_DAILY_CHARACTERS: int = Field(default=120000, ge=1)
 
     # --------------------------------------------------------- file uploads
     UPLOAD_DIR: Path = Path("./data/uploads")

@@ -161,7 +161,7 @@ async def _score_with_rubric(
     )
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": RUBRIC_PROMPT + language_instruction()},
+            {"role": "system", "content": RUBRIC_PROMPT + language_instruction(state.get("learning_profile", {}).get("language"))},
             {"role": "user", "content": payload},
         ]
     )

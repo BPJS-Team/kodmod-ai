@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
@@ -25,10 +26,12 @@ from api.chat_service import (
     sources,
     update_session_mode,
 )
-from api.dependencies import db_session, require_student
+from api.dependencies import current_user, db_session, require_student
 from config.settings import settings
 from database.models import User
 from voice import elevenlabs
+from voice.audio_cache import SpeechBudgetExceededError, profile_id
+from voice.menu_catalog import MENU_AUDIO
 from voice.streaming import save_upload
 from voice.stt import transcribe_path
 from voice.tts import synthesise_bytes
@@ -39,6 +42,7 @@ router = APIRouter(tags=["voice"])
 
 class VoiceTTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5_000)
+    language: Literal["id", "en"] | None = None
 
 
 class VoiceSTTResponse(BaseModel):
@@ -69,14 +73,38 @@ def _provider_error(exc: Exception, *, operation: str) -> HTTPException:
     )
 
 
-@router.post("/tts", summary="Synthesize student-visible text to audio")
+@router.get("/profile")
+async def voice_profile() -> dict:
+    return {"profile": profile_id()}
+
+
+@router.get("/menu/{key}", summary="Read a fixed, public application menu")
+async def menu_speech(key: str, language: Literal["id", "en"] = "id") -> Response:
+    if key not in MENU_AUDIO:
+        raise HTTPException(404, "Menu audio not found.")
+    try:
+        audio = await synthesise_bytes(MENU_AUDIO[key][language == "en"],
+                                       language=language, scope="public-menu")
+    except SpeechBudgetExceededError as exc:
+        raise HTTPException(429, "Suara sedang penuh. Gunakan suara perangkat atau coba nanti.") from exc
+    except Exception as exc:
+        raise _provider_error(exc, operation="sintesis") from exc
+    return Response(audio, media_type="audio/mpeg",
+                    headers={"Cache-Control": "public, max-age=86400",
+                             "X-Speech-Profile": profile_id()})
+
+
+@router.post("/tts", summary="Synthesize text for an active signed-in account")
 async def text_to_speech(
     body: VoiceTTSRequest,
-    _student: User = Depends(require_student),
+    user: User = Depends(current_user),
 ) -> Response:
     """Return audio bytes for an explicit, user-triggered listen action."""
     try:
-        audio = await synthesise_bytes(body.text)
+        audio = await synthesise_bytes(body.text, language=body.language or user.preferred_language,
+                                       scope="user:" + str(user.id))
+    except SpeechBudgetExceededError as exc:
+        raise HTTPException(429, "Batas suara hari ini tercapai. Gunakan suara perangkat.") from exc
     except (elevenlabs.ElevenLabsConfigurationError, elevenlabs.ElevenLabsError) as exc:
         raise _provider_error(exc, operation="sintesis") from exc
     except ValueError as exc:
@@ -99,7 +127,6 @@ async def speech_to_text(
     student: User = Depends(require_student),
 ) -> VoiceSTTResponse:
     """Transcribe one bounded upload; callers still review text before submit."""
-    del student  # dependency enforces ownership; no student data is sent upstream
     if not audio.content_type or not audio.content_type.startswith("audio/"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File audio diperlukan.")
 
@@ -115,14 +142,14 @@ async def speech_to_text(
                 content,
                 filename=audio.filename or "answer.webm",
                 content_type=audio.content_type,
-                language=settings.STT_LANGUAGE,
+                language=student.preferred_language,
             )
         else:
             suffix = Path(audio.filename or "answer.wav").suffix or ".wav"
             with NamedTemporaryFile(suffix=suffix, delete=True) as temp:
                 temp.write(content)
                 temp.flush()
-                text = await transcribe_path(temp.name, language=settings.STT_LANGUAGE)
+                text = await transcribe_path(temp.name, language=student.preferred_language)
             result = {"text": text, "language_code": settings.STT_LANGUAGE}
     except (elevenlabs.ElevenLabsConfigurationError, elevenlabs.ElevenLabsError) as exc:
         raise _provider_error(exc, operation="transkripsi") from exc
