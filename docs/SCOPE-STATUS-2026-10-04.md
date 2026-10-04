@@ -1,5 +1,7 @@
 # Status scope KODMOD, 4 Oktober 2026
 
+> **Arsip audit sebelumnya.** Gunakan [review Antigravity dan mapping scope terbaru](review-and-scope-2026-10-04.md) untuk status saat ini. Editorial kuis, registrasi tanpa undangan, suara dan belajar terpandu sudah berubah setelah snapshot di bawah.
+
 Audit source melalui CodeGraph, kemudian dibandingkan dengan roadmap. Dokumen ini mencatat implementasi yang ada pada checkout saat audit, bukan sertifikasi kesiapan VPS atau produksi.
 
 **Sudah** berarti source untuk kemampuan tersebut tersedia. **Partial** berarti sebagian alur tersedia atau batas validasinya masih terbuka. **Belum** berarti alur yang diminta masih berupa rencana/kontrak. Lulus tes simulasi tidak berarti provider, perangkat, atau deployment nyata sudah lulus.
