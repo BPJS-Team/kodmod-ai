@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('up', 'build', 'migrate', 'api', 'infra', 'qdrant', 'down', 'status', 'logs', 'admin', 'demo-users')]
+    [ValidateSet('up', 'build', 'backup', 'migrate', 'api', 'infra', 'qdrant', 'down', 'status', 'logs', 'admin', 'demo-users')]
     [string]$Action = 'up',
     [string]$CentreRoot = 'F:\Docker_Centre\kodmod'
 )
@@ -36,7 +36,55 @@ if ((Test-Path -LiteralPath $centreEnv) -and (Test-Path -LiteralPath $centreOver
     $composeArgs += @('--file', (Join-Path $sourceRoot 'docker-compose.yml'))
 }
 
+function Save-DatabaseBackup {
+    param([switch]$Required)
+    $taskContainer = & $dockerExe @composeArgs ps --all -q postgres
+    if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the PostgreSQL service.' }
+    if (-not $taskContainer) {
+        if ($Required) { throw 'Start PostgreSQL before creating a backup.' }
+        return # Fresh installation: no existing database to back up.
+    }
+    $taskContainer = $taskContainer.Trim()
+    $taskBackupDirectory = if (Test-Path -LiteralPath $centreOverride) {
+        Join-Path $CentreRoot 'backups'
+    } else {
+        Join-Path $sourceRoot '.runtime/backups'
+    }
+    New-Item -ItemType Directory -Force -Path $taskBackupDirectory | Out-Null
+    $taskName = 'kodmod-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.dump'
+    $taskRemotePath = '/tmp/' + $taskName
+    $taskDestination = Join-Path $taskBackupDirectory $taskName
+    & $dockerExe @composeArgs exec -T postgres pg_dump -U kodmod -d kodmod -Fc -f $taskRemotePath
+    if ($LASTEXITCODE -ne 0) { throw 'Database backup failed. Runtime update cancelled.' }
+    $taskArchive = & $dockerExe @composeArgs exec -T postgres pg_restore --list $taskRemotePath
+    if ($LASTEXITCODE -ne 0 -or $taskArchive.Count -lt 10) { throw 'Database backup archive is invalid.' }
+    & $dockerExe cp "${taskContainer}:$taskRemotePath" $taskDestination
+    if ($LASTEXITCODE -ne 0) { throw 'Could not copy the database backup to persistent storage.' }
+    $taskFile = Get-Item -LiteralPath $taskDestination
+    if ($taskFile.Length -eq 0) { throw 'Database backup is empty.' }
+    $taskManifest = @{
+        created_at = [DateTimeOffset]::UtcNow.ToString('o')
+        filename = $taskName
+        bytes = $taskFile.Length
+        sha256 = (Get-FileHash -LiteralPath $taskDestination -Algorithm SHA256).Hash.ToLowerInvariant()
+        archive_entries = $taskArchive.Count
+        source_checkout = $sourceRoot
+    }
+    $taskManifest | ConvertTo-Json | Set-Content -LiteralPath ($taskDestination + '.json') -Encoding utf8
+    Write-Host "Verified PostgreSQL backup: $taskDestination"
+}
+
+# Preserve the existing database before Compose's migration dependency runs.
+if ($Action -in @('up', 'api', 'migrate')) {
+    & $dockerExe @composeArgs up -d --wait --wait-timeout 90 postgres
+    if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL is unavailable. Runtime update cancelled.' }
+    Save-DatabaseBackup -Required
+} elseif ($Action -eq 'backup') {
+    Save-DatabaseBackup -Required
+}
+
 switch ($Action) {
+    'backup' { exit 0 }
     'up' { $composeArgs += @('up', '-d', '--build', '--wait', '--wait-timeout', '180') }
     'api' { $composeArgs += @('up', '-d', '--build', '--wait', '--wait-timeout', '180') }
     'build' { $composeArgs += @('build', 'ai-engine', 'web') }

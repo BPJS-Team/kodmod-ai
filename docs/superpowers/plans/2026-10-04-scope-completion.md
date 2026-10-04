@@ -1,0 +1,49 @@
+# KODMOD Scope Completion Implementation Plan
+
+> Execute inline, one milestone at a time, with a progress commit after its focused checks. The user approved the reviewed scope and asked for full testing after implementation. Do not repeat design approval gates for that approved scope.
+
+**Goal:** Complete the remaining code and local runtime scope while preserving the guided Tutor, independent assessments and teacher assignments.
+
+**Architecture:** Next.js remains the authenticated browser boundary. FastAPI and PostgreSQL own reviewed material versions, concept attribution, durable jobs, learning and assessment state. LangGraph teaches or assesses from the authorized source. Provider credentials remain server-only.
+
+**Tech Stack:** Next.js, customized shadcn/Radix, FastAPI, SQLAlchemy/Alembic, PostgreSQL/pgvector, Redis, LangChain/LangGraph, OpenAI and ElevenLabs Bian v2. OCR runs on the server; no Planner Agent.
+
+**Spec:** [Reviewed scope](../../review-and-scope-2026-10-04.md), [technical priorities](2026-10-04-technical-priorities.md), [guided learning contract](../../plans/2026-10-04-guided-learning-contract.md), and the user's instruction to continue sequentially before full testing.
+
+## Global constraints
+
+- Preserve the user's PDF folder and existing database records. Back up before local schema upgrades. Test changes on the isolated PostgreSQL service, not shared application data.
+- Keep three quiz lifecycles separate. SQL state and idempotent receipts survive reload, network retries and service restarts.
+- A question may update global Concept mastery only with reviewed, versioned attribution. Editing a mapping does not rewrite historical evidence.
+- All new mutations enforce role and object ownership. A Concept association never makes private classroom sources public.
+- UI/menu narration and instructional audio are independent. Both share the output coordinator, cancel stale audio and provide text/keyboard controls.
+- Keep the blue/navy theme, concise ID/EN product copy and themed confirmations. Human device and visual tests remain with the user.
+- Commit lowercase `feat: ...` messages without trailers. Do not push until the integrated result is reviewed.
+
+## Sequential milestones and completion gates
+
+| # | Milestone | Deliverable / gate | State |
+| --- | --- | --- | --- |
+| 1 | Update local Docker | Verified backup; Linux web/API build; additive 0007–0008 migration; healthy services; latest OpenAPI routes | In progress |
+| 2 | Reviewed concepts and mastery | Subject selection; versioned material mappings; question-specific allowed attribution; exactly-once mastery evidence for adaptive and formal quizzes | Pending |
+| 3 | Reviewed OCR and durable imports | Original files and page provenance; scan/native preview; teacher review; database-backed leased/retry jobs that survive restarts | Pending |
+| 4 | Guided Tutor and accessible UI consistency | Guided learning is the student entry; shadcn forms/tables/dialog/menu; global low-vision preferences; complete keyboard profile menu and ID/EN copy | Pending |
+| 5 | Provider telemetry | Persist real token/latency/status metadata without prompt/text/secrets; admin aggregation; explicitly configured price estimates | Pending |
+| 6 | Operations and release preparation | Updated Compose worker/runtime; backup/restore rehearsal on isolated DB; deployment/smoke tooling and VPS acceptance instructions | Pending |
+| 7 | Full code/API acceptance | Combined backend/frontend/PostgreSQL/build checks; real configured-provider checks; integration and restart/recovery validation | Pending |
+
+VPS host/domain and real assistive-device acceptance are external release gates. Preparation is implementable here; actual VPS/device proof must be reported separately.
+
+## Review focus
+
+1. Concurrent subject/material/mapping changes must not publish stale chunks or attribute a question to a different reviewed revision.
+2. Unmapped or cross-subject concepts must not alter mastery. Duplicate answers/submit/restart must yield one durable evidence row.
+3. OCR/index workers losing a lease or dying after provider work must safely retry; original/page references must remain private and bounded.
+4. Keyboard, reduced motion, high contrast and enlarged text must work across shells; app narration must not interrupt instructional speech.
+5. Provider errors must preserve canonical learning/quiz state and produce redacted telemetry; missing prices are unknown, not zero cost.
+
+## Execution ledger
+
+- Baseline: `9e760bb`, clean checkout. Docker project `kodmod-centre`, persistent files under `F:/Docker_Centre/kodmod`, source stays in this checkout.
+- Milestone 1 preflight: running DB at `0006_editorial_quizzes`; users=4, class_materials=0, learning_sessions=1. Verified custom-format PostgreSQL backup with 236 archive entries before updating. No fixture users were inserted into the main database.
+- Ruling: run focused checks per milestone, then the full suite after all code milestones, as requested. Real phone/assistive technology checks remain user-owned.

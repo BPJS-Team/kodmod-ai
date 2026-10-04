@@ -25,10 +25,18 @@ Script memakai project `kodmod-centre` dan override di `F:\Docker_Centre\kodmod`
 - API lokal: `http://127.0.0.1:8109`; probes `/live` dan `/ready`.
 - PostgreSQL: `127.0.0.1:5433`; Redis: `127.0.0.1:6379`.
 - Antarkontainer memakai `ai-engine:8000`, `postgres:5432`, dan `redis:6379`.
-- Migrasi otomatis menuju `0005_assessment_submissions`. Tidak memakai `database/schema.sql` lama.
+- Migrasi otomatis menuju Alembic `head` pada checkout yang dibangun. Tidak memakai `database/schema.sql` lama.
 - `down` menghentikan stack dan mempertahankan data. Jangan menambahkan `-v` untuk database yang diperlukan.
 
-Perintah lain: `build`, `logs`, `migrate`, `infra` (hanya database/cache), dan `qdrant` (opsional). `api` menjadi alias `up` untuk kompatibilitas script lama.
+Perintah lain: `build`, `backup`, `logs`, `migrate`, `infra` (hanya database/cache), dan `qdrant` (opsional). `api` menjadi alias `up` untuk kompatibilitas script lama.
+
+`up`, `api`, dan `migrate` menunggu PostgreSQL sehat lalu membuat backup custom-format sebelum migrasi. Jika dump, validasi arsip, atau salinan gagal, pembaruan dibatalkan. Backup dan manifest SHA-256 berada di `F:\Docker_Centre\kodmod\backups` (atau `.runtime/backups` tanpa Docker Centre). Perintah `backup` hanya membuat backup; tidak mengubah schema atau isi database.
+
+```powershell
+pwsh -NoProfile -File .\scripts\docker.ps1 backup
+```
+
+Dump ini melindungi database. Audio dan original unggahan tetap membutuhkan backup volume terpisah. Arsip berisi data aplikasi; simpan di lokasi privat di luar Git.
 
 Tanpa Docker Centre, dari root repository:
 
