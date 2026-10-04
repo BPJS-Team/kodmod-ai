@@ -7,6 +7,7 @@ managed transaction mode; PostgreSQL tests exercise concurrent row locking.
 import copy
 import uuid
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -418,3 +419,52 @@ async def test_unmapped_class_scope_never_persists_global_concept_evidence(asses
         assert mastery.mastery == 0.5
         assert mastery.n_attempts == 0
         assert await session.scalar(select(func.count()).select_from(models.MasteryEvent)) == 0
+
+
+@pytest.mark.parametrize("language", ["id", "en"])
+async def test_assessment_start_uses_graph_learning_profile_schema(assessment_http, language):
+    from graphs.state import build_learning_profile
+
+    client, factory, controls, graph, concept, _ = assessment_http
+    async with factory() as session:
+        owner = await session.get(models.User, controls["actor"].id)
+        owner.preferred_language = "id"
+        owner.accessibility_profile = "low_vision"
+        await session.commit()
+        controls["actor"] = owner
+    response = await client.post(
+        "/quiz/start",
+        json={"concept_id": str(concept.id), "n_questions": 1, "language": language},
+    )
+    assert response.status_code == 200, response.text
+    expected = {**build_learning_profile(owner), "language": language}
+    assert graph.saved["learning_profile"] == expected
+    assert graph.saved["detected_language"] == language
+    async with factory() as session:
+        quiz_session = await session.get(models.QuizSession, uuid.UUID(response.json()["quiz_session_id"]))
+        assert quiz_session.assessment_state["learning_profile"] == expected
+
+
+async def test_assessment_reads_decayed_mastery_and_updates_from_that_value(assessment_http):
+    client, factory, _, graph, concept, _ = assessment_http
+    async with factory() as session:
+        mastery = await session.scalar(select(models.MasteryScore))
+        mastery.mastery = 0.8
+        mastery.n_attempts = 4
+        mastery.last_seen = datetime.now(UTC) - timedelta(days=30)
+        await session.commit()
+    started = await start(client, concept)
+    assert graph.saved["mastery_scores"][str(concept.id)] == pytest.approx(0.65)
+    async with factory() as session:
+        mastery = await session.scalar(select(models.MasteryScore))
+        assert mastery.mastery == 0.8
+        assert mastery.n_attempts == 4
+        assert await session.scalar(select(func.count()).select_from(models.MasteryEvent)) == 0
+    response = await client.post("/quiz/submit", json=submission(started))
+    assert response.status_code == 200, response.text
+    async with factory() as session:
+        event = await session.scalar(select(models.MasteryEvent))
+        mastery = await session.scalar(select(models.MasteryScore))
+        assert event.mastery_before == pytest.approx(0.65)
+        assert mastery.mastery == pytest.approx(0.72875)
+        assert mastery.n_attempts == 5

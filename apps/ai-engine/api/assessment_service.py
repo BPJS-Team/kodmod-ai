@@ -28,7 +28,7 @@ from database.models import (
     QuizSession,
     User,
 )
-from graphs.state import initial_state
+from graphs.state import build_learning_profile, initial_state
 from models.quiz import (
     QuizQuestionOut,
     QuizStartRequest,
@@ -113,8 +113,12 @@ async def load_model(session: AsyncSession, student_id: uuid.UUID) -> tuple[Stud
             row.confidence,
             row.n_attempts,
         )
-        model._last_practiced[cid] = row.last_seen
+        if row.last_seen:
+            model._last_practiced[cid] = (
+                row.last_seen if row.last_seen.tzinfo else row.last_seen.replace(tzinfo=UTC)
+            )
         by_concept[cid] = row
+    model.apply_decay()
     return model, by_concept
 
 
@@ -145,10 +149,7 @@ async def start_assessment(
         detected_language=body.language,
         mastery_scores=dict(model._scores),
         mastery_confidence=dict(model._confidence),
-        learning_profile={
-            "accessibility_profile": student.accessibility_profile,
-            "preferred_language": body.language,
-        },
+        learning_profile={**build_learning_profile(student), "language": body.language},
     )
     final = await invoke(graph, state, sid)
     questions = copy.deepcopy(final.get("quiz_questions", []))

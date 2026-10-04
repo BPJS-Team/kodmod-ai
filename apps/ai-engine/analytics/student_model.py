@@ -241,6 +241,8 @@ async def update_student_model_node(state) -> dict[str, Any]:
         return {"next_action": "generate_analytics", "last_node": "update_student_model"}
 
     managed = state.get("assessment_managed", False)
+    # Imported class/material quizzes have no approved global Concept mapping yet.
+    scoped_material = bool(state.get("class_id") or state.get("material_id"))
     model = (
         StudentModel(
             student_id,
@@ -255,7 +257,7 @@ async def update_student_model_node(state) -> dict[str, Any]:
     for a in attempts[applied:]:
         q = q_by_id.get(a.get("question_id"), {})
         cid = q.get("concept_id")
-        if not cid:
+        if not cid or scoped_material:
             continue
         try:
             cid = str(UUID(str(cid)))
@@ -265,7 +267,7 @@ async def update_student_model_node(state) -> dict[str, Any]:
             continue
         model.update(cid, float(a.get("score", 0.0)), confidence=float(a.get("confidence", 0.9)))
 
-    if not managed:
+    if not managed and not scoped_material:
         await model.persist()
 
     # Advance the question index and mirror the progress into short-term
