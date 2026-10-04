@@ -30,6 +30,7 @@ test("student quiz starts with a question and returns feedback for answers", () 
   const answer = request("/quiz/submit", "POST", {
     quiz_session_id: started.data.quiz_session_id,
     question_id: started.data.first_question.question_id,
+    submission_id: "50000000-0000-4000-8000-000000000001",
     student_answer: "A",
   });
   assert.equal(answer.status, 200);

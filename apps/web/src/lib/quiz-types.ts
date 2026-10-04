@@ -13,6 +13,14 @@ export type QuizStartResponse = {
   total_questions: number;
 };
 
+export type QuizSubmitRequest = {
+  submission_id: string;
+  quiz_session_id: string;
+  question_id: string;
+  student_answer: string;
+  response_latency_ms?: number;
+};
+
 export type QuizSubmitResponse = {
   score: number;
   is_correct: boolean;

@@ -1,6 +1,8 @@
 // Disposable, local-only learning data. No production imports or database writes.
 import { validateMaterialFile } from "../src/lib/material-flow.mjs";
-export function createLearningFixture({ legacyPending = false } = {}) {
+import { parseQuizSubmission } from "../src/lib/quiz-submission.mjs";
+import { randomUUID } from "node:crypto";
+export function createLearningFixture({ legacyPending = false, quizFailureQueue = [], quizRequests = [] } = {}) {
   const classes = [
     {
       id: "10000000-0000-4000-8000-000000000001",
@@ -82,7 +84,7 @@ export function createLearningFixture({ legacyPending = false } = {}) {
   const quizSessions = new Map();
   let quizSerial = 1;
   const quizQuestion = (sessionId, index, difficulty) => ({
-    question_id: `${sessionId}-q-${index + 1}`,
+    question_id: randomUUID(),
     order_index: index,
     question:
       index === 0
@@ -297,16 +299,25 @@ export function createLearningFixture({ legacyPending = false } = {}) {
         const questions = Array.from({ length: count }, (_, index) =>
           quizQuestion(id, index, difficulty),
         );
-        quizSessions.set(id, { questions, current: 0, correct: 0 });
+        quizSessions.set(id, { studentId: user.id, questions, current: 0, correct: 0, attempts: 0, tries: 0, receipts: new Map() });
         send(200, {
           quiz_session_id: id,
           first_question: questions[0],
           total_questions: questions.length,
         });
       } else if (url.pathname === "/quiz/submit" && req.method === "POST") {
+        quizRequests.push(structuredClone(body));
+        try { body = parseQuizSubmission(body); } catch { send(422, { detail: "Data jawaban tidak valid." }); return true; }
+        const failure = quizFailureQueue.shift();
+        if (failure && failure !== 503) { send(failure, { detail: "Simulasi kegagalan pengiriman." }); return true; }
         const quiz = quizSessions.get(body.quiz_session_id);
-        if (!quiz) {
+        if (!quiz || quiz.studentId !== user.id) {
           send(404, {});
+          return true;
+        }
+        const previous = quiz.receipts.get(body.submission_id);
+        if (previous) {
+          send(JSON.stringify(previous.body) === JSON.stringify(body) ? 200 : 409, previous.result);
           return true;
         }
         const current = quiz.questions[quiz.current];
@@ -317,17 +328,22 @@ export function createLearningFixture({ legacyPending = false } = {}) {
         const isCorrect = String(body.student_answer || "").trim().toLowerCase() === "a" ||
           String(body.student_answer || "").trim().toLowerCase() === "satu per empat";
         if (isCorrect) quiz.correct += 1;
-        quiz.current += 1;
+        quiz.attempts += 1;
+        quiz.tries += 1;
+        if (isCorrect || quiz.tries >= 3) { quiz.current += 1; quiz.tries = 0; }
         const complete = quiz.current >= quiz.questions.length;
-        send(200, {
+        const result = {
           score: isCorrect ? 1 : 0,
           is_correct: isCorrect,
           feedback: isCorrect ? "Jawabanmu tepat." : "Coba periksa kembali pembilang dan penyebutnya.",
-          cumulative_score: quiz.correct / quiz.current,
+          cumulative_score: quiz.correct / quiz.attempts,
           quiz_complete: complete,
-          final_summary: complete ? `Kuis selesai. Skor kamu ${Math.round((quiz.correct / quiz.current) * 100)}%.` : null,
+          final_summary: complete ? `Kuis selesai. Skor kamu ${Math.round((quiz.correct / quiz.attempts) * 100)}%.` : null,
           next_question: complete ? null : quiz.questions[quiz.current],
-        });
+        };
+        quiz.receipts.set(body.submission_id, { body, result });
+        // Model a committed result whose response was lost, then replay it.
+        send(failure === 503 ? 503 : 200, failure === 503 ? { detail: "Hasil belum dapat dipastikan." } : result);
       } else {
         send(404, {});
       }

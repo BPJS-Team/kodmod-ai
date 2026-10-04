@@ -2,7 +2,9 @@
 // Run: node apps/web/tests/api-fixture.mjs
 import { createServer } from "node:http";
 import { createLearningFixture } from "./learning-fixture.mjs";
-const learning = createLearningFixture();
+const quizFailureQueue = [];
+const quizRequests = [];
+const learning = createLearningFixture({ quizFailureQueue, quizRequests });
 const users = [
   {
     id: "test-admin",
@@ -50,6 +52,14 @@ const server = createServer(async (req, res) => {
     } else body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
   } catch {
     return send(400, {});
+  }
+  // Browser acceptance controls exist only in this disposable loopback fixture.
+  if (url.pathname === "/__fixture/quiz") {
+    if (req.method === "POST") {
+      quizFailureQueue.splice(0, quizFailureQueue.length, ...(body.failures || []));
+      quizRequests.splice(0);
+    }
+    return send(200, { requests: quizRequests, failures: quizFailureQueue });
   }
   if (url.pathname === "/auth/login") {
     const user = users.find((u) => u.username === body.username);

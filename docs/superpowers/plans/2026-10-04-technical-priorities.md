@@ -57,7 +57,7 @@ The prior material milestone reports 254 backend tests and 33 frontend tests plu
 
 **Additional files/data:** Add `api/assessment_service.py` and a migration planned as `database/migrations/versions/0005_assessment_submissions.py` after rechecking head. A durable `assessment_submissions` record owns the actor/session/question/intentional-try ID, idempotency key, state and stored result. Unique `mastery_events` identify the accepted submission and Concept. PostgreSQL is the canonical accepted result; checkpoint/Redis state is a resumable projection.
 
-Source findings, not yet fixed or reproduced as live exploits:
+Historical source findings, now reproduced and fixed in isolated assessment tests:
 
 - `quiz.py:127-149` invokes the graph using the supplied session ID before checking session ownership. `question_id` is not checked against the active question.
 - The submit path lacks an explicit idempotency/concurrency boundary and finished-session guard. Persistence errors are logged while success can still be returned.
@@ -66,14 +66,16 @@ Source findings, not yet fixed or reproduced as live exploits:
 - Adaptive cumulative scoring averages tries. This is a practice metric, not the final score policy for a teacher assignment.
 - Student question numbering must follow returned `order_index`, including remediation that repeats the current question.
 
-- [ ] Add HTTP/graph reproductions for unknown/foreign sessions, mismatched/stale questions, finished-session replay, failed persistence and concurrent submits.
-- [ ] Check ownership and current question before graph execution. Select a retry/idempotency contract compatible with intentional remediation, so a duplicate request is distinguishable from a new try on the same question.
-- [ ] Persist each checkpoint attempt's own answer and identifier. Commit accepted answer/result plus its mastery effect/event through one authoritative database transaction. Refactor graph-side assessment persistence so it does not independently apply the same mastery update. Successful responses must match durable results; recovery must not rescore an already accepted submission.
-- [ ] Repair a missing/stale checkpoint from the accepted PostgreSQL result. A failed checkpoint write or lost HTTP response must not cause another accepted submission or mastery effect. Scope the event key to an intentional try, so a new remedial answer is still permitted.
-- [ ] For classroom questions without approved mapping, keep Concept attribution empty and skip Concept mastery. Preserve standalone adaptive fallback only where its catalog scope is valid.
-- [ ] Add tests for correct classroom text with an unrelated weak Concept in the student's existing mastery, as well as repeated-question numbering.
+- [x] Add HTTP/graph reproductions for unknown/foreign sessions, mismatched/stale questions, finished-session replay, failed persistence and concurrent submits.
+- [x] Check ownership and current question before graph execution. Select a retry/idempotency contract compatible with intentional remediation, so a duplicate request is distinguishable from a new try on the same question.
+- [x] Persist each checkpoint attempt's own answer and identifier. Commit accepted answer/result plus its mastery effect/event through one authoritative database transaction. Refactor graph-side assessment persistence so it does not independently apply the same mastery update. Successful responses must match durable results; recovery must not rescore an already accepted submission.
+- [x] Repair a missing/stale checkpoint from the accepted PostgreSQL result. A failed checkpoint write or lost HTTP response must not cause another accepted submission or mastery effect. Scope the event key to an intentional try, so a new remedial answer is still permitted.
+- [x] For classroom questions without approved mapping, keep Concept attribution empty and skip Concept mastery. Preserve standalone adaptive fallback only where its catalog scope is valid.
+- [x] Add tests for correct classroom text with an unrelated weak Concept in the student's existing mastery, as well as repeated-question numbering.
 
-**Gate:** No unowned or stale submission reaches scoring; retry has no second effect; saved answers match their original turn; unmapped classroom practice changes no unrelated Concept.
+**Gate:** Passed in isolated API/SQL tests. No unowned or stale submission reaches scoring; retry has no second effect; saved answers match their original turn; unmapped classroom practice changes no unrelated Concept.
+
+**Delivery evidence (2026-10-04):** 311 backend unit/contract/regression/PostgreSQL tests, including real row-lock overlap and the real LangGraph with simulated providers. Fresh migration to 0005, downgrade/re-upgrade, and Alembic metadata check passed. Frontend retry helpers and fixture contracts: 31 passed; lint, typecheck, and production build passed. Browser/Next proxy acceptance and real devices remain unverified because starting the isolated Next server was rejected by automatic approval review. See `docs/assessment-api.md` for the contract, legacy-session restart rule, and acceptance steps.
 
 ## 1. Teacher quiz: complete manual assignment flow
 
@@ -81,7 +83,7 @@ Source findings, not yet fixed or reproduced as live exploits:
 
 **Files to add:** `apps/ai-engine/api/routes/editorial_quizzes.py`, `api/editorial_quiz_service.py`, `models/editorial_quiz.py`, `database/migrations/versions/0006_editorial_quizzes.py`, and `tests/contract/test_editorial_quiz_schemas.py` / `tests/api/test_editorial_quizzes.py`. Paths after the first entry are relative to `apps/ai-engine`.
 
-**Files to modify:** `apps/ai-engine/database/models.py` and `api/main.py`. Revision name/number must be rechecked against Alembic head before creation. The current chain is `0001` through `0004_class_material_rag`.
+**Files to modify:** `apps/ai-engine/database/models.py` and `api/main.py`. Revision name/number must be rechecked against Alembic head before creation. The current chain is `0001` through `0005_assessment_submissions`.
 
 ### Data ownership
 

@@ -58,6 +58,8 @@ models--*/
 .idea/
 .claude/
 .codegraph/
+.superpowers/
+.runtime/
 .mcp.json
 AGENTS.md
 /apps/web/CLAUDE.md

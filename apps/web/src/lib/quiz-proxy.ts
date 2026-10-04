@@ -46,12 +46,17 @@ export async function forwardQuiz(path: string, init: RequestInit = {}) {
     return NextResponse.json({ message: messageFor(503) }, { status: 503 });
   }
 
-  const raw = await upstream.text();
   if (!upstream.ok) {
     return NextResponse.json(
       { message: messageFor(upstream.status) },
       { status: upstream.status },
     );
+  }
+  let raw: string;
+  try {
+    raw = await upstream.text();
+  } catch {
+    return NextResponse.json({ message: messageFor(503) }, { status: 503 });
   }
   try {
     return NextResponse.json(JSON.parse(raw), { status: upstream.status });
