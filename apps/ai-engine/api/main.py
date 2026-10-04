@@ -46,6 +46,7 @@ from api.routes import (
     chat,
     classrooms,
     content,
+    editorial_quizzes,
     exercise,
     health,
     quiz,
@@ -129,6 +130,7 @@ app.include_router(classrooms.router, prefix="/classes")
 app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 app.include_router(student.router, prefix="/student")
 app.include_router(teacher.router, prefix="/teacher")
+app.include_router(editorial_quizzes.router)
 app.include_router(admin.router, prefix="/admin")
 app.include_router(admin_insights.router, prefix="/admin")
 app.include_router(subjects.router, prefix="/subjects")

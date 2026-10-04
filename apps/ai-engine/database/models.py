@@ -379,6 +379,179 @@ class InteractionLog(Base):
     session = relationship("LearningSession", back_populates="interactions")
 
 
+# ------------------------------------------------------ teacher assignments --
+class QuizDraft(Base):
+    __tablename__ = "quiz_drafts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    teacher_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    subject_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="RESTRICT")
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    __table_args__ = (CheckConstraint("current_version >= 1", name="ck_quiz_draft_version"),)
+
+
+class QuizDraftVersion(Base):
+    __tablename__ = "quiz_draft_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    draft_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_drafts.id", ondelete="RESTRICT"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    subject_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subjects.id", ondelete="RESTRICT")
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    state: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    review_revision: Mapped[int] = mapped_column(Integer, default=0)
+    source_revisions: Mapped[list] = mapped_column(JSON, default=list)
+    scoring_policy: Mapped[str] = mapped_column(String(30), default="equal_weight_mcq")
+    release_policy: Mapped[str] = mapped_column(String(30), default="after_submission")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint("draft_id", "version", name="uq_quiz_draft_version"),
+        CheckConstraint(
+            "state IN ('draft','in_review','approved','rejected','published')",
+            name="ck_editorial_version_state",
+        ),
+        CheckConstraint(
+            "release_policy IN ('after_submission','after_due')", name="ck_editorial_release"
+        ),
+        CheckConstraint("version >= 1 AND review_revision >= 0", name="ck_editorial_revision"),
+    )
+
+
+class QuizDraftQuestion(Base):
+    __tablename__ = "quiz_draft_questions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_draft_versions.id", ondelete="RESTRICT"), index=True
+    )
+    order_index: Mapped[int] = mapped_column(Integer)
+    prompt: Mapped[str] = mapped_column(Text)
+    narration: Mapped[str] = mapped_column(Text, default="")
+    options: Mapped[list] = mapped_column(JSON)
+    correct_option_id: Mapped[str] = mapped_column(String(40))
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    concept_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="RESTRICT")
+    )
+    difficulty: Mapped[str] = mapped_column(String(20), default="medium")
+    __table_args__ = (
+        UniqueConstraint("version_id", "order_index", name="uq_editorial_question_order"),
+        CheckConstraint(
+            "order_index >= 1 AND order_index <= 20", name="ck_editorial_question_order"
+        ),
+        CheckConstraint(
+            "difficulty IN ('easy','medium','hard')", name="ck_editorial_question_difficulty"
+        ),
+    )
+
+
+class QuizReviewEvent(Base):
+    __tablename__ = "quiz_review_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_draft_versions.id", ondelete="RESTRICT"), index=True
+    )
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    kind: Mapped[str] = mapped_column(String(30))
+    note: Mapped[str] = mapped_column(Text, default="")
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class QuizAssignment(Base):
+    __tablename__ = "quiz_assignments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_draft_versions.id", ondelete="RESTRICT"), index=True
+    )
+    class_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classrooms.id", ondelete="RESTRICT"), index=True
+    )
+    teacher_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    __table_args__ = (
+        CheckConstraint(
+            "opens_at IS NULL OR due_at IS NULL OR opens_at < due_at", name="ck_assignment_schedule"
+        ),
+    )
+
+
+class AssignmentAttempt(Base):
+    __tablename__ = "assignment_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_assignments.id", ondelete="RESTRICT"), index=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    state: Mapped[str] = mapped_column(String(20), default="in_progress")
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    score: Mapped[float | None] = mapped_column(Float)
+    correct_count: Mapped[int | None] = mapped_column(Integer)
+    total_questions: Mapped[int] = mapped_column(Integer)
+    submission_key: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    submission_revision: Mapped[int | None] = mapped_column(Integer)
+    receipt: Mapped[dict | None] = mapped_column(JSON)
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "student_id", name="uq_assignment_student_attempt"),
+        CheckConstraint("state IN ('in_progress','submitted')", name="ck_assignment_attempt_state"),
+        CheckConstraint("revision >= 0", name="ck_assignment_attempt_revision"),
+        CheckConstraint(
+            "score IS NULL OR (score >= 0 AND score <= 100)", name="ck_assignment_score"
+        ),
+    )
+
+
+class AssignmentAnswer(Base):
+    __tablename__ = "assignment_answers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    attempt_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assignment_attempts.id", ondelete="RESTRICT"), index=True
+    )
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_draft_questions.id", ondelete="RESTRICT")
+    )
+    option_id: Mapped[str] = mapped_column(String(40))
+    is_correct: Mapped[bool | None] = mapped_column(Boolean)
+    feedback: Mapped[str | None] = mapped_column(Text)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    __table_args__ = (UniqueConstraint("attempt_id", "question_id", name="uq_assignment_answer"),)
+
+
 # ------------------------------------------------------------------ quiz --
 class QuizSession(Base):
     __tablename__ = "quiz_sessions"
