@@ -78,6 +78,21 @@ async def validate_catalog(session: AsyncSession, body: DraftInput):
             raise HTTPException(422, "Konsep harus berasal dari mata pelajaran yang dipilih.")
 
 
+async def lock_staff_actor(session: AsyncSession, actor: User) -> User:
+    """Recheck capability after acquiring the draft lock, until commit."""
+    current = await session.scalar(
+        select(User)
+        .where(User.id == actor.id)
+        .execution_options(populate_existing=True)
+        .with_for_update(read=True)
+    )
+    if current is None or not current.is_active or current.role not in {"teacher", "admin"}:
+        raise HTTPException(
+            403, "Akses review telah dicabut. Muat ulang atau hubungi administrator."
+        )
+    return current
+
+
 async def draft_for(
     session: AsyncSession, draft_id: uuid.UUID, actor: User, *, owner=False, lock=False
 ):

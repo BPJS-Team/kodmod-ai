@@ -189,6 +189,7 @@ async def nominate_reviewer(
     session: AsyncSession = Depends(db_session),
 ):
     draft, version = await service.draft_for(session, draft_id, actor, lock=True)
+    actor = await service.lock_staff_actor(session, actor)
     service.check_version(draft, version, body)
     owner_nomination = actor.id == draft.teacher_id and version.state == "draft"
     admin_reassignment = actor.role == "admin" and version.state == "in_review"
@@ -251,6 +252,7 @@ async def submit_review(
 
 async def decide(draft_id, body, actor, session, *, approved):
     draft, version = await service.draft_for(session, draft_id, actor, lock=True)
+    actor = await service.lock_staff_actor(session, actor)
     service.check_version(draft, version, body)
     if actor.id == draft.teacher_id or not (
         actor.role == "admin" or version.reviewer_id == actor.id

@@ -40,7 +40,9 @@ SCHEMA = "editorial_ui_fixture"
 PASSWORD = "editorial-test-password-123"
 URL = "postgresql+asyncpg://kodmod:kodmod@127.0.0.1:5434/kodmod_editorial_migration_test"
 engine = create_async_engine(
-    URL, connect_args={"server_settings": {"search_path": SCHEMA + ",public"}}
+    URL,
+    connect_args={"server_settings": {"search_path": SCHEMA + ",public"}},
+    execution_options={"schema_translate_map": {None: SCHEMA}},
 )
 factory = async_sessionmaker(engine, expire_on_commit=False)
 fixture = {}
@@ -88,6 +90,7 @@ async def lifespan(_):
         await session.commit()
         fixture.update(
             fixture="editorial-postgres",
+            schema=SCHEMA,
             subject_id=str(subject.id),
             class_id=str(classroom.id),
             users={name: str(user.id) for name, user in users.items()},

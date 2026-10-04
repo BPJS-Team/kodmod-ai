@@ -414,7 +414,15 @@ export async function StudentAssignmentPage({ id }: { id: string }) {
         description={`${assignment.class_name} · ${assignment.total_questions} soal · Revisi ${assignment.version}`}
       />
       <StudentAssignment
-        key={`${id}:${attempt?.revision ?? "new"}:${result?.submitted_at ?? ""}`}
+        key={JSON.stringify([
+          id,
+          attempt?.revision ?? "new",
+          result?.submitted_at ?? "",
+          result?.feedback_released ?? false,
+          assignment.is_closed,
+          assignment.opens_at,
+          assignment.due_at,
+        ])}
         assignment={assignment}
         initialAttempt={attempt}
         initialResult={result}

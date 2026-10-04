@@ -384,6 +384,48 @@ async def test_inactive_reviewer_and_foreign_owner_are_denied(editorial_http):
     assert (await client.get("/quiz-reviews", headers=headers("reviewer"))).status_code == 403
 
 
+@pytest.mark.parametrize("decision", ["approve", "reject"])
+@pytest.mark.parametrize("revocation", ["inactive", "demoted"])
+@pytest.mark.parametrize("actor_name", ["reviewer", "admin"])
+async def test_reviewer_revoked_after_auth_cannot_decide(
+    editorial_http, monkeypatch, decision, revocation, actor_name
+):
+    from api import editorial_quiz_service as service
+
+    env = editorial_http
+    client, factory, actors, _, _, headers = env
+    draft = await create(env)
+    draft = await transition(env, draft, "reviewer", reviewer_id=str(actors["reviewer"].id))
+    draft = await transition(env, draft, "submit-review")
+    original = service.draft_for
+
+    async def revoke_before_lock(session, draft_id, actor, **kwargs):
+        # Authentication has already read this actor. Another committed admin
+        # transaction revokes capability before the waiting decision gets its lock.
+        assert actor.is_active and actor.role in {"teacher", "admin"}
+        async with factory() as other:
+            reviewer = await other.get(db.User, actors[actor_name].id)
+            if revocation == "inactive":
+                reviewer.is_active = False
+            else:
+                reviewer.role = "student"
+            await other.commit()
+        return await original(session, draft_id, actor, **kwargs)
+
+    monkeypatch.setattr(service, "draft_for", revoke_before_lock)
+    response = await client.post(
+        f"/teacher/quizzes/{draft['id']}/{decision}",
+        json=action(draft) | {"note": "Review setelah capability dicabut."},
+        headers=headers(actor_name),
+    )
+    assert response.status_code == 403, response.text
+    async with factory() as session:
+        version = await session.get(db.QuizDraftVersion, uuid.UUID(draft["version"]["id"]))
+        assert version.state == "in_review"
+        kinds = list(await session.scalars(select(db.QuizReviewEvent.kind)))
+        assert not {"approved", "rejected"}.intersection(kinds)
+
+
 async def test_student_dto_does_not_expose_keys_and_release_policy_is_enforced(editorial_http):
     env = editorial_http
     client, factory, _, _, _, headers = env

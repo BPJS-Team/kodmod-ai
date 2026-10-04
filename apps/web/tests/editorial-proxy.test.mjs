@@ -13,6 +13,7 @@ before(async () => {
     "editorial-postgres",
     "Requires the isolated editorial fixture",
   );
+  assert.equal(fixture.schema, "editorial_ui_fixture");
   cookies = {};
   for (const actor of ["owner", "reviewer", "admin", "student", "outsider"]) {
     const response = await fetch(api + "/auth/login", {

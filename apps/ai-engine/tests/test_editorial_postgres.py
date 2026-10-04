@@ -131,3 +131,81 @@ async def test_concurrent_reassignment_revokes_stale_approval(editorial_http, mo
 
     one, two = await overlap(monkeypatch, reassign, approve)
     assert one.status_code == 200 and two.status_code == 404
+
+
+@pytest.mark.parametrize("revocation", ["inactive", "demoted"])
+async def test_revocation_committed_while_approval_waits_on_draft_lock(
+    editorial_http, monkeypatch, revocation
+):
+    env = editorial_http
+    client, factory, actors, _, _, headers = env
+    draft = await transition(
+        env, await create(env), "reviewer", reviewer_id=str(actors["reviewer"].id)
+    )
+    draft = await transition(env, draft, "submit-review")
+    entering_lock = asyncio.Event()
+    original = service.draft_for
+
+    async def tracked(*args, **kwargs):
+        entering_lock.set()  # Dependency authentication completed.
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(service, "draft_for", tracked)
+    async with factory() as blocker:
+        await blocker.scalar(
+            select(db.QuizDraft)
+            .where(db.QuizDraft.id == uuid.UUID(draft["id"]))
+            .with_for_update()
+        )
+        approval = asyncio.create_task(
+            client.post(
+                f"/teacher/quizzes/{draft['id']}/approve",
+                json=action(draft),
+                headers=headers("reviewer"),
+            )
+        )
+        await asyncio.wait_for(entering_lock.wait(), 10)
+        async with factory() as admin:
+            reviewer = await admin.get(db.User, actors["reviewer"].id)
+            if revocation == "inactive":
+                reviewer.is_active = False
+            else:
+                reviewer.role = "student"
+            await admin.commit()
+        assert not approval.done(), "Approval must still be waiting on the held draft row"
+        await blocker.commit()
+    response = await asyncio.wait_for(approval, 10)
+    assert response.status_code == 403, response.text
+    async with factory() as session:
+        version = await session.get(db.QuizDraftVersion, uuid.UUID(draft["version"]["id"]))
+        assert version.state == "in_review"
+
+
+async def test_approval_holds_staff_capability_until_commit(editorial_http, monkeypatch):
+    env = editorial_http
+    client, factory, actors, _, _, headers = env
+    draft = await transition(
+        env, await create(env), "reviewer", reviewer_id=str(actors["reviewer"].id)
+    )
+    draft = await transition(env, draft, "submit-review")
+
+    async def approve():
+        return await client.post(
+            f"/teacher/quizzes/{draft['id']}/approve",
+            json=action(draft),
+            headers=headers("reviewer"),
+        )
+
+    async def deactivate():
+        async with factory() as admin:
+            reviewer = await admin.get(db.User, actors["reviewer"].id)
+            reviewer.is_active = False
+            await admin.commit()
+        return True
+
+    approval, disabled = await overlap(monkeypatch, approve, deactivate)
+    assert approval.status_code == 200 and disabled
+    async with factory() as session:
+        reviewer = await session.get(db.User, actors["reviewer"].id)
+        version = await session.get(db.QuizDraftVersion, uuid.UUID(draft["version"]["id"]))
+        assert not reviewer.is_active and version.state == "approved"
