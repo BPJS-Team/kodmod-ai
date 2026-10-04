@@ -33,11 +33,10 @@ def test_km_contract_001_register_request_valid() -> None:
         password="rahasia-panjang",
         full_name="Budi Santoso",
         role="student",
-        invitation_code="abc123",
     )
-    # Usernames are compared case-insensitively, codes are shown in upper case.
+    # Usernames are compared case-insensitively; registration is open.
     assert r.username == "budi.s"
-    assert r.invitation_code == "ABC123"
+    assert "invitation_code" not in type(r).model_fields
     assert r.preferred_language == "id"
 
 
@@ -58,7 +57,6 @@ def test_km_contract_002_register_request_rejects(field: str, value: str) -> Non
         "password": "rahasia-panjang",
         "full_name": "Budi",
         "role": "student",
-        "invitation_code": "ABC123",
     }
     payload[field] = value
     with pytest.raises(ValidationError):

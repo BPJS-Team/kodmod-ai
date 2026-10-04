@@ -1,11 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, LayoutDashboard, Users, Ticket, ChevronRight, FileCheck2 } from "lucide-react";
+import { Activity, LayoutDashboard, Users, ChevronRight, FileCheck2 } from "lucide-react";
 const links = [
   { href: "/admin", label: "Ringkasan", Icon: LayoutDashboard },
   { href: "/admin/pengguna", label: "Pengguna", Icon: Users },
-  { href: "/admin/undangan", label: "Kode undangan", Icon: Ticket },
   { href: "/admin/review-kuis", label: "Review kuis", Icon: FileCheck2 },
   { href: "/admin/aktivitas", label: "Aktivitas & layanan", Icon: Activity },
 ];

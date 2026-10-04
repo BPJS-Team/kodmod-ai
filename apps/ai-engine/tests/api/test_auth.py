@@ -146,78 +146,36 @@ async def test_km_api_024_disabled_account_is_locked_out(client, student_factory
 # --------------------------------------------------------------------------- #
 # Register and login, the whole front door
 # --------------------------------------------------------------------------- #
-async def test_km_api_025_register_then_login(client, admin_factory) -> None:  # type: ignore[no-untyped-def]
+async def test_km_api_025_register_then_login(client) -> None:
     from sqlalchemy import text
 
     from database.session import async_session
-
-    _admin, admin_token = await admin_factory()
-
-    created = await client.post(
-        "/admin/invitations", json={"label": "uji", "max_uses": 1}, headers=_bearer(admin_token)
-    )
-    assert created.status_code == 201, created.text
-    code = created.json()["code"]
-
     username = f"pendaftar-{uuid.uuid4().hex[:8]}"
     password = "kata-sandi-uji-123"
+    payload = dict(username=username, password=password, full_name="Pendaftar Uji", role="student")
     try:
-        registered = await client.post(
-            "/auth/register",
-            json={
-                "username": username,
-                "password": password,
-                "full_name": "Pendaftar Uji",
-                "role": "student",
-                "invitation_code": code,
-            },
-        )
+        registered = await client.post("/auth/register", json=payload)
         assert registered.status_code == 201, registered.text
         assert registered.json()["user"]["role"] == "student"
-
-        # Single-use code: a second registration must be refused.
-        again = await client.post(
-            "/auth/register",
-            json={
-                "username": f"{username}-2",
-                "password": password,
-                "full_name": "Pendaftar Kedua",
-                "role": "student",
-                "invitation_code": code,
-            },
-        )
-        assert again.status_code == 400
-
+        assert (await client.post("/auth/register", json=payload)).status_code == 409
         ok = await client.post("/auth/login", json={"username": username, "password": password})
         assert ok.status_code == 200
-        assert ok.json()["token_type"] == "bearer"
-
-        bad = await client.post(
-            "/auth/login", json={"username": username, "password": "bukan-sandinya"}
-        )
+        bad = await client.post("/auth/login", json={"username": username, "password": "wrong-password"})
         assert bad.status_code == 401
     finally:
         async with async_session() as s:
             await s.execute(text("DELETE FROM users WHERE username = :u"), {"u": username})
-            await s.execute(text("DELETE FROM invitation_codes WHERE code = :c"), {"c": code})
+            await s.commit()
 
 
-async def test_km_api_026_registration_requires_a_valid_code(client) -> None:  # type: ignore[no-untyped-def]
-    r = await client.post(
-        "/auth/register",
-        json={
-            "username": f"tanpa-kode-{uuid.uuid4().hex[:6]}",
-            "password": "kata-sandi-uji-123",
-            "full_name": "Tanpa Kode",
-            "role": "student",
-            "invitation_code": "TIDAKADA",
-        },
-    )
-    assert r.status_code == 400
+async def test_km_api_026_registration_rejects_weak_password(client) -> None:
+    r = await client.post("/auth/register", json=dict(username="valid-name", password="short",
+                         full_name="Test", role="teacher"))
+    assert r.status_code == 422
 
 
 async def test_km_api_027_cannot_self_register_as_admin(client) -> None:  # type: ignore[no-untyped-def]
-    """Admin is never self-serve, whatever code the caller holds."""
+    """Admin is never self-serve, without any invitation."""
     r = await client.post(
         "/auth/register",
         json={
@@ -225,10 +183,9 @@ async def test_km_api_027_cannot_self_register_as_admin(client) -> None:  # type
             "password": "kata-sandi-uji-123",
             "full_name": "Calon Admin",
             "role": "admin",
-            "invitation_code": "APAPUN",
-        },
+                    },
     )
-    assert r.status_code == 422, "role=admin must fail schema validation before code validation"
+    assert r.status_code == 422, "role=admin must fail schema validation before creating an account"
 
 
 def test_km_api_028_jwt_settings_are_sane() -> None:

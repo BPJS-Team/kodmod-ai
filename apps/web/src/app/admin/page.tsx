@@ -3,7 +3,6 @@ import {
   ArrowUpRight,
   Users,
   UserCheck,
-  Ticket,
   Plus,
   BookOpen,
 } from "lucide-react";
@@ -11,19 +10,16 @@ import { requireSession } from "@/lib/session";
 import { backend } from "@/lib/server-api";
 import {
   dateLabel,
-  invitationStatus,
   roleLabel,
   type User,
-  type Invitation,
 } from "@/lib/types";
 import { Badge, Heading, Empty } from "@/components/ui";
 import { AdminInsights } from "@/components/admin-insights";
 import type { AdminActivity, AdminOverview } from "@/lib/admin-insights-types";
 export default async function AdminPage() {
   const { token, user } = await requireSession("admin");
-  const [users, invites, overview, activity] = await Promise.all([
+  const [users, overview, activity] = await Promise.all([
     backend<User[]>("/admin/users", token),
-    backend<Invitation[]>("/admin/invitations", token),
     backend<AdminOverview>("/admin/insights/overview", token),
     backend<AdminActivity>("/admin/activity?limit=8", token),
   ]);
@@ -53,8 +49,8 @@ export default async function AdminPage() {
             Pastikan guru dan siswa memiliki akses untuk melangkah ke perjalanan
             belajar berikutnya.
           </p>
-          <Link href="/admin/undangan/baru" className="button white">
-            Buat undangan <ArrowUpRight size={18} aria-hidden="true" />
+          <Link href="/admin/pengguna" className="button white">
+            Kelola pengguna <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
         <div className="welcome-art" aria-hidden="true">
@@ -76,11 +72,10 @@ export default async function AdminPage() {
             Icon: UserCheck,
           },
           {
-            label: "Undangan aktif",
-            value: invites.filter((i) => invitationStatus(i) === "Aktif")
-              .length,
-            detail: "Kode yang masih dapat dipakai",
-            Icon: Ticket,
+            label: "Guru terdaftar",
+            value: users.filter((u) => u.role === "teacher").length,
+            detail: "Akun pengajar",
+            Icon: BookOpen,
           },
         ].map(({ label, value, detail, Icon }) => (
           <section className="metric" key={label}>

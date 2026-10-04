@@ -166,7 +166,7 @@ npm run typecheck --workspace @kodmod/web
 npm run build --workspace @kodmod/web
 ```
 
-Tes akses memerlukan dua server fixture di atas. Verifikasi manual alur mutasi: tambah/edit/nonaktifkan pengguna, kode undangan buat/cabut, daftar memakai kode, filter pengguna, logout, dan akses lintas peran. Setelah pengujian, hentikan kedua terminal; terminal normal kembali menggunakan FastAPI sesuai `.env.local`.
+Tes akses memerlukan dua server fixture di atas. Verifikasi manual alur mutasi: tambah/edit/nonaktifkan pengguna, daftar siswa/guru tanpa undangan, filter pengguna, logout, dan akses lintas peran. Setelah pengujian, hentikan kedua terminal; terminal normal kembali menggunakan FastAPI sesuai `.env.local`.
 
 ## Aturan aksesibilitas
 

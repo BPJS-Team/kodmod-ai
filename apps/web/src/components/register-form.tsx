@@ -7,14 +7,13 @@ import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 export function RegisterForm() {
   const [state, action, pending] = useConfirmedAction(register, {
     title: "Buat akun KODMOD?",
-    text: "Pastikan data dan peran sudah benar. Kode undangan akan digunakan untuk mendaftarkan akun ini.",
+    text: "Pastikan nama dan peran sudah benar sebelum membuat akun.",
     confirmText: "Ya, buat akun",
   });
   const [fields, setFields] = useState({
     full_name: "",
     username: "",
     role: "student",
-    invitation_code: "",
   });
   function update(key: keyof typeof fields, value: string) {
     setFields((previous) => ({ ...previous, [key]: value }));
@@ -29,7 +28,6 @@ export function RegisterForm() {
         {[
           { key: "full_name" as const, label: "Nama lengkap", max: 200 },
           { key: "username" as const, label: "Username", max: 64 },
-          { key: "invitation_code" as const, label: "Kode undangan", max: 32 },
         ].map(({ key, label, max }) => (
           <div className="field" key={key}>
             <label htmlFor={key}>{label}</label>

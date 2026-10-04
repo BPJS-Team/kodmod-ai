@@ -41,7 +41,6 @@ class RegisterRequest(BaseModel):
     password: Password
     full_name: str = Field(min_length=1, max_length=200)
     role: SelfServeRole
-    invitation_code: str = Field(min_length=1, max_length=32)
     grade_level: str | None = None
     preferred_language: Literal["id", "en"] = "id"
 
@@ -49,12 +48,6 @@ class RegisterRequest(BaseModel):
     @classmethod
     def _lower(cls, v: str) -> str:
         return v.lower()
-
-    @field_validator("invitation_code")
-    @classmethod
-    def _upper(cls, v: str) -> str:
-        return v.strip().upper()
-
 
 class LoginRequest(BaseModel):
     username: Username

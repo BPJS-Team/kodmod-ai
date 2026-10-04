@@ -4,9 +4,8 @@ KODMOD AI - Authentication Routes
 
 Register, log in, inspect and edit your own account.
 
-Registration is gated by an invitation code an admin minted. A code is generic:
-it does not carry a role, and the person registering picks student or teacher
-for themselves. Admin accounts are never self-serve.
+Students and teachers can create their own accounts. Admin accounts are
+created only by an existing administrator or the provisioning script.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import current_user, db_session
 from api.security import create_access_token, hash_password, verify_password
 from config.settings import settings
-from database.models import InvitationCode, User
+from database.models import User
 from models.user import (
     ChangePasswordRequest,
     LoginRequest,
@@ -53,23 +52,7 @@ async def register(
     body: RegisterRequest,
     session: AsyncSession = Depends(db_session),
 ) -> TokenResponse:
-    """Create an account by redeeming an invitation code, then log straight in."""
-    # Lock the code row for the rest of the transaction so two people redeeming
-    # the last use of the same code cannot both succeed.
-    code = (
-        await session.execute(
-            select(InvitationCode)
-            .where(InvitationCode.code == body.invitation_code)
-            .with_for_update()
-        )
-    ).scalar_one_or_none()
-
-    if code is None or not code.is_redeemable():
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            "That invitation code is not valid. Ask your administrator for a new one.",
-        )
-
+    """Create a student or teacher account and return its authenticated session."""
     try:
         password_hash = hash_password(body.password)
     except ValueError as e:
@@ -87,7 +70,6 @@ async def register(
         else "standard",
     )
     session.add(user)
-    code.used_count += 1
 
     try:
         await session.flush()

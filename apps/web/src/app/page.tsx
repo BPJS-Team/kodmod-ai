@@ -300,7 +300,7 @@ export default function HomePage() {
               ],
               [
                 "Bagaimana cara mendapatkan akun?",
-                "Hubungi administrator sekolah atau pengelola KODMOD untuk mendapatkan akun atau kode undangan. Jika sudah memiliki akun, pilih Masuk di bagian atas halaman.",
+                "Pilih Daftar, isi nama, username dan kata sandi, lalu pilih peran siswa atau guru. Jika sudah memiliki akun, pilih Masuk.",
               ],
               [
                 "Apakah semua fitur belajar sudah tersedia?",

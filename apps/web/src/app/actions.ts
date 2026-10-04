@@ -60,21 +60,18 @@ export async function register(
   const username = text(data, "username").toLowerCase(),
     full_name = text(data, "full_name"),
     role = text(data, "role"),
-    invitation_code = text(data, "invitation_code").toUpperCase(),
     password = String(data.get("password") ?? "");
   if (
     !full_name ||
     full_name.length > 200 ||
     !/^[a-zA-Z0-9._-]{3,64}$/.test(username) ||
     !["student", "teacher"].includes(role) ||
-    !invitation_code ||
-    invitation_code.length > 32 ||
     password.length < 8 ||
     new TextEncoder().encode(password).length > 72
   )
     return {
       error:
-        "Periksa nama, username, peran, kode undangan, dan kata sandi (minimal 8 karakter).",
+        "Periksa nama, username, peran, dan kata sandi (minimal 8 karakter).",
     };
   let result: { access_token: string; expires_in: number; user: User };
   try {
@@ -85,14 +82,13 @@ export async function register(
         full_name,
         password,
         role,
-        invitation_code,
       }),
     });
   } catch (error) {
-    return error instanceof BackendError && error.status === 400
+    return error instanceof BackendError && error.status === 409
       ? {
           error:
-            "Kode undangan tidak berlaku atau kuotanya sudah habis. Minta kode baru kepada administrator.",
+            "Username sudah digunakan. Pilih username lain.",
         }
       : problem(error);
   }
@@ -171,51 +167,4 @@ export async function toggleUser(
   }
   revalidatePath("/admin", "layout");
   return { success: "Status akun berhasil diperbarui." };
-}
-export async function createInvitation(
-  _state: ActionState,
-  data: FormData,
-): Promise<ActionState> {
-  const { token } = await requireSession("admin");
-  const label = text(data, "label"),
-    max_uses = Number(data.get("max_uses")),
-    expires_in_days = Number(data.get("expires_in_days"));
-  if (
-    !label ||
-    label.length > 200 ||
-    !Number.isInteger(max_uses) ||
-    max_uses < 1 ||
-    max_uses > 1000 ||
-    !Number.isInteger(expires_in_days) ||
-    expires_in_days < 1 ||
-    expires_in_days > 365
-  )
-    return { error: "Isi label, kuota 1–1.000, dan masa berlaku 1–365 hari." };
-  try {
-    await backend("/admin/invitations", token, {
-      method: "POST",
-      body: JSON.stringify({ label, max_uses, expires_in_days }),
-    });
-  } catch (error) {
-    return problem(error);
-  }
-  revalidatePath("/admin", "layout");
-  redirect("/admin/undangan?success=created");
-}
-export async function revokeInvitation(
-  _state: ActionState,
-  data: FormData,
-): Promise<ActionState> {
-  const { token } = await requireSession("admin");
-  const id = text(data, "id");
-  if (!id) return { error: "Pilih undangan terlebih dahulu." };
-  try {
-    await backend(`/admin/invitations/${encodeURIComponent(id)}`, token, {
-      method: "DELETE",
-    });
-  } catch (error) {
-    return problem(error);
-  }
-  revalidatePath("/admin", "layout");
-  redirect("/admin/undangan?success=revoked");
 }

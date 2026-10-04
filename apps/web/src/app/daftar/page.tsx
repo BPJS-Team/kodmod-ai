@@ -8,10 +8,9 @@ export default async function RegisterPage() {
   if (current) redirect(homeFor(current.user.role));
   return (
     <AuthShell register>
-      <span className="auth-label">Mulai perjalananmu</span>
-      <h1>Ruang baru untuk bertumbuh.</h1>
+      <h1>Buat akun KODMOD</h1>
       <p className="auth-description">
-        Gunakan kode undangan dari administrator sekolah untuk bergabung.
+        Pilih peranmu dan mulai belajar atau mengajar.
       </p>
       <RegisterForm />
     </AuthShell>

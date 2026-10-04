@@ -2,19 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff, LoaderCircle, Check } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import {
   login,
   saveUser,
   toggleUser,
-  createInvitation,
-  revokeInvitation,
 } from "@/app/actions";
 import {
   ActionFeedback as Feedback,
   useConfirmedAction,
 } from "./action-feedback";
-import { confirmAction, notifyResult } from "@/lib/dialogs";
 import { roleLabel, type User } from "@/lib/types";
 
 function Submit({
@@ -106,7 +103,7 @@ export function LoginForm() {
         Masuk ke ruang belajar <ArrowRight size={18} />
       </Submit>
       <p className="form-help">
-        Punya kode undangan?{" "}
+        Belum punya akun?{" "}
         <Link className="text-link" href="/daftar">
           Buat akun
         </Link>
@@ -241,137 +238,5 @@ export function StatusForm({ user, self }: { user: User; self: boolean }) {
       )}
       <Feedback state={state} />
     </section>
-  );
-}
-export function InvitationForm() {
-  const [state, action, pending] = useConfirmedAction(createInvitation, {
-    title: "Buat kode undangan?",
-    text: "Kode ini membuka pendaftaran siswa dan guru sesuai kuota dan masa berlaku yang Anda isi.",
-    confirmText: "Ya, buat undangan",
-  });
-  const [label, setLabel] = useState("");
-  const [quota, setQuota] = useState("20");
-  const [days, setDays] = useState("14");
-  return (
-    <form
-      onReset={(event) => event.preventDefault()}
-      action={action}
-      className="panel form-panel"
-    >
-      <div className="field">
-        <label htmlFor="label">Nama undangan</label>
-        <input
-          id="label"
-          name="label"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          required
-          maxLength={200}
-          placeholder="Contoh: Pendaftaran tahun ajaran baru"
-        />
-      </div>
-      <div className="form-grid">
-        <div className="field">
-          <label htmlFor="max_uses">Kuota penggunaan</label>
-          <input
-            id="max_uses"
-            name="max_uses"
-            type="number"
-            required
-            min={1}
-            max={1000}
-            value={quota}
-            onChange={(e) => setQuota(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="expires_in_days">Masa berlaku (hari)</label>
-          <input
-            id="expires_in_days"
-            name="expires_in_days"
-            type="number"
-            required
-            min={1}
-            max={365}
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-          />
-        </div>
-      </div>
-      <p className="form-help">
-        Kode dapat dipakai mendaftar sebagai siswa atau guru. Pengguna tidak
-        otomatis bergabung ke kelas.
-      </p>
-      <Feedback state={state} />
-      <div className="form-footer">
-        <Link className="button secondary" href="/admin/undangan">
-          Batal
-        </Link>
-        <Submit pending={pending}>Buat kode undangan</Submit>
-      </div>
-    </form>
-  );
-}
-export function RevokeForm({ id, code }: { id: string; code: string }) {
-  const [state, action, pending] = useConfirmedAction(revokeInvitation, {
-    title: "Cabut kode undangan?",
-    text: `Kode ${code} tidak dapat dipakai lagi. Akun yang sudah terdaftar tetap ada.`,
-    confirmText: "Ya, cabut kode",
-    destructive: true,
-  });
-  return (
-    <div className="revoke-action">
-      <form onReset={(event) => event.preventDefault()} action={action}>
-        <input type="hidden" name="id" value={id} />
-        <p>
-          Kode <strong>{code}</strong> tidak akan bisa dipakai lagi. Akun yang
-          sudah terdaftar tetap ada.
-        </p>
-        <Submit pending={pending}>Ya, cabut kode</Submit>
-        <Feedback state={state} />
-      </form>
-    </div>
-  );
-}
-export function CopyCode({ code }: { code: string }) {
-  const [status, setStatus] = useState("");
-  return (
-    <>
-      <button
-        type="button"
-        className="button small secondary"
-        onClick={async () => {
-          if (
-            !(await confirmAction({
-              title: "Salin kode undangan?",
-              text: "Kode akan disalin ke clipboard. Bagikan hanya kepada calon pengguna sekolah.",
-              confirmText: "Ya, salin",
-            }))
-          )
-            return;
-          try {
-            await navigator.clipboard.writeText(code);
-            setStatus("Kode disalin.");
-            await notifyResult("Kode undangan berhasil disalin.");
-          } catch {
-            await notifyResult(
-              "Belum dapat menyalin. Pilih teks kode lalu salin secara manual.",
-              true,
-            );
-            setStatus(
-              "Belum dapat menyalin. Pilih teks kode lalu salin secara manual.",
-            );
-          }
-        }}
-      >
-        {status === "Kode disalin." ? (
-          <Check size={16} aria-hidden="true" />
-        ) : null}
-        Salin
-      </button>
-      <span className="copy-status" role="status">
-        {status}
-      </span>
-    </>
   );
 }
