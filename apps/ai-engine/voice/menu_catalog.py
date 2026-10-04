@@ -30,5 +30,10 @@ MENU_AUDIO = {
     "users": ("Pengguna", "Users"),
     "activity": ("Aktivitas dan layanan", "Activity and services"),
     "sound": ("Pengaturan suara dan bahasa", "Voice and language settings"),
+    "sound-on": ("Suara menu aktif", "Menu voice is on"),
+    "sound-off": ("Suara menu mati", "Menu voice is off"),
+    "language": ("Bahasa. Pilih Bahasa Indonesia atau Inggris.", "Language. Choose Indonesian or English."),
+    "navigation": ("Buka navigasi", "Open navigation"),
+    "language-changed": ("Bahasa telah berubah ke Bahasa Indonesia.", "Language changed to English."),
     "logout": ("Keluar dari akun", "Sign out"),
 }

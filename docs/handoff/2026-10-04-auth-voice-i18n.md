@@ -6,11 +6,11 @@ Status 4 Oktober 2026: handoff ini sudah diimplementasikan. Rincian pemeriksaan 
 
 - Siswa dan guru mendaftar tanpa kode undangan; admin tetap tidak dapat dibuat lewat registrasi publik.
 - Setup awal menyediakan panduan dan contoh suara KODMOD/perangkat. Default suara KODMOD, pembaca menu ON, Tutor ON. Pilihan, low vision, dan navigasi geser tersimpan di perangkat.
-- Navbar semua ruang menyediakan suara menu ON/OFF, pengaturan, dan ID/EN. Menu OFF tidak mematikan jawaban Tutor baru yang otomatis dibacakan.
+- Navbar semua ruang menyediakan suara menu ON/OFF, pengaturan, dan ID/EN. Menu dibaca saat hover (jeda 300 ms), fokus keyboard, atau klik. Menu OFF tidak mematikan jawaban Tutor baru yang otomatis dibacakan.
 - Satu koordinator mengatur output: pause/replay/stop, membatalkan audio tertunda, menjaga Tutor dari gangguan menu. Rekaman ditinjau sebagai teks sebelum dikirim.
 - Endpoint menu tamu hanya mengenal teks aplikasi yang dibatasi server. TTS teks bebas membutuhkan akun aktif; cache audio privat dipisahkan per akun.
 - Audio disimpan di browser dan volume Docker. Kunci mencakup teks, bahasa, profil/preset, dan cakupan pengguna. Penulisan atomik dan kunci lintas proses mencegah generasi ganda. Masa simpan server 30 hari, batas 1 GiB; browser 50 audio / 64 MB.
-- Bahasa disimpan lewat cookie dan profil akun. Login mengikuti profil; logout mempertahankan bahasa perangkat. Prompt AI, STT, suara perangkat, serta kalimat kuis/scoring memakai bahasa tiap permintaan.
+- Bahasa disimpan lewat cookie dan profil akun. Login mengikuti profil; logout mempertahankan bahasa perangkat. Perubahan bahasa yang berhasil mengucapkan konfirmasi dalam bahasa tujuan saat pembaca menu ON. Prompt AI, STT, suara perangkat, serta kalimat kuis/scoring memakai bahasa tiap permintaan.
 - UI memakai kamus terpusat, label aksesibel, switch shadcn, dan tanggal sesuai locale. Konten guru tetap dalam bahasa aslinya.
 - Landing/auth disederhanakan: copy fungsional, tema navy/biru, tanpa penjelasan provider/key/cache untuk pengguna. Tombol simpan popup tetap terlihat saat badan popup digulir.
 
@@ -18,8 +18,8 @@ Browser dapat menahan autoplay sampai ada interaksi. Tombol **Dengarkan panduan*
 
 ## Lanjutan yang diminta pengguna
 
-1. Bacakan menu saat hover, selain fokus keyboard dan klik; tetap cegah pemotongan Tutor/rekaman.
-2. Bacakan konfirmasi saat bahasa berubah dalam bahasa tujuan, memakai katalog audio server.
+1. Hover dan konfirmasi bahasa telah diimplementasikan. Tes kode mencakup keluar sebelum jeda, transisi anak tombol, prioritas Tutor/rekaman, nilai input privat, serta perubahan bahasa gagal/tidak berubah.
+2. Konfirmasi memakai katalog audio bersama. URL audio menu menyertakan versi profil agar pergantian preset tidak memakai audio HTTP lama.
 3. Uji dokumen nyata dari folder `materi`, termasuk buku banyak bab dan modul satu topik. Evaluasi ekstraksi, indeks, cakupan sumber, dan pembagian bab.
 4. Hitung progres scope dengan kriteria yang jelas, bukan jumlah komponen atau tes.
 

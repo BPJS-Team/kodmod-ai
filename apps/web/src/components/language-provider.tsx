@@ -18,7 +18,7 @@ export function LanguageProvider({ initialLanguage, children }: { initialLanguag
     if (!response.ok) throw new Error(translate("Bahasa belum dapat disimpan. Coba lagi.", language));
     setChoice({ source: initialLanguage, value: next });
     document.documentElement.lang = next;
-    window.dispatchEvent(new Event("kodmod:language-change"));
+    if (next !== language) window.dispatchEvent(new CustomEvent("kodmod:language-change", { detail: { language: next } }));
     router.refresh();
   }, [language, initialLanguage, router]);
   const value = useMemo(() => ({ language, t: (text: string, values?: Record<string, string | number>) => translate(text, language, values),

@@ -64,3 +64,26 @@ async def test_public_voice_only_accepts_menu_catalog(editorial_http, monkeypatc
     assert response.content == b"ID3-preview"
     assert (await client.get("/voice/menu/free-text?language=id")).status_code == 404
     assert (await client.get("/voice/menu/welcome?language=xx")).status_code == 422
+
+
+@pytest.mark.parametrize("language,expected", [
+    ("id", "Bahasa telah berubah ke Bahasa Indonesia."),
+    ("en", "Language changed to English."),
+])
+async def test_language_confirmation_is_shared_across_accounts(editorial_http, monkeypatch, language, expected):
+    from api.routes import voice
+    client, _, _, _, _, headers = editorial_http
+    requests = []
+
+    async def audio(text, **kwargs):
+        requests.append((text, kwargs))
+        return b"ID3-language"
+
+    monkeypatch.setattr(voice, "synthesise_bytes", audio)
+    for actor in [None, "student", "owner"]:
+        response = await client.get(f"/voice/menu/language-changed?language={language}",
+                                    headers=headers(actor) if actor else {})
+        assert response.status_code == 200, response.text
+        assert "public" in response.headers["cache-control"]
+    assert all(text == expected and context["language"] == language
+               and context["scope"] == "public-menu" for text, context in requests)

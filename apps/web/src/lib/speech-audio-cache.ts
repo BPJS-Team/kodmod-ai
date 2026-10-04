@@ -123,7 +123,7 @@ async function deleteSpeechAudio(key: string) {
 
 async function requestAudio(text: string, context: SpeechContext = {}) {
   const endpoint = context.menuKey
-    ? `/api/voice/menu/${encodeURIComponent(context.menuKey)}?language=${context.language ?? "id"}`
+    ? `/api/voice/menu/${encodeURIComponent(context.menuKey)}?language=${context.language ?? "id"}&v=${encodeURIComponent(context.profile ?? "default")}`
     : "/api/voice/tts";
   const response = await fetch(endpoint, {
     method: context.menuKey ? "GET" : "POST",

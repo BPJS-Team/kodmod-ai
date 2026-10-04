@@ -21,7 +21,7 @@ export default function LandingMenu({ links }: { links: string[][] }) {
         }
       }}
     >
-      <summary aria-label={t("Buka navigasi")}>
+      <summary data-voice-menu="navigation" aria-label={t("Buka navigasi")}>
         <Menu size={23} />
       </summary>
       <nav aria-label={t("Navigasi seluler")}>

@@ -8,6 +8,8 @@ import { DEFAULT_VOICE_SETTINGS, parseVoiceSettings, readVoiceSettingsSnapshot, 
   type VoiceSettings, type SpeechEngine } from "@/lib/speech-preferences.mjs";
 import { clearSpeechAudioCache, pruneExpiredSpeechAudioCache } from "@/lib/speech-audio-cache";
 import { speechOutput } from "@/lib/browser-speech";
+import { attachMenuNarration, announceLanguageChange } from "@/lib/menu-narration.mjs";
+import type { Language } from "@/lib/i18n.mjs";
 import { useI18n } from "./language-provider";
 import { Switch } from "./ui/switch";
 
@@ -55,6 +57,7 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
   const returnFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
   const initialGuidePlayed = useRef(false);
+  const pendingLanguage = useRef<Language | null>(null);
   const opened = ready && (!saved || settingsOpen);
   const output = useSyncExternalStore(speechOutput.subscribe, speechOutput.getState, speechOutput.getState);
   const previewActive = output.owner === "voice-setup";
@@ -106,32 +109,26 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
   useEffect(() => () => speechOutput.stop(), [pathname, language]);
 
   useEffect(() => {
-    if (!ready || opened || !saved || !preferences.menuEnabled) return;
-    let last: Element | null = null, lastAt = 0;
-    const narration = (event: Event) => {
-      const element = (event.target as HTMLElement)?.closest<HTMLElement>(
-        "[data-voice-menu],a,button,summary,input,select,textarea");
-      if (!element || element.closest("[data-voice-ignore],.swal2-container") || element.hasAttribute("disabled")) { speechOutput.cancelQueuedMenu(); return; }
-      if (document.querySelector(".voice-panel[data-recording=true]")) { speechOutput.cancelQueuedMenu(); return; }
-      const current = speechOutput.getState();
-      if (current.owner && current.owner !== "menu" && ["loading", "playing", "paused"].includes(current.status)) { speechOutput.cancelQueuedMenu(); return; }
-      const now = Date.now();
-      if (last === element && now - lastAt < 800) return;
-      last = element; lastAt = now;
-      const fieldKey: Record<string, string> = { username: "username", password: "password", full_name: "full-name", role: "role" };
-      const menuKey = element.dataset.voiceMenu ?? fieldKey[element.getAttribute("name") ?? ""];
-      const label = element.getAttribute("aria-label")
-        ?? (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
-          ? element.labels?.[0]?.textContent : element.textContent);
-      const text = label?.trim().slice(0, 300);
-      if (!text || (!menuKey && !/^\/(siswa|guru|admin)(\/|$)/.test(pathname))) { speechOutput.cancelQueuedMenu(); return; }
-      speechOutput.queueMenu({ owner: "menu", text, engine: preferences.engine, language, menuKey },
-        () => !document.querySelector(".voice-panel[data-recording=true],dialog[open],.swal2-container"));
+    const changed = (event: Event) => {
+      const next = (event as CustomEvent<{ language: Language }>).detail?.language;
+      if (next === "id" || next === "en") pendingLanguage.current = next;
     };
-    document.addEventListener("focusin", narration);
-    document.addEventListener("click", narration);
-    return () => { document.removeEventListener("focusin", narration);
-      document.removeEventListener("click", narration); speechOutput.stop("menu"); };
+    window.addEventListener("kodmod:language-change", changed);
+    return () => window.removeEventListener("kodmod:language-change", changed);
+  }, []);
+
+  useEffect(() => {
+    if (pendingLanguage.current !== language) return;
+    pendingLanguage.current = null;
+    // Runs after the previous language's audio cleanup, so the confirmation survives.
+    void announceLanguageChange(speechOutput, language, { engine: opened ? draft.engine : preferences.engine,
+      enabled: opened ? draft.menuEnabled : preferences.menuEnabled,
+      recording: Boolean(document.querySelector(".voice-panel[data-recording=true]")) });
+  }, [language, opened, draft.engine, draft.menuEnabled, preferences.engine, preferences.menuEnabled]);
+
+  useEffect(() => {
+    if (!ready || opened || !saved || !preferences.menuEnabled) return;
+    return attachMenuNarration({ document, speech: speechOutput, language, engine: preferences.engine, pathname });
   }, [ready, opened, saved, preferences.menuEnabled, preferences.engine, pathname, language]);
 
   useEffect(() => {
