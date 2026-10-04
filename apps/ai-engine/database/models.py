@@ -396,6 +396,8 @@ class QuizSession(Base):
     correct_count: Mapped[int] = mapped_column(Integer, default=0)
     final_score: Mapped[float | None] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20), default="in_progress")
+    # Committed REST assessment state; legacy sessions remain null and must restart.
+    assessment_state: Mapped[dict | None] = mapped_column(JSON)
 
 
 class QuizQuestion(Base):
@@ -433,6 +435,54 @@ class QuizAttempt(Base):
     feedback: Mapped[str | None] = mapped_column(Text)
     response_latency_ms: Mapped[int | None] = mapped_column(Integer)
     answered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AssessmentSubmission(Base):
+    __tablename__ = "assessment_submissions"
+    __table_args__ = (
+        UniqueConstraint("quiz_session_id", "attempt_index", name="uq_assessment_attempt_index"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    quiz_session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_sessions.id", ondelete="CASCADE"), index=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_questions.id", ondelete="CASCADE")
+    )
+    quiz_attempt_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("quiz_attempts.id", ondelete="CASCADE"), unique=True
+    )
+    attempt_index: Mapped[int] = mapped_column(Integer)
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+    response_payload: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class MasteryEvent(Base):
+    __tablename__ = "mastery_events"
+    __table_args__ = (
+        UniqueConstraint("submission_id", "concept_id", name="uq_mastery_submission_concept"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assessment_submissions.id", ondelete="CASCADE")
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    concept_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("concepts.id", ondelete="CASCADE")
+    )
+    score: Mapped[float] = mapped_column(Float)
+    confidence: Mapped[float] = mapped_column(Float)
+    mastery_before: Mapped[float] = mapped_column(Float)
+    mastery_after: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 # --------------------------------------------------------------- mastery --

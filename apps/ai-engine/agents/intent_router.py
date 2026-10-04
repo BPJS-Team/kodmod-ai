@@ -77,6 +77,15 @@ Return ONLY a JSON object, no prose:
 async def intent_router_node(state: KODMODState) -> dict:
     """LangGraph node - the graph entry point, before any cluster logic."""
     text = state.get("user_input", "")
+    if state.get("assessment_managed") and state.get("student_answer"):
+        # This endpoint explicitly submits an answer; even "stop" is answer text.
+        return {
+            "intent": "quiz",
+            "intent_confidence": 1.0,
+            "student_answer": state["student_answer"],
+            "next_action": "score_answer",
+            "last_node": "intent_router",
+        }
     if not text.strip():
         # No utterance to classify (e.g. a REST entrypoint that drives the graph
         # directly). Honour a concrete intent the caller already set instead of

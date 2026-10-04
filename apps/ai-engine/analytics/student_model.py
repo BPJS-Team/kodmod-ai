@@ -240,7 +240,16 @@ async def update_student_model_node(state) -> dict[str, Any]:
     if not student_id or not attempts:
         return {"next_action": "generate_analytics", "last_node": "update_student_model"}
 
-    model = await StudentModel.load(student_id)
+    managed = state.get("assessment_managed", False)
+    model = (
+        StudentModel(
+            student_id,
+            _scores=dict(state.get("mastery_scores", {})),
+            _confidence=dict(state.get("mastery_confidence", {})),
+        )
+        if managed
+        else await StudentModel.load(student_id)
+    )
     q_by_id = {q.get("question_id"): q for q in questions}
     applied = min(max(int(state.get("mastery_applied_attempts", 0)), 0), len(attempts))
     for a in attempts[applied:]:
@@ -256,13 +265,14 @@ async def update_student_model_node(state) -> dict[str, Any]:
             continue
         model.update(cid, float(a.get("score", 0.0)), confidence=float(a.get("confidence", 0.9)))
 
-    await model.persist()
+    if not managed:
+        await model.persist()
 
     # Advance the question index and mirror the progress into short-term
     # memory so the next utterance re-enters the graph on the right question.
     new_index = state.get("current_question_index", 0) + 1
     session_id = state.get("session_id")
-    if session_id:
+    if session_id and not managed:
         try:
             from memory.short_term import clear_quiz_session, store_quiz_session
 

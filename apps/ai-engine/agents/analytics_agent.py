@@ -39,6 +39,21 @@ log = logging.getLogger(__name__)
 
 async def analytics_node(state: KODMODState) -> dict[str, Any]:
     """Compute analytics for the current student and update state."""
+    if state.get("assessment_managed"):
+        # Pending evidence has not committed yet. Keep this preview in the graph;
+        # dashboards aggregate the accepted SQL rows after the REST transaction.
+        scores = list(state.get("mastery_scores", {}).values())
+        summary = {
+            **state.get("analytics_summary", {}),
+            "overall_mastery": sum(scores) / len(scores) if scores else 0.0,
+            "avg_quiz_score": state.get("cumulative_quiz_score", 0.0),
+        }
+        return {
+            "analytics_summary": summary,
+            "generated_response": f"Latihan selesai. Nilai latihanmu {round(summary['avg_quiz_score'] * 100)} persen.",
+            "next_action": "recommend",
+            "last_node": "analytics",
+        }
     student_id = state.get("student_id")
     if not student_id:
         log.warning("Analytics called without student_id")

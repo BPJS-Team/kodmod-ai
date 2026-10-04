@@ -1,7 +1,6 @@
 """Stage 4 §7 - /quiz endpoints.
 
-Spec: docs/testplan/04-api.md §7 (KM-API-070..075). Whole group is a known-bug
-backlog until #1 (Student.profile), #5 (field mismatch), #6, #11 are fixed.
+Spec: docs/assessment-api.md and docs/testplan/04-api.md §7.
 """
 
 from __future__ import annotations
@@ -46,10 +45,14 @@ async def test_km_api_072_quiz_submit(client, student_factory, auth_headers) -> 
     r = await client.post(
         "/quiz/submit",
         headers=auth_headers(tok),
-        json={"quiz_session_id": str(uuid.uuid4()), "question_id": "q1", "student_answer": "A"},
+        json={
+            "quiz_session_id": str(uuid.uuid4()),
+            "question_id": str(uuid.uuid4()),
+            "submission_id": str(uuid.uuid4()),
+            "student_answer": "A",
+        },
     )
-    assert r.status_code == 200
-    assert {"score", "is_correct", "feedback", "quiz_complete", "cumulative_score"} <= set(r.json())
+    assert r.status_code == 404
 
 
 async def test_km_api_073_quiz_submit_completes(
@@ -66,8 +69,14 @@ async def test_km_api_073_quiz_submit_completes(
     sub = await client.post(
         "/quiz/submit",
         headers=auth_headers(tok),
-        json={"quiz_session_id": sess, "question_id": "q1", "student_answer": "A"},
+        json={
+            "quiz_session_id": sess,
+            "question_id": start.json()["first_question"]["question_id"],
+            "submission_id": str(uuid.uuid4()),
+            "student_answer": "A",
+        },
     )
+    assert sub.status_code == 200, sub.text
     assert sub.json()["quiz_complete"] is True
     assert sub.json()["final_summary"]
 

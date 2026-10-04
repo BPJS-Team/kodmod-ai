@@ -162,6 +162,7 @@ class KODMODState(TypedDict, total=False):
     accessible_response: str  # post-accessibility-agent text; this is what ships
 
     # ---- Quiz state --------------------------------------------------------
+    assessment_managed: bool  # REST owns the database transaction and durable evidence
     quiz_session_id: str
     quiz_n_questions: int  # explicit length request (0 = let the agent decide)
     quiz_questions: list[QuizQuestion]
@@ -253,6 +254,7 @@ def initial_state(
         generated_response="",
         accessible_response="",
         quiz_session_id="",
+        assessment_managed=False,
         quiz_n_questions=0,
         quiz_questions=[],
         current_question_index=0,

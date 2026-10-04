@@ -149,11 +149,44 @@ def test_km_contract_007_quiz_submit_request_field_names() -> None:
     assert set(QuizSubmitRequest.model_fields) == {
         "quiz_session_id",
         "question_id",
+        "submission_id",
         "student_answer",
         "response_latency_ms",
     }
-    r = QuizSubmitRequest(quiz_session_id=uuid.uuid4(), question_id="q1", student_answer="A")
+    r = QuizSubmitRequest(
+        quiz_session_id=uuid.uuid4(),
+        question_id=uuid.uuid4(),
+        submission_id=uuid.uuid4(),
+        student_answer=" A ",
+    )
     assert r.response_latency_ms is None
+    assert r.student_answer == "A"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("submission_id", "not-a-uuid"),
+        ("question_id", "q1"),
+        ("student_answer", "   "),
+        ("student_answer", "a" * 4001),
+        ("response_latency_ms", -1),
+        ("response_latency_ms", 3600001),
+        ("response_latency_ms", 1.5),
+    ],
+)
+def test_quiz_submission_rejects_invalid_evidence(field, value):
+    from models.quiz import QuizSubmitRequest
+
+    payload = {
+        "quiz_session_id": uuid.uuid4(),
+        "question_id": uuid.uuid4(),
+        "submission_id": uuid.uuid4(),
+        "student_answer": "A",
+    }
+    payload[field] = value
+    with pytest.raises(ValidationError):
+        QuizSubmitRequest(**payload)
 
 
 def test_km_contract_008_quiz_submit_response_defaults_and_bounds() -> None:

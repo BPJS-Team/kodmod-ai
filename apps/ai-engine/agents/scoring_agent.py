@@ -282,6 +282,8 @@ async def _persist_progress(
     `settings.QUIZ_MAX_ATTEMPTS_PER_QUESTION` failed tries instead of looping
     on the same question forever.
     """
+    if state.get("assessment_managed"):
+        return
     session_id = state.get("session_id")
     if not session_id:
         return

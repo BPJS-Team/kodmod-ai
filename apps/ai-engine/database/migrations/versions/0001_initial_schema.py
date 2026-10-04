@@ -53,10 +53,31 @@ BASELINE_TABLES = {
 
 def _baseline_metadata() -> sa.MetaData:
     metadata = sa.MetaData()
-    changed_tables = {"curriculum_chunks", "learning_sessions"}
+    changed_tables = {"curriculum_chunks", "learning_sessions", "quiz_sessions"}
     for table in Base.metadata.tables.values():
         if table.name in BASELINE_TABLES and table.name not in changed_tables:
             table.to_metadata(metadata)
+    sa.Table(
+        "quiz_sessions",
+        metadata,
+        sa.Column("id", UUID(as_uuid=True), primary_key=True),
+        sa.Column(
+            "student_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
+        sa.Column(
+            "concept_id", UUID(as_uuid=True), sa.ForeignKey("concepts.id", ondelete="SET NULL")
+        ),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("ended_at", sa.DateTime(timezone=True)),
+        sa.Column("total_questions", sa.Integer(), nullable=False),
+        sa.Column("correct_count", sa.Integer(), nullable=False),
+        sa.Column("final_score", sa.Float()),
+        sa.Column("status", sa.String(20), nullable=False),
+    )
     sa.Table(
         "learning_sessions",
         metadata,

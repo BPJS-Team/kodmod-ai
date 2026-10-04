@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class QuizStartRequest(BaseModel):
@@ -33,9 +33,15 @@ class QuizStartResponse(BaseModel):
 
 class QuizSubmitRequest(BaseModel):
     quiz_session_id: uuid.UUID
-    question_id: str
-    student_answer: str
-    response_latency_ms: int | None = None
+    question_id: uuid.UUID
+    submission_id: uuid.UUID
+    student_answer: str = Field(min_length=1, max_length=4000)
+    response_latency_ms: int | None = Field(default=None, ge=0, le=3600000, strict=True)
+
+    @field_validator("student_answer", mode="before")
+    @classmethod
+    def trim_answer(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class QuizSubmitResponse(BaseModel):
