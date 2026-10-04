@@ -1,10 +1,41 @@
 export const SPEECH_ENGINE_PREFERENCE_KEY = "kodmod.speech-engine.v1";
 export const SPEECH_AUDIO_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const VOICE_SETTINGS_KEY = "kodmod.voice-settings.v2";
+export const DEFAULT_VOICE_SETTINGS = Object.freeze({ engine: "app", menuEnabled: true,
+  tutorEnabled: true, lowVision: false, guidedNavigation: false });
 
 const AUDIO_CACHE_VERSION = "kodmod-elevenlabs-v2";
 const inFlightAudio = new Map();
 let inMemoryPreference = null;
 let cacheGeneration = 0;
+let memorySettings = null;
+
+export function readVoiceSettingsSnapshot() {
+  try { return globalThis.localStorage?.getItem(VOICE_SETTINGS_KEY) ?? memorySettings; }
+  catch { return memorySettings; }
+}
+
+export function parseVoiceSettings(snapshot) {
+  try {
+    const value = JSON.parse(snapshot);
+    if (!value || !["app", "device"].includes(value.engine)) return null;
+    return { engine: value.engine,
+      menuEnabled: typeof value.menuEnabled === "boolean" ? value.menuEnabled : true,
+      tutorEnabled: typeof value.tutorEnabled === "boolean" ? value.tutorEnabled : true,
+      lowVision: value.lowVision === true, guidedNavigation: value.guidedNavigation === true };
+  } catch { return null; }
+}
+
+export function writeVoiceSettings(value) {
+  const parsed = parseVoiceSettings(JSON.stringify(value));
+  if (!parsed) return false;
+  memorySettings = JSON.stringify(parsed);
+  let saved = true;
+  try { globalThis.localStorage.setItem(VOICE_SETTINGS_KEY, memorySettings); }
+  catch { saved = false; }
+  announcePreferenceChange();
+  return saved;
+}
 
 function announcePreferenceChange() {
   if (typeof window !== "undefined") {
@@ -63,9 +94,10 @@ async function digestSpeechText(value) {
   return fallbackDigest(value);
 }
 
-export async function speechAudioCacheKey(text) {
+export async function speechAudioCacheKey(text, context = {}) {
   const normalized = String(text ?? "").trim();
-  const digest = await digestSpeechText(normalized);
+  const digest = await digestSpeechText(JSON.stringify([normalized, context.language ?? "id",
+    context.profile ?? "legacy", context.scope ?? "legacy", context.menuKey ?? ""]));
   return `${AUDIO_CACHE_VERSION}:${digest}`;
 }
 
@@ -81,11 +113,12 @@ export function createSpeechAudioLoader({
   now = Date.now,
   cacheTtlMs = SPEECH_AUDIO_CACHE_TTL_MS,
 }) {
-  return async function loadSpeechAudio(text) {
+  return async function loadSpeechAudio(text, context = {}) {
     const normalized = String(text ?? "").trim();
     if (!normalized) throw new Error("Teks untuk dibacakan masih kosong.");
 
-    const key = await speechAudioCacheKey(normalized);
+    if (context.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    const key = await speechAudioCacheKey(normalized, context);
     let cached = null;
     try {
       cached = await read(key);
@@ -97,14 +130,14 @@ export function createSpeechAudioLoader({
     }
 
     const pending = inFlightAudio.get(key);
-    if (pending) {
-      const blob = await pending;
+    if (pending && !pending.signal?.aborted) {
+      const blob = await pending.promise;
       return { blob, cached: false };
     }
 
     const generation = cacheGeneration;
     const request = (async () => {
-      const blob = await fetchAudio(normalized);
+      const blob = await fetchAudio(normalized, context);
       if (generation === cacheGeneration) {
         try {
           await write(key, { blob, expiresAt: now() + cacheTtlMs });
@@ -114,11 +147,12 @@ export function createSpeechAudioLoader({
       }
       return blob;
     })();
-    inFlightAudio.set(key, request);
+    const entry = { promise: request, signal: context.signal };
+    inFlightAudio.set(key, entry);
     try {
       return { blob: await request, cached: false };
     } finally {
-      if (inFlightAudio.get(key) === request) inFlightAudio.delete(key);
+      if (inFlightAudio.get(key) === entry) inFlightAudio.delete(key);
     }
   };
 }

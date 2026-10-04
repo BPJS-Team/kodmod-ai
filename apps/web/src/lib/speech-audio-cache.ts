@@ -2,7 +2,8 @@ import {
   createSpeechAudioLoader,
   invalidateSpeechAudioCache,
   SPEECH_AUDIO_CACHE_TTL_MS,
-  type CachedSpeechAudio,
+    type CachedSpeechAudio,
+    type SpeechContext,
 } from "./speech-preferences.mjs";
 
 const DATABASE_NAME = "kodmod-speech-audio-v1";
@@ -120,11 +121,15 @@ async function deleteSpeechAudio(key: string) {
   });
 }
 
-async function requestAudio(text: string) {
-  const response = await fetch("/api/voice/tts", {
-    method: "POST",
+async function requestAudio(text: string, context: SpeechContext = {}) {
+  const endpoint = context.menuKey
+    ? `/api/voice/menu/${encodeURIComponent(context.menuKey)}?language=${context.language ?? "id"}`
+    : "/api/voice/tts";
+  const response = await fetch(endpoint, {
+    method: context.menuKey ? "GET" : "POST",
     headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text }),
+    body: context.menuKey ? undefined : JSON.stringify({ text, language: context.language }),
+    signal: context.signal,
   });
   if (!response.ok) {
     const message = await response
@@ -144,8 +149,15 @@ const loadSpeechAudio = createSpeechAudioLoader({
   fetchAudio: requestAudio,
 });
 
-export function getSpeechAudio(text: string) {
-  return loadSpeechAudio(text);
+export async function getSpeechAudio(text: string, context: SpeechContext = {}) {
+  // Always resolve scope before a private local cache lookup. A shared browser
+  // must never replay another account's cached answer after login/logout.
+  const response = await fetch("/api/voice/profile", { cache: "no-store", signal: context.signal });
+  if (!response.ok) throw new Error("Audio belum dapat dibuat. Coba lagi.");
+  const profile = await response.json() as { profile: string; scope: string };
+  if (!context.menuKey && profile.scope === "guest") throw new Error("Sesi berakhir. Silakan masuk kembali.");
+  return loadSpeechAudio(text, { ...context, profile: profile.profile,
+    scope: context.menuKey ? "public-menu" : profile.scope });
 }
 
 export async function pruneExpiredSpeechAudioCache() {

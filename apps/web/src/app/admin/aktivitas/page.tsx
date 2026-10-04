@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { AdminInsights } from "@/components/admin-insights";
 import { Heading } from "@/components/ui";
 import type { AdminActivity, AdminOverview } from "@/lib/admin-insights-types";
@@ -14,8 +16,8 @@ export default async function AdminActivityPage() {
   return (
     <>
       <Heading
-        title="Aktivitas & layanan"
-        description="Pantau kesehatan operasional KODMOD dan status provider pendukung."
+        title={<UiText>{"Aktivitas & layanan"}</UiText>}
+        description={<UiText>{"Pantau kesehatan operasional KODMOD dan status provider pendukung."}</UiText>}
       />
       <AdminInsights initialOverview={overview} initialActivity={activity} />
     </>

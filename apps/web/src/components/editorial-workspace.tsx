@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n, UiDate } from "@/components/language-provider";
+
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -72,6 +74,7 @@ export function QuizWorkspace({
   mode?: "owner" | "review";
   admin?: boolean;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [draft, setDraft] = useState(initial);
   const [title, setTitle] = useState(initial?.version.title ?? "");
@@ -219,12 +222,10 @@ export function QuizWorkspace({
   return (
     <>
       <div className="editorial-status-bar">
-        <Badge active={state !== "rejected"}>{quizState[state]}</Badge>
-        <span>
-          Revisi {draft?.current_version ?? 1} · {items.length} soal
-        </span>
+        <Badge active={state !== "rejected"}>{<UiText>{quizState[state]}</UiText>}</Badge>
+        <span><UiText>{"Revisi "}</UiText>{draft?.current_version ?? 1} · {items.length}<UiText>{" soal"}</UiText></span>
         <span className={dirty ? "editorial-unsaved" : ""}>
-          {dirty ? "Perubahan belum disimpan" : "Isi sudah tersimpan"}
+          {dirty ? <UiText>{"Perubahan belum disimpan"}</UiText> : <UiText>{"Isi sudah tersimpan"}</UiText>}
         </span>
       </div>
       {error && (
@@ -234,9 +235,7 @@ export function QuizWorkspace({
             type="button"
             className="button secondary small"
             onClick={() => router.refresh()}
-          >
-            Muat ulang halaman
-          </button>
+          ><UiText>{"Muat ulang halaman"}</UiText></button>
         </p>
       )}
       <p className="editorial-live" role="status" aria-live="polite">
@@ -250,13 +249,11 @@ export function QuizWorkspace({
                 <div className="editorial-section-title">
                   <span className="editorial-number">01</span>
                   <div>
-                    <h2>Identitas kuis</h2>
-                    <p>Berikan konteks yang jelas sebelum siswa mulai.</p>
+                    <h2><UiText>{"Identitas kuis"}</UiText></h2>
+                    <p><UiText>{"Berikan konteks yang jelas sebelum siswa mulai."}</UiText></p>
                   </div>
                 </div>
-                <label className="field">
-                  Judul kuis
-                  <input
+                <label className="field"><UiText>{"Judul kuis"}</UiText><input
                     value={title}
                     onChange={(e) => {
                       setTitle(e.target.value);
@@ -265,12 +262,10 @@ export function QuizWorkspace({
                     required
                     maxLength={200}
                     disabled={busy}
-                    placeholder="Contoh: Memahami pecahan di sekitar kita"
+                    placeholder={t("Contoh: Memahami pecahan di sekitar kita")}
                   />
                 </label>
-                <label className="field">
-                  Deskripsi
-                  <textarea
+                <label className="field"><UiText>{"Deskripsi"}</UiText><textarea
                     rows={3}
                     value={description}
                     onChange={(e) => {
@@ -279,13 +274,11 @@ export function QuizWorkspace({
                     }}
                     maxLength={2000}
                     disabled={busy}
-                    placeholder="Apa yang akan dipelajari siswa?"
+                    placeholder={t("Apa yang akan dipelajari siswa?")}
                   />
                 </label>
                 <div className="editorial-two-fields">
-                  <label className="field">
-                    Mata pelajaran
-                    <select
+                  <label className="field"><UiText>{"Mata pelajaran"}</UiText><select
                       value={subjectId}
                       onChange={(e) => {
                         setSubjectId(e.target.value);
@@ -297,7 +290,7 @@ export function QuizWorkspace({
                       required
                       disabled={busy}
                     >
-                      <option value="">Pilih mata pelajaran</option>
+                      <option value=""><UiText>{"Pilih mata pelajaran"}</UiText></option>
                       {subjectRows.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
@@ -305,9 +298,7 @@ export function QuizWorkspace({
                       ))}
                     </select>
                   </label>
-                  <label className="field">
-                    Pembahasan untuk siswa
-                    <select
+                  <label className="field"><UiText>{"Pembahasan untuk siswa"}</UiText><select
                       value={release}
                       onChange={(e) => {
                         setRelease(e.target.value as typeof release);
@@ -315,20 +306,14 @@ export function QuizWorkspace({
                       }}
                       disabled={busy}
                     >
-                      <option value="after_submission">
-                        Setelah jawaban dikirim
-                      </option>
-                      <option value="after_due">
-                        Setelah batas pengumpulan
-                      </option>
+                      <option value="after_submission"><UiText>{"Setelah jawaban dikirim"}</UiText></option>
+                      <option value="after_due"><UiText>{"Setelah batas pengumpulan"}</UiText></option>
                     </select>
                   </label>
                 </div>
                 <details className="editorial-details">
-                  <summary>Tambah mata pelajaran</summary>
-                  <label className="field">
-                    Nama mata pelajaran baru
-                    <input
+                  <summary><UiText>{"Tambah mata pelajaran"}</UiText></summary>
+                  <label className="field"><UiText>{"Nama mata pelajaran baru"}</UiText><input
                       value={newSubject}
                       onChange={(e) => setNewSubject(e.target.value)}
                       maxLength={120}
@@ -360,24 +345,20 @@ export function QuizWorkspace({
                         "Mata pelajaran ditambahkan.",
                       )
                     }
-                  >
-                    Tambah mata pelajaran
-                  </button>
+                  ><UiText>{"Tambah mata pelajaran"}</UiText></button>
                 </details>
               </section>
               <section className="panel editorial-section">
                 <div className="editorial-section-title">
                   <span className="editorial-number">02</span>
                   <div>
-                    <h2>Soal & pembahasan</h2>
-                    <p>
-                      Pilihan ganda yang ringkas, jelas, dan nyaman dibacakan.
-                    </p>
+                    <h2><UiText>{"Soal & pembahasan"}</UiText></h2>
+                    <p><UiText>{"Pilihan ganda yang ringkas, jelas, dan nyaman dibacakan."}</UiText></p>
                   </div>
                 </div>
                 {items.map((q, index) => (
                   <fieldset className="editorial-question" key={index}>
-                    <legend>Soal {index + 1}</legend>
+                    <legend><UiText>{"Soal "}</UiText>{index + 1}</legend>
                     <div className="editorial-question-tools">
                       <button
                         type="button"
@@ -425,9 +406,7 @@ export function QuizWorkspace({
                         <Trash2 size={16} aria-hidden="true" />
                       </button>
                     </div>
-                    <label className="field">
-                      Pertanyaan
-                      <textarea
+                    <label className="field"><UiText>{"Pertanyaan"}</UiText><textarea
                         rows={3}
                         value={q.prompt}
                         onChange={(e) =>
@@ -438,12 +417,9 @@ export function QuizWorkspace({
                         disabled={busy}
                       />
                     </label>
-                    <div className="editorial-option-help">
-                      Pilih satu kunci jawaban. Kunci hanya terlihat oleh guru
-                      dan reviewer sebelum pembahasan dirilis.
-                    </div>
+                    <div className="editorial-option-help"><UiText>{"Pilih satu kunci jawaban. Kunci hanya terlihat oleh guru dan reviewer sebelum pembahasan dirilis."}</UiText></div>
                     <fieldset className="editorial-options">
-                      <legend>Kunci dan pilihan soal {index + 1}</legend>
+                      <legend><UiText>{"Kunci dan pilihan soal "}</UiText>{index + 1}</legend>
                       {q.options.map((option, oi) => (
                         <div className="editorial-option" key={option.id}>
                           <label className="editorial-key">
@@ -460,8 +436,7 @@ export function QuizWorkspace({
                             <span>{String.fromCharCode(65 + oi)}</span>
                           </label>
                           <label className="field">
-                            <span className="sr-only">
-                              Isi pilihan {String.fromCharCode(65 + oi)} soal{" "}
+                            <span className="sr-only"><UiText>{"Isi pilihan "}</UiText>{String.fromCharCode(65 + oi)}<UiText>{" soal"}</UiText>{" "}
                               {index + 1}
                             </span>
                             <input
@@ -525,11 +500,8 @@ export function QuizWorkspace({
                         })
                       }
                     >
-                      <Plus size={15} aria-hidden="true" /> Tambah pilihan
-                    </button>
-                    <label className="field">
-                      Pembahasan
-                      <textarea
+                      <Plus size={15} aria-hidden="true" /><UiText>{"Tambah pilihan"}</UiText></button>
+                    <label className="field"><UiText>{"Pembahasan"}</UiText><textarea
                         rows={3}
                         maxLength={4000}
                         value={q.explanation}
@@ -537,13 +509,11 @@ export function QuizWorkspace({
                           change(index, { explanation: e.target.value })
                         }
                         disabled={busy}
-                        placeholder="Jelaskan alasan jawaban benar dengan bahasa sederhana."
+                        placeholder={t("Jelaskan alasan jawaban benar dengan bahasa sederhana.")}
                       />
                     </label>
                     <div className="editorial-two-fields">
-                      <label className="field">
-                        Tingkat kesulitan
-                        <select
+                      <label className="field"><UiText>{"Tingkat kesulitan"}</UiText><select
                           value={q.difficulty}
                           onChange={(e) =>
                             change(index, {
@@ -553,21 +523,16 @@ export function QuizWorkspace({
                           }
                           disabled={busy}
                         >
-                          <option value="easy">Mudah</option>
-                          <option value="medium">Sedang</option>
-                          <option value="hard">Sulit</option>
+                          <option value="easy"><UiText>{"Mudah"}</UiText></option>
+                          <option value="medium"><UiText>{"Sedang"}</UiText></option>
+                          <option value="hard"><UiText>{"Sulit"}</UiText></option>
                         </select>
                       </label>
-                      <span className="editorial-help">
-                        Nilai setiap soal berbobot sama. Belum ada batas waktu
-                        per soal.
-                      </span>
+                      <span className="editorial-help"><UiText>{"Nilai setiap soal berbobot sama. Belum ada batas waktu per soal."}</UiText></span>
                     </div>
                     <details className="editorial-details">
-                      <summary>Narasi alternatif untuk audio</summary>
-                      <label className="field">
-                        Narasi soal
-                        <textarea
+                      <summary><UiText>{"Narasi alternatif untuk audio"}</UiText></summary>
+                      <label className="field"><UiText>{"Narasi soal"}</UiText><textarea
                           rows={3}
                           maxLength={6000}
                           value={q.narration}
@@ -575,7 +540,7 @@ export function QuizWorkspace({
                             change(index, { narration: e.target.value })
                           }
                           disabled={busy}
-                          placeholder="Opsional. Tulis simbol atau rumus menjadi kalimat yang mudah didengar."
+                          placeholder={t("Opsional. Tulis simbol atau rumus menjadi kalimat yang mudah didengar.")}
                         />
                       </label>
                     </details>
@@ -593,15 +558,15 @@ export function QuizWorkspace({
                     setDirty(true);
                   }}
                 >
-                  <Plus size={17} aria-hidden="true" /> Tambah soal{" "}
+                  <Plus size={17} aria-hidden="true" /><UiText>{" Tambah soal"}</UiText>{" "}
                   <span className="muted">{items.length}/20</span>
                 </button>
               </section>
               <div className="editorial-save-bar">
                 <span>
                   {dirty
-                    ? "Simpan perubahan sebelum mengajukan review."
-                    : "Anda dapat menyiapkan revisi berikutnya kapan saja."}
+                    ? <UiText>{"Simpan perubahan sebelum mengajukan review."}</UiText>
+                    : <UiText>{"Anda dapat menyiapkan revisi berikutnya kapan saja."}</UiText>}
                 </span>
                 <button
                   className="button primary"
@@ -609,10 +574,10 @@ export function QuizWorkspace({
                 >
                   <Save size={17} aria-hidden="true" />{" "}
                   {busy
-                    ? "Menyimpan…"
+                    ? <UiText>{"Menyimpan…"}</UiText>
                     : draft
-                      ? "Simpan revisi baru"
-                      : "Simpan draft"}
+                      ? <UiText>{"Simpan revisi baru"}</UiText>
+                      : <UiText>{"Simpan draft"}</UiText>}
                 </button>
               </div>
             </form>
@@ -621,22 +586,21 @@ export function QuizWorkspace({
               <div className="editorial-section-title">
                 <FileCheck2 size={24} aria-hidden="true" />
                 <div>
-                  <h2>Pratinjau revisi {draft?.current_version}</h2>
+                  <h2><UiText>{"Pratinjau revisi "}</UiText>{draft?.current_version}</h2>
                   <p>
                     {description ||
-                      "Periksa pertanyaan, kunci, dan pembahasan sebelum mengambil keputusan."}
+                      <UiText>{"Periksa pertanyaan, kunci, dan pembahasan sebelum mengambil keputusan."}</UiText>}
                   </p>
                 </div>
               </div>
               {draft?.version.questions.map((q) => (
                 <article className="editorial-review-question" key={q.id}>
-                  <span className="editorial-kicker">
-                    SOAL {q.order_index} ·{" "}
+                  <span className="editorial-kicker"><UiText>{"SOAL "}</UiText>{q.order_index} ·{" "}
                     {q.difficulty === "easy"
-                      ? "MUDAH"
+                      ? <UiText>{"MUDAH"}</UiText>
                       : q.difficulty === "hard"
-                        ? "SULIT"
-                        : "SEDANG"}
+                        ? <UiText>{"SULIT"}</UiText>
+                        : <UiText>{"SEDANG"}</UiText>}
                   </span>
                   <h3>{q.prompt}</h3>
                   <ol type="A" className="editorial-review-options">
@@ -650,19 +614,18 @@ export function QuizWorkspace({
                         {o.label}
                         {o.id === q.correct_option_id && (
                           <span>
-                            <Check size={15} aria-hidden="true" /> Kunci jawaban
-                          </span>
+                            <Check size={15} aria-hidden="true" /><UiText>{"Kunci jawaban"}</UiText></span>
                         )}
                       </li>
                     ))}
                   </ol>
                   <p>
-                    <strong>Pembahasan:</strong>{" "}
-                    {q.explanation || "Belum ditulis."}
+                    <strong><UiText>{"Pembahasan:"}</UiText></strong>{" "}
+                    {q.explanation || <UiText>{"Belum ditulis."}</UiText>}
                   </p>
                   {q.narration && (
                     <p>
-                      <strong>Narasi:</strong> {q.narration}
+                      <strong><UiText>{"Narasi:"}</UiText></strong> {q.narration}
                     </p>
                   )}
                 </article>
@@ -674,10 +637,8 @@ export function QuizWorkspace({
               <div className="editorial-section-title">
                 <span className="editorial-number">03</span>
                 <div>
-                  <h2>Penugasan kelas</h2>
-                  <p>
-                    Versi terbit dibagikan ke siswa yang menjadi anggota kelas.
-                  </p>
+                  <h2><UiText>{"Penugasan kelas"}</UiText></h2>
+                  <p><UiText>{"Versi terbit dibagikan ke siswa yang menjadi anggota kelas."}</UiText></p>
                 </div>
               </div>
               {state === "published" ? (
@@ -714,15 +675,13 @@ export function QuizWorkspace({
                   }}
                   className="editorial-assignment-form"
                 >
-                  <label className="field">
-                    Kelas tujuan
-                    <select
+                  <label className="field"><UiText>{"Kelas tujuan"}</UiText><select
                       required
                       value={classId}
                       onChange={(e) => setClassId(e.target.value)}
                       disabled={busy || dirty}
                     >
-                      <option value="">Pilih kelas aktif</option>
+                      <option value=""><UiText>{"Pilih kelas aktif"}</UiText></option>
                       {classes
                         .filter((c) => !c.is_archived)
                         .map((c) => (
@@ -733,18 +692,14 @@ export function QuizWorkspace({
                     </select>
                   </label>
                   <div className="editorial-two-fields">
-                    <label className="field">
-                      Dibuka pada (waktu perangkat)
-                      <input
+                    <label className="field"><UiText>{"Dibuka pada (waktu perangkat)"}</UiText><input
                         type="datetime-local"
                         value={opens}
                         onChange={(e) => setOpens(e.target.value)}
                         disabled={busy || dirty}
                       />
                     </label>
-                    <label className="field">
-                      Batas pengumpulan (waktu perangkat)
-                      <input
+                    <label className="field"><UiText>{"Batas pengumpulan (waktu perangkat)"}</UiText><input
                         type="datetime-local"
                         value={due}
                         onChange={(e) => setDue(e.target.value)}
@@ -753,28 +708,20 @@ export function QuizWorkspace({
                       />
                     </label>
                   </div>
-                  <p className="editorial-help">
-                    Kosongkan jadwal untuk langsung dibuka tanpa tenggat.
-                    Pembahasan setelah tenggat membutuhkan batas pengumpulan.
-                  </p>
+                  <p className="editorial-help"><UiText>{"Kosongkan jadwal untuk langsung dibuka tanpa tenggat. Pembahasan setelah tenggat membutuhkan batas pengumpulan."}</UiText></p>
                   <button
                     className="button primary"
                     disabled={busy || dirty || !classId}
                   >
-                    <Send size={16} aria-hidden="true" /> Bagikan ke kelas
-                  </button>
+                    <Send size={16} aria-hidden="true" /><UiText>{"Bagikan ke kelas"}</UiText></button>
                   {!classes.some((c) => !c.is_archived) && (
-                    <Link className="learning-back" href="/guru/kelas/baru">
-                      Buat kelas aktif terlebih dahulu{" "}
+                    <Link className="learning-back" href="/guru/kelas/baru"><UiText>{"Buat kelas aktif terlebih dahulu"}</UiText>{" "}
                       <ArrowUpRight size={16} aria-hidden="true" />
                     </Link>
                   )}
                 </form>
               ) : (
-                <p className="info-note">
-                  Penugasan tersedia setelah revisi ini disetujui dan
-                  diterbitkan.
-                </p>
+                <p className="info-note"><UiText>{"Penugasan tersedia setelah revisi ini disetujui dan diterbitkan."}</UiText></p>
               )}
               <div className="editorial-assignment-list">
                 {draft.assignments.map((a) => (
@@ -785,15 +732,13 @@ export function QuizWorkspace({
                   >
                     <span>
                       <strong>{a.class_name}</strong>
-                      <small>
-                        Revisi {a.version} ·{" "}
+                      <small><UiText>{"Revisi "}</UiText>{a.version} ·{" "}
                         {a.is_closed
-                          ? "Ditutup"
+                          ? <UiText>{"Ditutup"}</UiText>
                           : "Tenggat: " + scheduleLabel(a.due_at)}
                       </small>
                     </span>
-                    <span>
-                      Lihat hasil <ArrowUpRight size={17} aria-hidden="true" />
+                    <span><UiText>{"Lihat hasil"}</UiText><ArrowUpRight size={17} aria-hidden="true" />
                     </span>
                   </Link>
                 ))}
@@ -803,7 +748,7 @@ export function QuizWorkspace({
         </div>
         <aside className="editorial-aside">
           <section className="panel editorial-section editorial-lifecycle">
-            <h2>Langkah publikasi</h2>
+            <h2><UiText>{"Langkah publikasi"}</UiText></h2>
             <ol>
               {[
                 "Tulis & simpan draft",
@@ -833,14 +778,12 @@ export function QuizWorkspace({
             </ol>
             {owner ? (
               <div className="editorial-lifecycle-actions">
-                <label className="field">
-                  Reviewer
-                  <select
+                <label className="field"><UiText>{"Reviewer"}</UiText><select
                     value={reviewer}
                     onChange={(e) => setReviewer(e.target.value)}
                     disabled={busy || dirty || state !== "draft"}
                   >
-                    <option value="">Antrean admin</option>
+                    <option value=""><UiText>{"Antrean admin"}</UiText></option>
                     {reviewers
                       .filter((r) => r.id !== draft?.teacher_id)
                       .map((r) => (
@@ -868,9 +811,7 @@ export function QuizWorkspace({
                           { reviewer_id: reviewer || null },
                         )
                       }
-                    >
-                      Simpan reviewer
-                    </button>
+                    ><UiText>{"Simpan reviewer"}</UiText></button>
                     <button
                       className="button primary"
                       type="button"
@@ -887,8 +828,7 @@ export function QuizWorkspace({
                         )
                       }
                     >
-                      <Send size={16} aria-hidden="true" /> Ajukan review
-                    </button>
+                      <Send size={16} aria-hidden="true" /><UiText>{"Ajukan review"}</UiText></button>
                   </>
                 )}
                 {draft && state === "approved" && (
@@ -904,33 +844,28 @@ export function QuizWorkspace({
                       )
                     }
                   >
-                    <CheckCircle2 size={17} aria-hidden="true" /> Terbitkan kuis
-                  </button>
+                    <CheckCircle2 size={17} aria-hidden="true" /><UiText>{"Terbitkan kuis"}</UiText></button>
                 )}
                 {!draft && (
-                  <p className="editorial-help">
-                    Simpan draft pertama untuk mulai review.
-                  </p>
+                  <p className="editorial-help"><UiText>{"Simpan draft pertama untuk mulai review."}</UiText></p>
                 )}
                 {["in_review", "rejected"].includes(state) && (
                   <p className="editorial-help">
                     {state === "in_review"
-                      ? "Sedang menunggu keputusan reviewer. Perubahan isi akan menjadi revisi baru."
-                      : "Periksa catatan di bawah, perbaiki isi, lalu simpan dan ajukan revisi baru."}
+                      ? <UiText>{"Sedang menunggu keputusan reviewer. Perubahan isi akan menjadi revisi baru."}</UiText>
+                      : <UiText>{"Periksa catatan di bawah, perbaiki isi, lalu simpan dan ajukan revisi baru."}</UiText>}
                   </p>
                 )}
               </div>
             ) : (
               <div className="editorial-lifecycle-actions">
-                <label className="field">
-                  Catatan review
-                  <textarea
+                <label className="field"><UiText>{"Catatan review"}</UiText><textarea
                     rows={4}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     maxLength={2000}
                     disabled={busy || state !== "in_review"}
-                    placeholder="Wajib diisi jika meminta perbaikan."
+                    placeholder={t("Wajib diisi jika meminta perbaikan.")}
                   />
                 </label>
                 <button
@@ -946,8 +881,7 @@ export function QuizWorkspace({
                     )
                   }
                 >
-                  <CheckCircle2 size={16} aria-hidden="true" /> Setujui revisi
-                </button>
+                  <CheckCircle2 size={16} aria-hidden="true" /><UiText>{"Setujui revisi"}</UiText></button>
                 <button
                   type="button"
                   className="button secondary"
@@ -960,20 +894,16 @@ export function QuizWorkspace({
                       { note },
                     )
                   }
-                >
-                  Minta perbaikan
-                </button>
+                ><UiText>{"Minta perbaikan"}</UiText></button>
                 {admin && state === "in_review" && (
                   <details className="editorial-details">
-                    <summary>Ganti reviewer</summary>
-                    <label className="field">
-                      Reviewer pengganti
-                      <select
+                    <summary><UiText>{"Ganti reviewer"}</UiText></summary>
+                    <label className="field"><UiText>{"Reviewer pengganti"}</UiText><select
                         value={reviewer}
                         onChange={(e) => setReviewer(e.target.value)}
                         disabled={busy}
                       >
-                        <option value="">Antrean admin</option>
+                        <option value=""><UiText>{"Antrean admin"}</UiText></option>
                         {reviewers
                           .filter((r) => r.id !== draft?.teacher_id)
                           .map((r) => (
@@ -997,9 +927,7 @@ export function QuizWorkspace({
                           { reviewer_id: reviewer || null },
                         )
                       }
-                    >
-                      Ganti reviewer
-                    </button>
+                    ><UiText>{"Ganti reviewer"}</UiText></button>
                   </details>
                 )}
               </div>
@@ -1007,12 +935,12 @@ export function QuizWorkspace({
           </section>
           {draft && (
             <section className="panel editorial-section">
-              <h2>Catatan revisi</h2>
+              <h2><UiText>{"Catatan revisi"}</UiText></h2>
               <ul className="editorial-timeline">
                 {draft.events.map((event, i) => (
                   <li key={i}>
                     <strong>{eventLabel[event.kind] || event.kind}</strong>
-                    <small>{scheduleLabel(event.created_at)}</small>
+                    <small>{<UiDate value={event.created_at} time empty="Tanpa batas waktu" />}</small>
                     {event.note && <p>{event.note}</p>}
                   </li>
                 ))}

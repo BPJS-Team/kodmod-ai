@@ -1,3 +1,5 @@
+
+import { UiText, UiDate } from "@/components/language-provider";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -6,7 +8,6 @@ import {
   Layers3,
   Plus,
   Users,
-  Sparkles,
 } from "lucide-react";
 import { classroomData } from "@/lib/classrooms";
 import { requireSession } from "@/lib/session";
@@ -29,8 +30,7 @@ const baseFor = (role: LearningRole) =>
 export function BackToClasses({ role }: { role: LearningRole }) {
   return (
     <Link className="learning-back" href={`${baseFor(role)}/kelas`}>
-      <ArrowLeft size={16} aria-hidden="true" /> Semua kelas
-    </Link>
+      <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Semua kelas"}</UiText></Link>
   );
 }
 function ClassCards({ rows, role }: { rows: Classroom[]; role: LearningRole }) {
@@ -47,7 +47,7 @@ function ClassCards({ rows, role }: { rows: Classroom[]; role: LearningRole }) {
               <BookOpen size={23} aria-hidden="true" />
             </span>
             <Badge active={!row.is_archived}>
-              {row.is_archived ? "Arsip" : row.subject}
+              {row.is_archived ? <UiText>{"Arsip"}</UiText> : row.subject}
             </Badge>
           </div>
           <h3>{row.name}</h3>
@@ -57,8 +57,7 @@ function ClassCards({ rows, role }: { rows: Classroom[]; role: LearningRole }) {
           </p>
           <div className="class-card-bottom">
             <span>
-              {row.material_count} materi · {row.member_count} siswa
-            </span>
+              {row.material_count}<UiText>{" materi · "}</UiText>{row.member_count}<UiText>{" siswa"}</UiText></span>
             <ArrowUpRight size={20} aria-hidden="true" />
           </div>
         </Link>
@@ -69,13 +68,13 @@ function ClassCards({ rows, role }: { rows: Classroom[]; role: LearningRole }) {
       <Empty
         title={
           role === "teacher"
-            ? "Ruang untuk ide pertama Anda."
-            : "Kelas Anda akan hadir di sini."
+            ? <UiText>{"Ruang untuk ide pertama Anda."}</UiText>
+            : <UiText>{"Kelas Anda akan hadir di sini."}</UiText>
         }
       >
         {role === "teacher"
-          ? "Buat kelas, tambahkan siswa, lalu bagikan materi pertama."
-          : "Minta guru menambahkan username Anda sebagai anggota kelas untuk mulai belajar."}
+          ? <UiText>{"Buat kelas, tambahkan siswa, lalu bagikan materi pertama."}</UiText>
+          : <UiText>{"Minta guru menambahkan username Anda sebagai anggota kelas untuk mulai belajar."}</UiText>}
       </Empty>
     </div>
   );
@@ -96,52 +95,42 @@ export async function ClassIndex({
   return (
     <>
       <Heading
-        title={dashboard ? `Halo, ${user.full_name}.` : "Kelas saya"}
+        title={dashboard ? <><UiText>{"Halo, "}</UiText> {user.full_name}.</> : <UiText>{"Kelas saya"}</UiText>}
         description={
           dashboard
             ? teacher
-              ? "Satu ruang untuk menumbuhkan banyak kemungkinan."
-              : "Sedikit demi sedikit, pengetahuan baru dimulai di sini."
-            : "Materi, anggota, dan ruang belajar Anda dalam satu tempat."
+              ? <UiText>{"Satu ruang untuk menumbuhkan banyak kemungkinan."}</UiText>
+              : <UiText>{"Sedikit demi sedikit, pengetahuan baru dimulai di sini."}</UiText>
+            : <UiText>{"Materi, anggota, dan ruang belajar Anda dalam satu tempat."}</UiText>
         }
       >
         {teacher && (
           <Link className="button primary" href="/guru/kelas/baru">
-            <Plus size={17} aria-hidden="true" />
-            Buat kelas
-          </Link>
+            <Plus size={17} aria-hidden="true" /><UiText>{"Buat kelas"}</UiText></Link>
         )}
       </Heading>
       {dashboard && (
         <>
           <section className="learning-hero">
             <div>
-              <span className="learning-eyebrow">
-                <Sparkles size={15} aria-hidden="true" />{" "}
-                {teacher
-                  ? "DARI IDE MENJADI PEMAHAMAN"
-                  : "RUANG UNTUK BERTUMBUH"}
-              </span>
               <h2>
                 {teacher
-                  ? "Pelajaran hebat dimulai dari ruang yang tepat."
-                  : "Langkah kecil hari ini. Wawasan baru esok hari."}
+                  ? <UiText>{"Siapkan kelas dan materi belajar."}</UiText>
+                  : <UiText>{"Lanjutkan belajar dari kelasmu."}</UiText>}
               </h2>
               <p>
                 {teacher
-                  ? "Siapkan materi, ajak siswa, dan bangun pengalaman belajar yang lebih terarah."
-                  : "Buka kelas Anda, pilih materi, dan belajar sesuai ritme yang nyaman."}
+                  ? <UiText>{"Siapkan materi, ajak siswa, dan bangun pengalaman belajar yang lebih terarah."}</UiText>
+                  : <UiText>{"Buka kelas Anda, pilih materi, dan belajar sesuai ritme yang nyaman."}</UiText>}
               </p>
               <Link
                 href={`${baseFor(role)}/kelas`}
                 className="button learning-hero-button"
-              >
-                Jelajahi kelas <ArrowUpRight size={18} aria-hidden="true" />
+              ><UiText>{"Jelajahi kelas"}</UiText><ArrowUpRight size={18} aria-hidden="true" />
               </Link>
             </div>
             <div className="learning-orbit" aria-hidden="true">
               <BookOpen size={68} strokeWidth={1} />
-              <span>LEARN · GROW · REPEAT</span>
             </div>
           </section>
           <div className="learning-stats">
@@ -163,7 +152,7 @@ export async function ClassIndex({
               <div className="panel learning-stat" key={title}>
                 <Icon size={21} aria-hidden="true" />
                 <span>
-                  {title}
+                  <UiText>{title}</UiText>
                   <strong>{value}</strong>
                 </span>
               </div>
@@ -173,13 +162,12 @@ export async function ClassIndex({
       )}
       {dashboard && !teacher && <StudentOverview />}
       <div className="learning-section-heading">
-        <h2>{dashboard ? "Ruang belajar terbaru" : "Semua ruang belajar"}</h2>
-        <span>{rows.length} kelas</span>
+        <h2>{dashboard ? <UiText>{"Ruang belajar terbaru"}</UiText> : <UiText>{"Semua ruang belajar"}</UiText>}</h2>
+        <span>{rows.length}<UiText>{" kelas"}</UiText></span>
       </div>
       <ClassCards rows={dashboard ? rows.slice(0, 6) : rows} role={role} />
       {dashboard && rows.length > 6 && (
-        <Link className="learning-back" href={`${baseFor(role)}/kelas`}>
-          Lihat semua kelas <ArrowUpRight size={16} aria-hidden="true" />
+        <Link className="learning-back" href={`${baseFor(role)}/kelas`}><UiText>{"Lihat semua kelas"}</UiText><ArrowUpRight size={16} aria-hidden="true" />
         </Link>
       )}
     </>
@@ -213,29 +201,24 @@ export async function ClassRoom({
       </Heading>
       <div className="class-meta">
         <Badge active={!row.is_archived}>
-          {row.is_archived ? "Diarsipkan" : row.subject}
+          {row.is_archived ? <UiText>{"Diarsipkan"}</UiText> : row.subject}
         </Badge>
-        <span>Guru: {row.teacher_name}</span>
-        <span>{row.member_count} siswa</span>
+        <span><UiText>{"Guru: "}</UiText>{row.teacher_name}</span>
+        <span>{row.member_count}<UiText>{" siswa"}</UiText></span>
       </div>
       {row.is_archived && (
-        <p className="info-note">
-          Kelas ini diarsipkan. Aktifkan kembali untuk mengelola anggota dan
-          materi.
-        </p>
+        <p className="info-note"><UiText>{"Kelas ini diarsipkan. Aktifkan kembali untuk mengelola anggota dan materi."}</UiText></p>
       )}
       <div className={`class-detail-grid ${teacher ? "" : "student-detail"}`}>
         <section className="panel learning-section">
           <div className="learning-section-heading">
-            <h2>Materi belajar</h2>
+            <h2><UiText>{"Materi belajar"}</UiText></h2>
             {teacher && !row.is_archived && (
               <Link
                 className="button primary"
                 href={`/guru/kelas/${id}/materi/baru`}
               >
-                <Plus size={16} aria-hidden="true" />
-                Tambah materi
-              </Link>
+                <Plus size={16} aria-hidden="true" /><UiText>{"Tambah materi"}</UiText></Link>
             )}
           </div>
           {row.materials.length ? (
@@ -252,10 +235,10 @@ export async function ClassRoom({
                   <span className="material-info">
                     <strong>{material.title}</strong>
                     <small>
-                      {dateLabel(material.created_at)}
+                      {<UiDate value={material.created_at} />}
                       {teacher
                         ? ` · ${material.published ? "Terbit" : "Draft"}`
-                        : " · Siap dibaca"}
+                        : <UiText>{" · Siap dibaca"}</UiText>}
                     </small>
                   </span>
                   <ArrowUpRight size={20} aria-hidden="true" />
@@ -263,17 +246,16 @@ export async function ClassRoom({
               ))}
             </div>
           ) : (
-            <Empty title="Belum ada materi">
+            <Empty title={<UiText>{"Belum ada materi"}</UiText>}>
               {teacher
-                ? "Mulai dengan satu penjelasan sederhana. Simpan draft atau langsung terbitkan untuk siswa."
-                : "Guru belum menerbitkan materi. Silakan kembali setelah materi dibagikan."}
+                ? <UiText>{"Mulai dengan satu penjelasan sederhana. Simpan draft atau langsung terbitkan untuk siswa."}</UiText>
+                : <UiText>{"Guru belum menerbitkan materi. Silakan kembali setelah materi dibagikan."}</UiText>}
             </Empty>
           )}
         </section>
         {teacher && (
           <section className="panel learning-section">
-            <h2>
-              Anggota kelas{" "}
+            <h2><UiText>{"Anggota kelas"}</UiText>{" "}
               <span className="muted">({row.members.length})</span>
             </h2>
             {!row.is_archived && <ClassAction classId={id} mode="add-member" />}
@@ -284,7 +266,7 @@ export async function ClassRoom({
                     <strong>{member.full_name}</strong>
                     <small>
                       @{member.username}
-                      {!member.is_active ? " · Nonaktif" : ""}
+                      {!member.is_active ? <UiText>{" · Nonaktif"}</UiText> : ""}
                     </small>
                   </div>
                   {!row.is_archived && (
@@ -299,9 +281,7 @@ export async function ClassRoom({
               ))}
             </div>
             {!row.members.length && (
-              <p className="muted">
-                Belum ada anggota. Tambahkan siswa menggunakan username akunnya.
-              </p>
+              <p className="muted"><UiText>{"Belum ada anggota. Tambahkan siswa menggunakan username akunnya."}</UiText></p>
             )}
           </section>
         )}

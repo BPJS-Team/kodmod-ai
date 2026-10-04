@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n } from "@/components/language-provider";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, LoaderCircle, RefreshCw, UploadCloud } from "lucide-react";
@@ -9,6 +11,7 @@ import { confirmAction, notifyResult } from "@/lib/dialogs";
 import { materialTutorStatus, validateMaterialFile } from "@/lib/material-flow.mjs";
 
 export function ClassForm() {
+  const { t } = useI18n();
   const [values, setValues] = useState({
     name: "",
     subject: "",
@@ -26,35 +29,29 @@ export function ClassForm() {
       className="panel form-panel form-stack"
     >
       <ActionFeedback state={state} />
-      <label className="field">
-        Nama kelas
-        <input
+      <label className="field"><UiText>{"Nama kelas"}</UiText><input
           required
           name="name"
           maxLength={120}
-          placeholder="Contoh: Matematika • Kelas 8A"
+          placeholder={t("Contoh: Matematika • Kelas 8A")}
           value={values.name}
           onChange={(e) => setValues({ ...values, name: e.target.value })}
         />
       </label>
-      <label className="field">
-        Mata pelajaran
-        <input
+      <label className="field"><UiText>{"Mata pelajaran"}</UiText><input
           required
           name="subject"
           maxLength={120}
-          placeholder="Contoh: Matematika"
+          placeholder={t("Contoh: Matematika")}
           value={values.subject}
           onChange={(e) => setValues({ ...values, subject: e.target.value })}
         />
       </label>
-      <label className="field">
-        Tentang kelas
-        <textarea
+      <label className="field"><UiText>{"Tentang kelas"}</UiText><textarea
           name="description"
           rows={4}
           maxLength={2000}
-          placeholder="Apa yang akan dipelajari di kelas ini?"
+          placeholder={t("Apa yang akan dipelajari di kelas ini?")}
           value={values.description}
           onChange={(e) =>
             setValues({ ...values, description: e.target.value })
@@ -62,7 +59,7 @@ export function ClassForm() {
         />
       </label>
       <button className="button primary" disabled={pending}>
-        {pending ? "Memproses…" : "Buat kelas"}
+        {pending ? <UiText>{"Memproses…"}</UiText> : <UiText>{"Buat kelas"}</UiText>}
       </button>
     </form>
   );
@@ -79,6 +76,7 @@ export function ClassAction({
   studentId?: string;
   name?: string;
 }) {
+  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const labels = {
     "add-member": "Tambahkan siswa",
@@ -111,13 +109,11 @@ export function ClassAction({
       <input type="hidden" name="mode" value={mode} />
       {studentId && <input type="hidden" name="studentId" value={studentId} />}
       {mode === "add-member" && (
-        <label className="field">
-          Username siswa
-          <input
+        <label className="field"><UiText>{"Username siswa"}</UiText><input
             name="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username akun yang sudah terdaftar"
+            placeholder={t("Username akun yang sudah terdaftar")}
             required
             minLength={3}
             maxLength={64}
@@ -130,7 +126,7 @@ export function ClassAction({
         className={`button ${mode === "add-member" || mode === "restore" ? "primary" : "secondary"}`}
         aria-label={mode === "remove-member" ? `Keluarkan ${name}` : undefined}
       >
-        {pending ? "Memproses…" : labels[mode]}
+        {pending ? <UiText>{"Memproses…"}</UiText> : labels[mode]}
       </button>
       <ActionFeedback state={state} />
     </form>
@@ -144,6 +140,7 @@ export function MaterialForm({
   classId: string;
   material?: Material;
 }) {
+  const { t } = useI18n();
   const [title, setTitle] = useState(material?.title || "");
   const [content, setContent] = useState(material?.content || "");
   const [published, setPublished] = useState(material?.published || false);
@@ -220,36 +217,32 @@ export function MaterialForm({
       <ActionFeedback state={state} />
       <input type="hidden" name="source_filename" value={sourceFilename} />
       {material && tutorStatus && (
-        <section className={`material-ai-status ${material.rag_status === "failed" ? "failed" : ""}`} aria-label="Kesiapan materi untuk Tutor">
+        <section className={`material-ai-status ${material.rag_status === "failed" ? "failed" : ""}`} aria-label={t("Kesiapan materi untuk Tutor")}>
           <div>
             <strong>{tutorStatus.heading}</strong>
             <p>{tutorStatus.description}</p>
           </div>
           <div className="material-status-actions">
-            <button type="button" className="button secondary" onClick={() => router.refresh()} disabled={pending || importing || indexing}><RefreshCw size={16} aria-hidden="true" /> Perbarui status</button>
-            {tutorStatus.actionLabel && <button type="button" className="button primary" onClick={() => void retryIndex()} disabled={pending || importing || indexing}>{indexing ? "Menyiapkan…" : tutorStatus.actionLabel}</button>}
+            <button type="button" className="button secondary" onClick={() => router.refresh()} disabled={pending || importing || indexing}><RefreshCw size={16} aria-hidden="true" /><UiText>{" Perbarui status"}</UiText></button>
+            {tutorStatus.actionLabel && <button type="button" className="button primary" onClick={() => void retryIndex()} disabled={pending || importing || indexing}>{indexing ? <UiText>{"Menyiapkan…"}</UiText> : tutorStatus.actionLabel}</button>}
           </div>
         </section>
       )}
-      <label className="field">
-        Judul materi
-        <input
+      <label className="field"><UiText>{"Judul materi"}</UiText><input
           required
           maxLength={200}
           name="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Contoh: Mengenal persamaan linear"
+          placeholder={t("Contoh: Mengenal persamaan linear")}
         />
       </label>
-      <section className="material-import" aria-label="Impor dokumen materi">
+      <section className="material-import" aria-label={t("Impor dokumen materi")}>
         <div className="material-import-heading">
           <span className="material-import-icon" aria-hidden="true"><UploadCloud size={24} /></span>
-          <div><h2>Mulai dari dokumen Anda</h2><p>Unggah dokumen, tinjau teksnya, lalu simpan sebagai materi kelas.</p></div>
+          <div><h2><UiText>{"Mulai dari dokumen Anda"}</UiText></h2><p><UiText>{"Unggah dokumen, tinjau teksnya, lalu simpan sebagai materi kelas."}</UiText></p></div>
         </div>
-        <label className="field">
-        Pilih dokumen materi (opsional)
-        <input
+        <label className="field"><UiText>{"Pilih dokumen materi (opsional)"}</UiText><input
           type="file"
           accept=".pdf,.docx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
           disabled={pending || importing}
@@ -259,16 +252,14 @@ export function MaterialForm({
             if (file) void importFile(file);
           }}
         />
-        <small>PDF dengan teks, DOCX, Markdown, atau TXT. Maksimal 25 MB. PDF hasil scan perlu diubah menjadi teks terlebih dahulu.</small>
+        <small><UiText>{"PDF dengan teks, DOCX, Markdown, atau TXT. Maksimal 25 MB. PDF hasil scan perlu diubah menjadi teks terlebih dahulu."}</UiText></small>
         </label>
-        {importing && <p className="material-import-progress" role="status"><LoaderCircle className="spin" size={18} aria-hidden="true" /> Membaca dokumen, mohon tunggu…</p>}
+        {importing && <p className="material-import-progress" role="status"><LoaderCircle className="spin" size={18} aria-hidden="true" /><UiText>{" Membaca dokumen, mohon tunggu…"}</UiText></p>}
         {sourceFilename && <p className="material-source-file"><FileText size={17} aria-hidden="true" /><span>{sourceFilename}</span></p>}
         {importNotice && <p className="material-import-notice" role="status">{importNotice}</p>}
         {importError && <p className="alert error-message" role="alert">{importError}</p>}
       </section>
-      <label className="field">
-        Isi materi
-        <textarea
+      <label className="field"><UiText>{"Isi materi"}</UiText><textarea
           className="material-editor"
           required
           maxLength={100000}
@@ -277,26 +268,23 @@ export function MaterialForm({
           value={content}
           disabled={importing || pending}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Tulis penjelasan, contoh, dan petunjuk belajar di sini…"
+          placeholder={t("Tulis penjelasan, contoh, dan petunjuk belajar di sini…")}
         />
         <small>
-          {content.length.toLocaleString("id-ID")} / 100.000 karakter
-        </small>
-        <small>Setelah disimpan, isi materi disiapkan untuk Tutor. Hanya materi terbit yang dapat digunakan siswa anggota kelas.</small>
+          {content.length.toLocaleString("id-ID")}<UiText>{"/ 100.000 karakter"}</UiText></small>
+        <small><UiText>{"Setelah disimpan, isi materi disiapkan untuk Tutor. Hanya materi terbit yang dapat digunakan siswa anggota kelas."}</UiText></small>
       </label>
-      <label className="field">
-        Visibilitas
-        <select
+      <label className="field"><UiText>{"Visibilitas"}</UiText><select
           name="published"
           value={published ? "yes" : "no"}
           onChange={(e) => setPublished(e.target.value === "yes")}
         >
-          <option value="no">Draft • hanya guru</option>
-          <option value="yes">Terbit • anggota kelas</option>
+          <option value="no"><UiText>{"Draft • hanya guru"}</UiText></option>
+          <option value="yes"><UiText>{"Terbit • anggota kelas"}</UiText></option>
         </select>
       </label>
       <button className="button primary" disabled={pending || importing}>
-        {pending ? "Menyimpan…" : "Simpan materi"}
+        {pending ? <UiText>{"Menyimpan…"}</UiText> : <UiText>{"Simpan materi"}</UiText>}
       </button>
     </form>
   );

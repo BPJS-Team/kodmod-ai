@@ -1,4 +1,13 @@
 export type SpeechEngine = "app" | "device";
+export type VoiceSettings = { engine: SpeechEngine; menuEnabled: boolean; tutorEnabled: boolean;
+  lowVision: boolean; guidedNavigation: boolean };
+export const VOICE_SETTINGS_KEY: string;
+export const DEFAULT_VOICE_SETTINGS: VoiceSettings;
+export function readVoiceSettingsSnapshot(): string | null;
+export function parseVoiceSettings(snapshot: string | null): VoiceSettings | null;
+export function writeVoiceSettings(settings: VoiceSettings): boolean;
+export type SpeechContext = { language?: "id" | "en"; profile?: string; scope?: string;
+  menuKey?: string; signal?: AbortSignal };
 
 export type CachedSpeechAudio = {
   blob: Blob;
@@ -17,13 +26,13 @@ export function writeSpeechEnginePreference(
   engine: SpeechEngine,
 ): boolean;
 
-export function speechAudioCacheKey(text: string): Promise<string>;
+export function speechAudioCacheKey(text: string, context?: SpeechContext): Promise<string>;
 export function invalidateSpeechAudioCache(): void;
 
 export function createSpeechAudioLoader(options: {
   read: (key: string) => Promise<CachedSpeechAudio | null>;
   write: (key: string, entry: CachedSpeechAudio) => Promise<void>;
-  fetchAudio: (text: string) => Promise<Blob>;
+  fetchAudio: (text: string, context?: SpeechContext) => Promise<Blob>;
   now?: () => number;
   cacheTtlMs?: number;
-}): (text: string) => Promise<{ blob: Blob; cached: boolean }>;
+}): (text: string, context?: SpeechContext) => Promise<{ blob: Blob; cached: boolean }>;

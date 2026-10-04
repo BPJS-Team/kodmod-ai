@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth-shell";
 import { RegisterForm } from "@/components/register-form";
@@ -8,10 +10,8 @@ export default async function RegisterPage() {
   if (current) redirect(homeFor(current.user.role));
   return (
     <AuthShell register>
-      <h1>Buat akun KODMOD</h1>
-      <p className="auth-description">
-        Pilih peranmu dan mulai belajar atau mengajar.
-      </p>
+      <h1><UiText>{"Buat akun KODMOD"}</UiText></h1>
+      <p className="auth-description"><UiText>{"Pilih peranmu dan mulai belajar atau mengajar."}</UiText></p>
       <RegisterForm />
     </AuthShell>
   );

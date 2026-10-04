@@ -1,4 +1,6 @@
 "use client";
+import { UiText, UiDate } from "@/components/language-provider";
+
 import { useRef, useState } from "react";
 import { RefreshCw, LockKeyhole } from "lucide-react";
 import { editorialRequest } from "@/lib/editorial-client";
@@ -53,15 +55,14 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
     <>
       <div className="editorial-status-bar">
         <Badge active={!data.assignment.is_closed}>
-          {data.assignment.is_closed ? "Penugasan ditutup" : "Penugasan aktif"}
+          {data.assignment.is_closed ? <UiText>{"Penugasan ditutup"}</UiText> : <UiText>{"Penugasan aktif"}</UiText>}
         </Badge>
-        <span>
-          Dibuka:{" "}
+        <span><UiText>{"Dibuka:"}</UiText>{" "}
           {data.assignment.opens_at
             ? scheduleLabel(data.assignment.opens_at)
-            : "Langsung"}
+            : <UiText>{"Langsung"}</UiText>}
         </span>
-        <span>Tenggat: {scheduleLabel(data.assignment.due_at)}</span>
+        <span><UiText>{"Tenggat: "}</UiText>{<UiDate value={data.assignment.due_at} time empty="Tanpa batas waktu" />}</span>
       </div>
       {error && (
         <p role="alert" className="editorial-error">
@@ -93,7 +94,7 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
       </div>
       <section className="panel editorial-section">
         <div className="learning-section-heading">
-          <h2>Hasil siswa</h2>
+          <h2><UiText>{"Hasil siswa"}</UiText></h2>
           <div className="editorial-toolbar">
             <button
               type="button"
@@ -101,30 +102,27 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
               disabled={busy}
               onClick={() => void refresh()}
             >
-              <RefreshCw size={16} aria-hidden="true" /> Perbarui
-            </button>
+              <RefreshCw size={16} aria-hidden="true" /><UiText>{"Perbarui"}</UiText></button>
             <button
               type="button"
               className="button secondary small"
               disabled={busy || data.assignment.is_closed}
               onClick={() => void refresh(true)}
             >
-              <LockKeyhole size={16} aria-hidden="true" /> Tutup penugasan
-            </button>
+              <LockKeyhole size={16} aria-hidden="true" /><UiText>{"Tutup penugasan"}</UiText></button>
           </div>
         </div>
         {data.results.length ? (
           <div className="editorial-table-scroll">
             <table className="editorial-table">
-              <caption className="sr-only">
-                Hasil anggota aktif kelas {data.assignment.class_name}
+              <caption className="sr-only"><UiText>{"Hasil anggota aktif kelas "}</UiText>{data.assignment.class_name}
               </caption>
               <thead>
                 <tr>
-                  <th scope="col">Siswa</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Nilai</th>
-                  <th scope="col">Dikirim pada</th>
+                  <th scope="col"><UiText>{"Siswa"}</UiText></th>
+                  <th scope="col"><UiText>{"Status"}</UiText></th>
+                  <th scope="col"><UiText>{"Nilai"}</UiText></th>
+                  <th scope="col"><UiText>{"Dikirim pada"}</UiText></th>
                 </tr>
               </thead>
               <tbody>
@@ -134,19 +132,19 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
                     <td>
                       <Badge active={r.state === "submitted"}>
                         {r.state === "submitted"
-                          ? "Selesai"
+                          ? <UiText>{"Selesai"}</UiText>
                           : r.state === "in_progress"
-                            ? "Sedang dikerjakan"
-                            : "Belum mulai"}
+                            ? <UiText>{"Sedang dikerjakan"}</UiText>
+                            : <UiText>{"Belum mulai"}</UiText>}
                       </Badge>
                     </td>
                     <td>
-                      {r.score === null ? "Belum dinilai" : `${r.score}/100`}
+                      {r.score === null ? <UiText>{"Belum dinilai"}</UiText> : `${r.score}/100`}
                     </td>
                     <td>
                       {r.submitted_at
                         ? scheduleLabel(r.submitted_at)
-                        : "Belum mengirim"}
+                        : <UiText>{"Belum mengirim"}</UiText>}
                     </td>
                   </tr>
                 ))}
@@ -154,14 +152,9 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
             </table>
           </div>
         ) : (
-          <Empty title="Belum ada anggota aktif">
-            Tambahkan siswa ke kelas untuk membagikan penugasan ini.
-          </Empty>
+          <Empty title={<UiText>{"Belum ada anggota aktif"}</UiText>}><UiText>{"Tambahkan siswa ke kelas untuk membagikan penugasan ini."}</UiText></Empty>
         )}
-        <p className="editorial-help">
-          Nilai pilihan ganda berbobot sama. Ringkasan ini mengikuti anggota
-          aktif kelas saat ini.
-        </p>
+        <p className="editorial-help"><UiText>{"Nilai pilihan ganda berbobot sama. Ringkasan ini mengikuti anggota aktif kelas saat ini."}</UiText></p>
       </section>
     </>
   );

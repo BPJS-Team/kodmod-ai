@@ -4,7 +4,9 @@ import Link from "next/link";
 import { register } from "@/app/actions";
 import { Password } from "./forms";
 import { ActionFeedback, useConfirmedAction } from "./action-feedback";
+import { useI18n } from "./language-provider";
 export function RegisterForm() {
+  const { t } = useI18n();
   const [state, action, pending] = useConfirmedAction(register, {
     title: "Buat akun KODMOD?",
     text: "Pastikan nama dan peran sudah benar sebelum membuat akun.",
@@ -30,7 +32,7 @@ export function RegisterForm() {
           { key: "username" as const, label: "Username", max: 64 },
         ].map(({ key, label, max }) => (
           <div className="field" key={key}>
-            <label htmlFor={key}>{label}</label>
+            <label htmlFor={key}>{t(label)}</label>
             <input
               id={key}
               name={key}
@@ -49,31 +51,30 @@ export function RegisterForm() {
           </div>
         ))}
         <div className="field">
-          <label htmlFor="role">Daftar sebagai</label>
+          <label htmlFor="role">{t("Daftar sebagai")}</label>
           <select
             id="role"
             name="role"
             value={fields.role}
             onChange={(e) => update("role", e.target.value)}
           >
-            <option value="student">Siswa</option>
-            <option value="teacher">Guru</option>
+            <option value="student">{t("Siswa")}</option>
+            <option value="teacher">{t("Guru")}</option>
           </select>
         </div>
       </div>
       <Password label="Kata sandi" autoComplete="new-password" minLength={8} />
       <p className="form-help">
-        Minimal 8 karakter. Gunakan kata sandi yang belum dipakai di layanan
-        lain.
+        {t("Minimal 8 karakter.")}
       </p>
       <ActionFeedback state={state} />
       <button type="submit" className="button primary" disabled={pending}>
-        {pending ? "Membuat akun…" : "Buat akun dan mulai"}
+        {t(pending ? "Membuat akun…" : "Buat akun")}
       </button>
       <p className="form-help">
-        Sudah punya akun?{" "}
+        {t("Sudah punya akun?")}{" "}
         <Link className="text-link" href="/masuk">
-          Masuk di sini
+          {t("Masuk")}
         </Link>
       </p>
     </form>

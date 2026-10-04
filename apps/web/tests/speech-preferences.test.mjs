@@ -35,6 +35,12 @@ test("changing the ElevenLabs voice profile invalidates previous cached audio", 
   const key = await speechAudioCacheKey("Halo dunia!");
 
   assert.match(key, /^kodmod-elevenlabs-v2:/);
+  assert.notEqual(await speechAudioCacheKey("Halo", { language: "id", profile: "first", scope: "a" }),
+    await speechAudioCacheKey("Halo", { language: "en", profile: "first", scope: "a" }));
+  assert.notEqual(await speechAudioCacheKey("Halo", { language: "id", profile: "first", scope: "a" }),
+    await speechAudioCacheKey("Halo", { language: "id", profile: "second", scope: "a" }));
+  assert.notEqual(await speechAudioCacheKey("Halo", { language: "id", profile: "first", scope: "a" }),
+    await speechAudioCacheKey("Halo", { language: "id", profile: "first", scope: "b" }));
 });
 
 test("speech audio loader reuses unexpired audio without calling TTS again", async () => {

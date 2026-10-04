@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -56,16 +58,14 @@ function Pagination({
           className="button secondary small"
           href={`${path}?page=${page - 1}`}
         >
-          <ArrowLeft size={16} aria-hidden="true" /> Sebelumnya
-        </Link>
+          <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Sebelumnya"}</UiText></Link>
       )}
-      <span>Halaman {page + 1}</span>
+      <span><UiText>{"Halaman "}</UiText>{page + 1}</span>
       {next && (
         <Link
           className="button secondary small"
           href={`${path}?page=${page + 1}`}
-        >
-          Selanjutnya <ArrowRight size={16} aria-hidden="true" />
+        ><UiText>{"Selanjutnya"}</UiText><ArrowRight size={16} aria-hidden="true" />
         </Link>
       )}
     </nav>
@@ -81,35 +81,29 @@ export async function TeacherQuizIndex({ page: raw }: { page?: string }) {
   return (
     <>
       <Heading
-        title="Kuis & penugasan"
-        description="Dari pertanyaan yang baik, menuju pemahaman yang lebih terarah."
+        title={<UiText>{"Kuis & penugasan"}</UiText>}
+        description={<UiText>{"Dari pertanyaan yang baik, menuju pemahaman yang lebih terarah."}</UiText>}
       >
         <Link className="button primary" href="/guru/kuis/baru">
-          <Plus size={17} aria-hidden="true" /> Buat kuis
-        </Link>
+          <Plus size={17} aria-hidden="true" /><UiText>{"Buat kuis"}</UiText></Link>
       </Heading>
       <section className="editorial-hero">
         <div>
           <span className="editorial-kicker">
-            <BookOpenCheck size={16} aria-hidden="true" /> RUANG UNTUK MEMAHAMI
-          </span>
-          <h2>Siapkan. Tinjau. Bagikan.</h2>
-          <p>
-            Tulis soal dengan pembahasan yang jelas, ajukan review, lalu bagikan
-            ke kelas. Jawaban dan nilai siswa tersimpan dalam satu alur.
-          </p>
+            <BookOpenCheck size={16} aria-hidden="true" /><UiText>{"RUANG UNTUK MEMAHAMI"}</UiText></span>
+          <h2><UiText>{"Siapkan. Tinjau. Bagikan."}</UiText></h2>
+          <p><UiText>{"Tulis soal dengan pembahasan yang jelas, ajukan review, lalu bagikan ke kelas. Jawaban dan nilai siswa tersimpan dalam satu alur."}</UiText></p>
         </div>
         <div className="editorial-hero-steps" aria-label="Alur kuis">
-          <span>01 · Draft</span>
-          <span>02 · Review</span>
-          <span>03 · Publikasi</span>
-          <span>04 · Penugasan</span>
+          <span><UiText>{"01 · Draft"}</UiText></span>
+          <span><UiText>{"02 · Review"}</UiText></span>
+          <span><UiText>{"03 · Publikasi"}</UiText></span>
+          <span><UiText>{"04 · Penugasan"}</UiText></span>
         </div>
       </section>
       <div className="learning-section-heading">
-        <h2>Kuis Anda</h2>
-        <Link className="learning-back" href="/guru/review-kuis">
-          Antrean review <ArrowUpRight size={16} aria-hidden="true" />
+        <h2><UiText>{"Kuis Anda"}</UiText></h2>
+        <Link className="learning-back" href="/guru/review-kuis"><UiText>{"Antrean review"}</UiText><ArrowUpRight size={16} aria-hidden="true" />
         </Link>
       </div>
       {rows.length ? (
@@ -125,18 +119,17 @@ export async function TeacherQuizIndex({ page: raw }: { page?: string }) {
                   <FileCheck2 size={22} aria-hidden="true" />
                 </span>
                 <Badge active={q.state !== "rejected"}>
-                  {quizState[q.state]}
+                  {<UiText>{quizState[q.state]}</UiText>}
                 </Badge>
               </div>
               <h3>{q.title}</h3>
               <p>
                 {q.description ||
-                  "Buka kuis untuk menyiapkan soal, pembahasan, dan penugasan."}
+                  <UiText>{"Buka kuis untuk menyiapkan soal, pembahasan, dan penugasan."}</UiText>}
               </p>
               <div className="editorial-card-bottom">
-                <span>Revisi {q.current_version}</span>
-                <span>
-                  Kelola kuis <ArrowUpRight size={17} aria-hidden="true" />
+                <span><UiText>{"Revisi "}</UiText>{q.current_version}</span>
+                <span><UiText>{"Kelola kuis"}</UiText><ArrowUpRight size={17} aria-hidden="true" />
                 </span>
               </div>
             </Link>
@@ -144,10 +137,7 @@ export async function TeacherQuizIndex({ page: raw }: { page?: string }) {
         </div>
       ) : (
         <section className="panel">
-          <Empty title="Mulai dari satu pertanyaan.">
-            Buat kuis pilihan ganda, lalu minta review sebelum membagikannya ke
-            siswa.
-          </Empty>
+          <Empty title={<UiText>{"Mulai dari satu pertanyaan."}</UiText>}><UiText>{"Buat kuis pilihan ganda, lalu minta review sebelum membagikannya ke siswa."}</UiText></Empty>
         </section>
       )}
       <Pagination page={page} next={rows.length === 25} path="/guru/kuis" />
@@ -169,11 +159,10 @@ export async function TeacherQuizEditor({ id }: { id?: string }) {
   return (
     <>
       <Link className="learning-back" href="/guru/kuis">
-        <ArrowLeft size={16} aria-hidden="true" /> Semua kuis
-      </Link>
+        <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Semua kuis"}</UiText></Link>
       <Heading
-        title={draft?.version.title || "Buat kuis baru"}
-        description="Pertanyaan yang jelas. Review yang terarah. Pengalaman belajar yang nyaman."
+        title={draft?.version.title || <UiText>{"Buat kuis baru"}</UiText>}
+        description={<UiText>{"Pertanyaan yang jelas. Review yang terarah. Pengalaman belajar yang nyaman."}</UiText>}
       />
       <QuizWorkspace
         key={
@@ -206,21 +195,18 @@ export async function QuizReviewIndex({
   return (
     <>
       <Heading
-        title="Review kuis"
+        title={<UiText>{"Review kuis"}</UiText>}
         description={
           role === "admin"
-            ? "Pastikan pertanyaan dan pembahasan siap membantu siswa belajar."
-            : "Tinjau revisi kuis yang dipercayakan kepada Anda."
+            ? <UiText>{"Pastikan pertanyaan dan pembahasan siap membantu siswa belajar."}</UiText>
+            : <UiText>{"Tinjau revisi kuis yang dipercayakan kepada Anda."}</UiText>
         }
       />
       <section className="panel editorial-review-intro">
         <ShieldCheck size={27} aria-hidden="true" />
         <div>
-          <h2>Satu revisi. Satu keputusan yang jelas.</h2>
-          <p>
-            Periksa soal, kunci, dan narasi. Persetujuan memberi guru izin untuk
-            menerbitkan revisi tersebut.
-          </p>
+          <h2><UiText>{"Satu revisi. Satu keputusan yang jelas."}</UiText></h2>
+          <p><UiText>{"Periksa soal, kunci, dan narasi. Persetujuan memberi guru izin untuk menerbitkan revisi tersebut."}</UiText></p>
         </div>
       </section>
       {rows.length ? (
@@ -233,14 +219,13 @@ export async function QuizReviewIndex({
             >
               <div className="editorial-card-top">
                 <FileCheck2 size={23} aria-hidden="true" />
-                <Badge>Menunggu review</Badge>
+                <Badge><UiText>{"Menunggu review"}</UiText></Badge>
               </div>
               <h2>{q.title}</h2>
-              <p>Disiapkan oleh {q.owner_name}</p>
+              <p><UiText>{"Disiapkan oleh "}</UiText>{q.owner_name}</p>
               <div className="editorial-card-bottom">
-                <span>Revisi {q.current_version}</span>
-                <span>
-                  Tinjau <ArrowUpRight size={17} aria-hidden="true" />
+                <span><UiText>{"Revisi "}</UiText>{q.current_version}</span>
+                <span><UiText>{"Tinjau"}</UiText><ArrowUpRight size={17} aria-hidden="true" />
                 </span>
               </div>
             </Link>
@@ -248,9 +233,7 @@ export async function QuizReviewIndex({
         </div>
       ) : (
         <section className="panel">
-          <Empty title="Antrean review sudah bersih.">
-            Kuis yang menunggu penilaian akan muncul di sini.
-          </Empty>
+          <Empty title={<UiText>{"Antrean review sudah bersih."}</UiText>}><UiText>{"Kuis yang menunggu penilaian akan muncul di sini."}</UiText></Empty>
         </section>
       )}
       <Pagination page={page} next={rows.length === 25} path={base} />
@@ -278,11 +261,10 @@ export async function QuizReviewDetail({
         className="learning-back"
         href={role === "admin" ? "/admin/review-kuis" : "/guru/review-kuis"}
       >
-        <ArrowLeft size={16} aria-hidden="true" /> Antrean review
-      </Link>
+        <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Antrean review"}</UiText></Link>
       <Heading
         title={draft.version.title}
-        description="Keputusan Anda berlaku untuk revisi yang sedang ditampilkan."
+        description={<UiText>{"Keputusan Anda berlaku untuk revisi yang sedang ditampilkan."}</UiText>}
       />
       <QuizWorkspace
         key={`${draft.id}:${draft.current_version}:${draft.version.review_revision}`}
@@ -304,20 +286,15 @@ export async function StudentAssignmentIndex({ page: raw }: { page?: string }) {
   return (
     <>
       <Heading
-        title="Tugas dari guru"
-        description="Kerjakan satu langkah pada satu waktu. Jawaban tersimpan saat kamu menyimpannya."
+        title={<UiText>{"Tugas dari guru"}</UiText>}
+        description={<UiText>{"Kerjakan satu langkah pada satu waktu. Jawaban tersimpan saat kamu menyimpannya."}</UiText>}
       />
       <section className="editorial-hero">
         <div>
           <span className="editorial-kicker">
-            <BookOpenCheck size={16} aria-hidden="true" /> BELAJAR DENGAN
-            TERARAH
-          </span>
-          <h2>Satu soal, satu langkah maju.</h2>
-          <p>
-            Buka penugasan kelas, dengarkan soal jika diperlukan, dan lanjutkan
-            dari jawaban yang sudah tersimpan.
-          </p>
+            <BookOpenCheck size={16} aria-hidden="true" /><UiText>{"BELAJAR DENGAN TERARAH"}</UiText></span>
+          <h2><UiText>{"Satu soal, satu langkah maju."}</UiText></h2>
+          <p><UiText>{"Buka penugasan kelas, dengarkan soal jika diperlukan, dan lanjutkan dari jawaban yang sudah tersimpan."}</UiText></p>
         </div>
       </section>
       {rows.length ? (
@@ -339,19 +316,18 @@ export async function StudentAssignmentIndex({ page: raw }: { page?: string }) {
                       availability === "open" || availability === "submitted"
                     }
                   >
-                    {availabilityLabel[availability]}
+                    {<UiText>{availabilityLabel[availability]}</UiText>}
                   </Badge>
                 </div>
                 <h2>{a.title}</h2>
                 <p>
-                  {a.class_name} · {a.total_questions} soal
-                </p>
+                  {a.class_name} · {a.total_questions}<UiText>{" soal"}</UiText></p>
                 <div className="editorial-card-schedule">
                   <CalendarClock size={15} aria-hidden="true" />
                   <span>
                     {a.due_at
                       ? "Tenggat: " + scheduleLabel(a.due_at)
-                      : "Tanpa batas pengumpulan"}
+                      : <UiText>{"Tanpa batas pengumpulan"}</UiText>}
                   </span>
                 </div>
                 <div className="editorial-card-bottom">
@@ -362,10 +338,10 @@ export async function StudentAssignmentIndex({ page: raw }: { page?: string }) {
                   </span>
                   <span>
                     {availability === "submitted"
-                      ? "Lihat hasil"
+                      ? <UiText>{"Lihat hasil"}</UiText>
                       : a.attempt_state === "in_progress"
-                        ? "Lanjutkan"
-                        : "Buka tugas"}
+                        ? <UiText>{"Lanjutkan"}</UiText>
+                        : <UiText>{"Buka tugas"}</UiText>}
                     <ArrowUpRight size={17} aria-hidden="true" />
                   </span>
                 </div>
@@ -375,9 +351,7 @@ export async function StudentAssignmentIndex({ page: raw }: { page?: string }) {
         </div>
       ) : (
         <section className="panel">
-          <Empty title="Tugasmu akan muncul di sini.">
-            Guru akan membagikan kuis setelah kamu terdaftar di kelas.
-          </Empty>
+          <Empty title={<UiText>{"Tugasmu akan muncul di sini."}</UiText>}><UiText>{"Guru akan membagikan kuis setelah kamu terdaftar di kelas."}</UiText></Empty>
         </section>
       )}
       <Pagination page={page} next={rows.length === 25} path="/siswa/tugas" />
@@ -407,8 +381,7 @@ export async function StudentAssignmentPage({ id }: { id: string }) {
   return (
     <>
       <Link className="learning-back" href="/siswa/tugas">
-        <ArrowLeft size={16} aria-hidden="true" /> Semua tugas
-      </Link>
+        <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Semua tugas"}</UiText></Link>
       <Heading
         title={assignment.title}
         description={`${assignment.class_name} · ${assignment.total_questions} soal · Revisi ${assignment.version}`}
@@ -439,8 +412,7 @@ export async function TeacherAssignmentPage({ id }: { id: string }) {
   return (
     <>
       <Link className="learning-back" href="/guru/kuis">
-        <ArrowLeft size={16} aria-hidden="true" /> Semua kuis
-      </Link>
+        <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Semua kuis"}</UiText></Link>
       <Heading
         title={result.assignment.title}
         description={`${result.assignment.class_name} · Hasil penugasan revisi ${result.assignment.version}`}

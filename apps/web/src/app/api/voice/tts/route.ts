@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { session } from "@/lib/session";
+import { validLanguage } from "@/lib/i18n.mjs";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  const language = typeof body === "object" && body !== null && "language" in body ? body.language : undefined;
+  if (language !== undefined && !validLanguage(language)) return new Response(null, { status: 400 });
 
   let upstream: Response;
   try {
@@ -39,9 +42,9 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${current.token}`,
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, language }),
       cache: "no-store",
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(75_000)]),
     });
   } catch {
     return NextResponse.json(
@@ -54,7 +57,8 @@ export async function POST(request: Request) {
     const message =
       upstream.status === 503
         ? "Fitur suara belum diaktifkan oleh pengelola."
-        : upstream.status === 401 || upstream.status === 403
+        : upstream.status === 403 ? "Akun ini tidak memiliki akses suara."
+        : upstream.status === 401
           ? "Sesi berakhir. Silakan masuk kembali."
           : "Audio belum dapat dibuat. Coba lagi.";
     return NextResponse.json({ message }, { status: upstream.status });

@@ -1,4 +1,6 @@
 "use client";
+import { UiText } from "@/components/language-provider";
+
 
 import { useState } from "react";
 import Link from "next/link";
@@ -13,6 +15,7 @@ import {
   useConfirmedAction,
 } from "./action-feedback";
 import { roleLabel, type User } from "@/lib/types";
+import { useI18n } from "./language-provider";
 
 function Submit({
   pending,
@@ -21,12 +24,13 @@ function Submit({
   pending: boolean;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <button className="button primary" type="submit" disabled={pending}>
       {pending && (
         <LoaderCircle className="spin" size={18} aria-hidden="true" />
       )}
-      {pending ? "Memproses…" : children}
+      {pending ? t("Memproses…") : children}
     </button>
   );
 }
@@ -39,11 +43,12 @@ export function Password({
   autoComplete: string;
   minLength?: number;
 }) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const [password, setPassword] = useState("");
   return (
     <div className="field">
-      <label htmlFor="password">{label}</label>
+      <label htmlFor="password">{t(label)}</label>
       <div className="password-field">
         <input
           id="password"
@@ -59,7 +64,7 @@ export function Password({
         <button
           type="button"
           aria-label={
-            visible ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"
+            t(visible ? "Sembunyikan kata sandi" : "Tampilkan kata sandi")
           }
           aria-pressed={visible}
           onClick={() => setVisible(!visible)}
@@ -71,6 +76,7 @@ export function Password({
   );
 }
 export function LoginForm() {
+  const { t } = useI18n();
   const [state, action, pending] = useConfirmedAction(login, {
     title: "Masuk ke KODMOD?",
     text: "Lanjutkan masuk menggunakan akun yang telah Anda isi.",
@@ -84,7 +90,7 @@ export function LoginForm() {
       className="form-stack"
     >
       <div className="field">
-        <label htmlFor="username">Username</label>
+        <label htmlFor="username"><UiText>{"Username"}</UiText></label>
         <input
           id="username"
           name="username"
@@ -94,22 +100,22 @@ export function LoginForm() {
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="Username dari sekolah"
+          placeholder={t("Username")}
         />
       </div>
       <Password label="Kata sandi" autoComplete="current-password" />
       <Feedback state={state} />
       <Submit pending={pending}>
-        Masuk ke ruang belajar <ArrowRight size={18} />
+        {t("Masuk")} <ArrowRight size={18} aria-hidden="true" />
       </Submit>
       <p className="form-help">
-        Belum punya akun?{" "}
+        {t("Belum punya akun?")}{" "}
         <Link className="text-link" href="/daftar">
-          Buat akun
+          {t("Buat akun")}
         </Link>
       </p>
       <p className="form-help">
-        Lupa kata sandi? Hubungi administrator sekolah untuk bantuan akses.
+        {t("Lupa kata sandi? Hubungi administrator sekolah.")}
       </p>
     </form>
   );
@@ -138,7 +144,7 @@ export function UserForm({
       <input type="hidden" name="id" value={user?.id || ""} />
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="full_name">Nama lengkap</label>
+          <label htmlFor="full_name"><UiText>{"Nama lengkap"}</UiText></label>
           <input
             id="full_name"
             name="full_name"
@@ -150,7 +156,7 @@ export function UserForm({
           />
         </div>
         <div className="field">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username"><UiText>{"Username"}</UiText></label>
           <input
             id="username"
             name="username"
@@ -168,12 +174,12 @@ export function UserForm({
           />
           <small id="username-help">
             {user
-              ? "Username tidak dapat diubah."
-              : "Huruf, angka, titik, garis bawah, atau tanda hubung."}
+              ? <UiText>{"Username tidak dapat diubah."}</UiText>
+              : <UiText>{"Huruf, angka, titik, garis bawah, atau tanda hubung."}</UiText>}
           </small>
         </div>
         <div className="field">
-          <label htmlFor="role">Peran</label>
+          <label htmlFor="role"><UiText>{"Peran"}</UiText></label>
           <select
             id="role"
             name="role"
@@ -199,11 +205,9 @@ export function UserForm({
       </div>
       <Feedback state={state} />
       <div className="form-footer">
-        <Link className="button secondary" href="/admin/pengguna">
-          Batal
-        </Link>
+        <Link className="button secondary" href="/admin/pengguna"><UiText>{"Batal"}</UiText></Link>
         <Submit pending={pending}>
-          {user ? "Simpan perubahan" : "Buat pengguna"}
+          {user ? <UiText>{"Simpan perubahan"}</UiText> : <UiText>{"Buat pengguna"}</UiText>}
         </Submit>
       </div>
     </form>
@@ -218,21 +222,20 @@ export function StatusForm({ user, self }: { user: User; self: boolean }) {
   });
   return (
     <section className="panel">
-      <h2>Akses akun</h2>
+      <h2><UiText>{"Akses akun"}</UiText></h2>
       <p className="muted">
         {self
-          ? "Akun Anda sendiri tidak dapat dinonaktifkan."
-          : "Penonaktifan menghentikan akses masuk. Data dan riwayat pengguna tetap disimpan."}
+          ? <UiText>{"Akun Anda sendiri tidak dapat dinonaktifkan."}</UiText>
+          : <UiText>{"Penonaktifan menghentikan akses masuk. Data dan riwayat pengguna tetap disimpan."}</UiText>}
       </p>
       {!self && (
         <form onReset={(event) => event.preventDefault()} action={action}>
           <input type="hidden" name="id" value={user.id} />
           <input type="hidden" name="active" value={String(!user.is_active)} />
-          <p>
-            Ubah akses masuk untuk <strong>{user.full_name}</strong>?
+          <p><UiText>{"Ubah akses masuk untuk"}</UiText><strong>{user.full_name}</strong>?
           </p>
           <Submit pending={pending}>
-            {user.is_active ? "Ya, nonaktifkan" : "Ya, aktifkan"}
+            {user.is_active ? <UiText>{"Ya, nonaktifkan"}</UiText> : <UiText>{"Ya, aktifkan"}</UiText>}
           </Submit>
         </form>
       )}

@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n } from "@/components/language-provider";
+
 
 import { useState } from "react";
 import {
@@ -60,6 +62,7 @@ export function StudentAnalytics({
   initial: StudentAnalytics;
   initialSpoken: string;
 }) {
+  const { t } = useI18n();
   const [data, setData] = useState(initial);
   const [spoken, setSpoken] = useState(initialSpoken);
   const [window, setWindow] = useState<AnalyticsWindow>(initial.window);
@@ -118,22 +121,19 @@ export function StudentAnalytics({
   }
 
   return (
-    <section className="analytics-workspace" aria-label="Progres belajar siswa">
+    <section className="analytics-workspace" aria-label={t("Progres belajar siswa")}>
       <div className="analytics-toolbar">
         <div>
           <span className="analytics-kicker">
-            <BarChart3 size={14} aria-hidden="true" /> RINGKASAN PERJALANANMU
-          </span>
-          <h2>Belajar dengan arah yang jelas.</h2>
-          <p>Gunakan data ini untuk memilih langkah berikutnya, bukan untuk membandingkan diri.</p>
+            <BarChart3 size={14} aria-hidden="true" /><UiText>{"RINGKASAN PERJALANANMU"}</UiText></span>
+          <h2><UiText>{"Belajar dengan arah yang jelas."}</UiText></h2>
+          <p><UiText>{"Gunakan data ini untuk memilih langkah berikutnya, bukan untuk membandingkan diri."}</UiText></p>
         </div>
         <button type="button" className="button secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" />
-          Perbarui data
-        </button>
+          <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" /><UiText>{"Perbarui data"}</UiText></button>
       </div>
 
-      <div className="analytics-window-tabs" role="tablist" aria-label="Rentang waktu progres">
+      <div className="analytics-window-tabs" role="tablist" aria-label={t("Rentang waktu progres")}>
         {windows.map((item) => (
           <button
             key={item.value}
@@ -144,7 +144,7 @@ export function StudentAnalytics({
             onClick={() => void changeWindow(item.value)}
             disabled={loading}
           >
-            {item.label}
+            {t(item.label)}
           </button>
         ))}
       </div>
@@ -153,39 +153,39 @@ export function StudentAnalytics({
 
       <div className="analytics-hero panel">
         <div className="analytics-hero-copy">
-          <span className="analytics-kicker">PROFIL BELAJAR</span>
+          <span className="analytics-kicker"><UiText>{"PROFIL BELAJAR"}</UiText></span>
           <h3>{data.student_name}</h3>
-          <p>{levelLabel(data.overall_mastery)} · {data.n_sessions} sesi belajar pada periode ini.</p>
+          <p>{levelLabel(data.overall_mastery)} · {data.n_sessions}<UiText>{" sesi belajar pada periode ini."}</UiText></p>
           <progress max={1} value={data.overall_mastery} aria-label={`Penguasaan materi ${percent(data.overall_mastery)}`} />
           <div className="analytics-progress-meta">
             <strong>{percent(data.overall_mastery)}</strong>
-            <span>penguasaan materi</span>
+            <span><UiText>{"penguasaan materi"}</UiText></span>
           </div>
         </div>
         <div className="analytics-hero-mark" aria-hidden="true">
           <Target size={44} strokeWidth={1.5} />
-          <span>Langkah kecil<br />tetap berarti.</span>
+          <span><UiText>{"Langkah kecil"}</UiText><br /><UiText>{"tetap berarti."}</UiText></span>
         </div>
       </div>
 
       <div className="analytics-stat-grid">
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon blue"><BookOpenCheck size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label">Akurasi latihan</span>
+          <span className="analytics-stat-label"><UiText>{"Akurasi latihan"}</UiText></span>
           <strong>{percent(data.quiz_accuracy)}</strong>
-          <small>{data.n_quiz_attempts} jawaban tercatat</small>
+          <small>{data.n_quiz_attempts}<UiText>{" jawaban tercatat"}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon purple"><Clock3 size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label">Waktu belajar</span>
+          <span className="analytics-stat-label"><UiText>{"Waktu belajar"}</UiText></span>
           <strong>{minutesLabel(data.total_minutes)}</strong>
-          <small>{data.interaction_count} interaksi dengan tutor</small>
+          <small>{data.interaction_count}<UiText>{" interaksi dengan tutor"}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon green"><TrendingUp size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label">Konsistensi</span>
+          <span className="analytics-stat-label"><UiText>{"Konsistensi"}</UiText></span>
           <strong>{percent(data.engagement_index)}</strong>
-          <small>ritme belajar pada periode ini</small>
+          <small><UiText>{"ritme belajar pada periode ini"}</UiText></small>
         </article>
       </div>
 
@@ -193,8 +193,8 @@ export function StudentAnalytics({
         <article className="panel analytics-card">
           <div className="analytics-card-heading">
             <div>
-              <span className="analytics-kicker">FOKUS BERIKUTNYA</span>
-              <h3>Konsep yang perlu dikuatkan</h3>
+              <span className="analytics-kicker"><UiText>{"FOKUS BERIKUTNYA"}</UiText></span>
+              <h3><UiText>{"Konsep yang perlu dikuatkan"}</UiText></h3>
             </div>
             <AlertTriangle size={20} aria-hidden="true" />
           </div>
@@ -207,20 +207,20 @@ export function StudentAnalytics({
                     <span>{percent(concept.mastery)}</span>
                   </div>
                   <progress max={1} value={concept.mastery} aria-label={`${concept.concept_name} ${percent(concept.mastery)}`} />
-                  <small>{concept.n_attempts} latihan · coba satu langkah lagi hari ini</small>
+                  <small>{concept.n_attempts}<UiText>{" latihan · coba satu langkah lagi hari ini"}</UiText></small>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="analytics-empty">Belum ada konsep yang perlu perhatian khusus.</p>
+            <p className="analytics-empty"><UiText>{"Belum ada konsep yang perlu perhatian khusus."}</UiText></p>
           )}
         </article>
 
         <article className="panel analytics-card">
           <div className="analytics-card-heading">
             <div>
-              <span className="analytics-kicker">KEKUATANMU</span>
-              <h3>Konsep yang sudah menguat</h3>
+              <span className="analytics-kicker"><UiText>{"KEKUATANMU"}</UiText></span>
+              <h3><UiText>{"Konsep yang sudah menguat"}</UiText></h3>
             </div>
             <Sparkles size={20} aria-hidden="true" />
           </div>
@@ -233,12 +233,12 @@ export function StudentAnalytics({
                     <span>{percent(concept.mastery)}</span>
                   </div>
                   <progress max={1} value={concept.mastery} aria-label={`${concept.concept_name} ${percent(concept.mastery)}`} />
-                  <small>{concept.n_attempts} latihan · pertahankan dengan menjelaskan ulang</small>
+                  <small>{concept.n_attempts}<UiText>{" latihan · pertahankan dengan menjelaskan ulang"}</UiText></small>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="analytics-empty">Selesaikan satu latihan untuk melihat kekuatanmu.</p>
+            <p className="analytics-empty"><UiText>{"Selesaikan satu latihan untuk melihat kekuatanmu."}</UiText></p>
           )}
         </article>
       </div>
@@ -247,8 +247,8 @@ export function StudentAnalytics({
         <article className="panel analytics-card">
           <div className="analytics-card-heading">
             <div>
-              <span className="analytics-kicker">REKOMENDASI PERSONAL</span>
-              <h3>Langkah yang bisa kamu ambil</h3>
+              <span className="analytics-kicker"><UiText>{"REKOMENDASI PERSONAL"}</UiText></span>
+              <h3><UiText>{"Langkah yang bisa kamu ambil"}</UiText></h3>
             </div>
             <Sparkles size={20} aria-hidden="true" />
           </div>
@@ -258,14 +258,14 @@ export function StudentAnalytics({
                 <span>{item.priority}</span>
                 <div><strong>{item.title}</strong><p>{item.body}</p></div>
               </div>
-            )) : <p className="analytics-empty">Belum ada rekomendasi baru. Teruskan ritmemu.</p>}
+            )) : <p className="analytics-empty"><UiText>{"Belum ada rekomendasi baru. Teruskan ritmemu."}</UiText></p>}
           </div>
         </article>
         <article className="panel analytics-card analytics-voice-card">
           <div className="analytics-card-heading">
             <div>
-              <span className="analytics-kicker"><Headphones size={14} aria-hidden="true" /> RINGKASAN SUARA</span>
-              <h3>Dengarkan progresmu</h3>
+              <span className="analytics-kicker"><Headphones size={14} aria-hidden="true" /><UiText>{" RINGKASAN SUARA"}</UiText></span>
+              <h3><UiText>{"Dengarkan progresmu"}</UiText></h3>
             </div>
           </div>
           <p className="analytics-spoken">{spoken}</p>

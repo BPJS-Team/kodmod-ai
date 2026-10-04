@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { Heading } from "@/components/ui";
 import { StudentLibrary } from "@/components/student-library";
 import { classroomData } from "@/lib/classrooms";
@@ -10,8 +12,8 @@ export default async function Page() {
   return (
     <>
       <Heading
-        title="Pustaka materi"
-        description="Temukan bacaan dari kelas Anda, simpan yang menarik, dan pelajari sesuai ritme Anda."
+        title={<UiText>{"Pustaka materi"}</UiText>}
+        description={<UiText>{"Temukan bacaan dari kelas Anda, simpan yang menarik, dan pelajari sesuai ritme Anda."}</UiText>}
       />
       <StudentLibrary materials={materials} />
     </>

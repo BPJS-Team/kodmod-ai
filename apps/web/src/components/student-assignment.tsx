@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n, UiDate } from "@/components/language-provider";
+
 
 import { useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -20,7 +22,6 @@ import {
 import { createQuizSubmissionId } from "@/lib/quiz-submission.mjs";
 import {
   availabilityLabel,
-  scheduleLabel,
   type Assignment,
   type AssignmentAttempt,
   type AssignmentResult,
@@ -87,6 +88,7 @@ export function StudentAssignment({
   initialAttempt: AssignmentAttempt | null;
   initialResult: AssignmentResult | null;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [attempt, setAttempt] = useState(initialAttempt);
   const [result, setResult] = useState(initialResult);
@@ -268,46 +270,43 @@ export function StudentAssignment({
       <div className="editorial-result">
         <section className="panel editorial-result-hero">
           <CheckCircle2 size={36} aria-hidden="true" />
-          <span className="editorial-kicker">TUGAS SELESAI</span>
-          <h2>Terima kasih sudah mencoba.</h2>
+          <span className="editorial-kicker"><UiText>{"TUGAS SELESAI"}</UiText></span>
+          <h2><UiText>{"Terima kasih sudah mencoba."}</UiText></h2>
           <div className="editorial-final-score">
             {result.score}
             <span>/100</span>
           </div>
           <p>
-            {result.correct_count} dari {result.total_questions} jawaban benar.
-          </p>
-          <small>Dikirim {scheduleLabel(result.submitted_at)}</small>
+            {result.correct_count}<UiText>{" dari "}</UiText>{result.total_questions}<UiText>{" jawaban benar."}</UiText></p>
+          <small><UiText>{"Dikirim "}</UiText>{<UiDate value={result.submitted_at} time empty="Tanpa batas waktu" />}</small>
         </section>
         {result.feedback_released ? (
           <section className="panel editorial-section">
-            <h2>Pembahasan jawaban</h2>
+            <h2><UiText>{"Pembahasan jawaban"}</UiText></h2>
             {result.review.map((r, i) => (
               <article
                 key={r.question_id}
                 className="editorial-review-question"
               >
                 <Badge active={r.is_correct}>
-                  {r.is_correct ? "Benar" : "Perlu dipelajari lagi"}
+                  {r.is_correct ? <UiText>{"Benar"}</UiText> : <UiText>{"Perlu dipelajari lagi"}</UiText>}
                 </Badge>
                 <h3>
                   {i + 1}. {r.prompt}
                 </h3>
-                <p>
-                  Jawabanmu:{" "}
+                <p><UiText>{"Jawabanmu:"}</UiText>{" "}
                   <strong>
                     {r.options.find((o) => o.id === r.option_id)?.label}
                   </strong>
                 </p>
-                <p>
-                  Jawaban benar:{" "}
+                <p><UiText>{"Jawaban benar:"}</UiText>{" "}
                   <strong>
                     {r.options.find((o) => o.id === r.correct_option_id)?.label}
                   </strong>
                 </p>
                 <p className="editorial-feedback">
                   {r.explanation ||
-                    "Guru belum menambahkan pembahasan untuk soal ini."}
+                    <UiText>{"Guru belum menambahkan pembahasan untuk soal ini."}</UiText>}
                 </p>
                 <VoiceControls
                   key={r.question_id}
@@ -318,18 +317,16 @@ export function StudentAssignment({
           </section>
         ) : (
           <section className="panel editorial-section">
-            <h2>Pembahasan menyusul</h2>
-            <p>
-              Guru akan membuka pembahasan setelah batas pengumpulan:{" "}
-              {scheduleLabel(assignment.due_at)}.
+            <h2><UiText>{"Pembahasan menyusul"}</UiText></h2>
+            <p><UiText>{"Guru akan membuka pembahasan setelah batas pengumpulan:"}</UiText>{" "}
+              {<UiDate value={assignment.due_at} time empty="Tanpa batas waktu" />}.
             </p>
             <button
               className="button secondary"
               type="button"
               onClick={() => router.refresh()}
             >
-              <RefreshCw size={16} aria-hidden="true" /> Periksa pembahasan
-            </button>
+              <RefreshCw size={16} aria-hidden="true" /><UiText>{"Periksa pembahasan"}</UiText></button>
           </section>
         )}
       </div>
@@ -339,9 +336,9 @@ export function StudentAssignment({
     <>
       <div className="editorial-status-bar">
         <Badge active={availability === "open"}>
-          {availabilityLabel[availability]}
+          {<UiText>{availabilityLabel[availability]}</UiText>}
         </Badge>
-        <span>Tenggat: {scheduleLabel(assignment.due_at)}</span>
+        <span><UiText>{"Tenggat: "}</UiText>{<UiDate value={assignment.due_at} time empty="Tanpa batas waktu" />}</span>
       </div>
       {error && (
         <p role="alert" className="editorial-error">
@@ -351,9 +348,7 @@ export function StudentAssignment({
             className="button secondary small"
             onClick={() => router.refresh()}
             disabled={busy}
-          >
-            Muat ulang progres
-          </button>
+          ><UiText>{"Muat ulang progres"}</UiText></button>
         </p>
       )}
       <p className="editorial-live" role="status" aria-live="polite">
@@ -364,17 +359,16 @@ export function StudentAssignment({
           <span className="class-symbol">
             <CheckCircle2 size={27} aria-hidden="true" />
           </span>
-          <h2>Siap untuk mulai?</h2>
+          <h2><UiText>{"Siap untuk mulai?"}</UiText></h2>
           <p>
             {assignment.description ||
-              "Kerjakan sesuai ritmemu. Simpan setiap pilihan untuk melanjutkan dari progres yang sama."}
+              <UiText>{"Kerjakan sesuai ritmemu. Simpan setiap pilihan untuk melanjutkan dari progres yang sama."}</UiText>}
           </p>
           <ul>
             <li>
-              {assignment.total_questions} soal pilihan ganda, satu percobaan.
-            </li>
-            <li>Jawaban dapat ditinjau kembali sebelum dikirim.</li>
-            <li>Tersedia pembacaan soal dan pilihan melalui kontrol suara.</li>
+              {assignment.total_questions}<UiText>{" soal pilihan ganda, satu percobaan."}</UiText></li>
+            <li><UiText>{"Jawaban dapat ditinjau kembali sebelum dikirim."}</UiText></li>
+            <li><UiText>{"Tersedia pembacaan soal dan pilihan melalui kontrol suara."}</UiText></li>
           </ul>
           <button
             type="button"
@@ -382,7 +376,7 @@ export function StudentAssignment({
             onClick={() => void start()}
             disabled={busy || availability !== "open"}
           >
-            {busy ? "Menyiapkan…" : "Mulai tugas"}
+            {busy ? <UiText>{"Menyiapkan…"}</UiText> : <UiText>{"Mulai tugas"}</UiText>}
             <ArrowRight size={17} aria-hidden="true" />
           </button>
         </section>
@@ -390,10 +384,10 @@ export function StudentAssignment({
         question && (
           <div className="editorial-attempt-grid">
             <aside className="panel editorial-section editorial-progress">
-              <h2>Progres tugas</h2>
+              <h2><UiText>{"Progres tugas"}</UiText></h2>
               <strong>
                 {answeredCount}
-                <span> / {attempt.questions.length} soal tersimpan</span>
+                <span> / {attempt.questions.length}<UiText>{" soal tersimpan"}</UiText></span>
               </strong>
               <progress
                 value={answeredCount}
@@ -402,7 +396,7 @@ export function StudentAssignment({
               />
               <nav
                 className="editorial-question-nav"
-                aria-label="Pilih nomor soal"
+                aria-label={t("Pilih nomor soal")}
               >
                 {attempt.questions.map((q, i) => (
                   <button
@@ -418,12 +412,11 @@ export function StudentAssignment({
                   </button>
                 ))}
               </nav>
-              <p>Jawaban tersimpan saat kamu menekan Simpan & lanjut.</p>
+              <p><UiText>{"Jawaban tersimpan saat kamu menekan Simpan & lanjut."}</UiText></p>
             </aside>
             <div className="editorial-main">
               <section className="panel editorial-section">
-                <span className="editorial-kicker">
-                  SOAL {question.order_index} DARI {attempt.questions.length}
+                <span className="editorial-kicker"><UiText>{"SOAL "}</UiText>{question.order_index}<UiText>{" DARI "}</UiText>{attempt.questions.length}
                 </span>
                 <h2
                   ref={heading}
@@ -436,7 +429,7 @@ export function StudentAssignment({
                   className="quiz-options editorial-student-options"
                   disabled={busy || !!pending || availability !== "open"}
                 >
-                  <legend>Pilih satu jawaban</legend>
+                  <legend><UiText>{"Pilih satu jawaban"}</UiText></legend>
                   {question.options.map((o, i) => (
                     <label
                       key={o.id}
@@ -458,10 +451,10 @@ export function StudentAssignment({
                 </fieldset>
                 <p className="editorial-help">
                   {dirty
-                    ? "Pilihan terbaru belum disimpan."
+                    ? <UiText>{"Pilihan terbaru belum disimpan."}</UiText>
                     : saved
-                      ? "Pilihan pada soal ini sudah tersimpan."
-                      : "Pilih jawaban, lalu simpan untuk melanjutkan."}
+                      ? <UiText>{"Pilihan pada soal ini sudah tersimpan."}</UiText>
+                      : <UiText>{"Pilih jawaban, lalu simpan untuk melanjutkan."}</UiText>}
                 </p>
                 <div className="editorial-question-footer">
                   <button
@@ -470,8 +463,7 @@ export function StudentAssignment({
                     disabled={index === 0 || busy || !!pending}
                     onClick={() => void navigate(index - 1)}
                   >
-                    <ArrowLeft size={16} aria-hidden="true" /> Sebelumnya
-                  </button>
+                    <ArrowLeft size={16} aria-hidden="true" /><UiText>{"Sebelumnya"}</UiText></button>
                   <button
                     type="button"
                     className="button primary"
@@ -480,8 +472,7 @@ export function StudentAssignment({
                     }
                     onClick={() => void save()}
                   >
-                    <Save size={16} aria-hidden="true" /> Simpan & lanjut
-                  </button>
+                    <Save size={16} aria-hidden="true" /><UiText>{"Simpan & lanjut"}</UiText></button>
                 </div>
               </section>
               <VoiceControls
@@ -490,11 +481,11 @@ export function StudentAssignment({
               />
               <section className="panel editorial-section editorial-final-submit">
                 <div>
-                  <h2>Tinjau sebelum mengirim</h2>
+                  <h2><UiText>{"Tinjau sebelum mengirim"}</UiText></h2>
                   <p>
                     {pending
-                      ? "Hasil pengiriman belum pasti. Pilihan dikunci sampai pengiriman ulang selesai; permintaan yang sama tidak akan dinilai dua kali."
-                      : "Pastikan semua jawaban sudah tersimpan. Setelah dikirim, jawaban tidak dapat diubah."}
+                      ? <UiText>{"Hasil pengiriman belum pasti. Pilihan dikunci sampai pengiriman ulang selesai; permintaan yang sama tidak akan dinilai dua kali."}</UiText>
+                      : <UiText>{"Pastikan semua jawaban sudah tersimpan. Setelah dikirim, jawaban tidak dapat diubah."}</UiText>}
                   </p>
                 </div>
                 <button
@@ -511,10 +502,10 @@ export function StudentAssignment({
                 >
                   <Send size={17} aria-hidden="true" />{" "}
                   {busy
-                    ? "Mengirim…"
+                    ? <UiText>{"Mengirim…"}</UiText>
                     : pending
-                      ? "Coba kirim kembali"
-                      : "Kirim semua jawaban"}
+                      ? <UiText>{"Coba kirim kembali"}</UiText>
+                      : <UiText>{"Kirim semua jawaban"}</UiText>}
                 </button>
               </section>
             </div>

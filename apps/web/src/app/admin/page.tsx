@@ -1,3 +1,5 @@
+
+import { UiText, UiDate } from "@/components/language-provider";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -9,7 +11,6 @@ import {
 import { requireSession } from "@/lib/session";
 import { backend } from "@/lib/server-api";
 import {
-  dateLabel,
   roleLabel,
   type User,
 } from "@/lib/types";
@@ -28,29 +29,18 @@ export default async function AdminPage() {
     <>
       <Heading
         title={`Selamat datang, ${user.full_name.split(" ")[0]}.`}
-        description="Kelola akses, siapkan ruang belajar, dan dampingi sekolah Anda."
+        description={<UiText>{"Kelola akses, siapkan ruang belajar, dan dampingi sekolah Anda."}</UiText>}
       >
         <Link className="button primary" href="/admin/pengguna/baru">
-          <Plus size={18} aria-hidden="true" /> Tambah pengguna
-        </Link>
+          <Plus size={18} aria-hidden="true" /><UiText>{"Tambah pengguna"}</UiText></Link>
       </Heading>
       <section className="dashboard-welcome">
         <div>
           <span className="welcome-label">
-            <BookOpen size={16} aria-hidden="true" /> Mulai dari akses yang
-            tepat
-          </span>
-          <h2>
-            Ruang belajar yang baik,
-            <br />
-            dimulai bersama Anda.
-          </h2>
-          <p>
-            Pastikan guru dan siswa memiliki akses untuk melangkah ke perjalanan
-            belajar berikutnya.
-          </p>
-          <Link href="/admin/pengguna" className="button white">
-            Kelola pengguna <ArrowUpRight size={18} aria-hidden="true" />
+            <BookOpen size={16} aria-hidden="true" /><UiText>{"Mulai dari akses yang tepat"}</UiText></span>
+          <h2><UiText>{"Ruang belajar yang baik,"}</UiText><br /><UiText>{"dimulai bersama Anda."}</UiText></h2>
+          <p><UiText>{"Pastikan guru dan siswa memiliki akses untuk melangkah ke perjalanan belajar berikutnya."}</UiText></p>
+          <Link href="/admin/pengguna" className="button white"><UiText>{"Kelola pengguna"}</UiText><ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
         <div className="welcome-art" aria-hidden="true">
@@ -91,21 +81,20 @@ export default async function AdminPage() {
       <section className="panel table-panel">
         <div className="panel-heading">
           <div>
-            <h2>Pengguna terbaru</h2>
-            <p>Akun yang baru bergabung di KODMOD.</p>
+            <h2><UiText>{"Pengguna terbaru"}</UiText></h2>
+            <p><UiText>{"Akun yang baru bergabung di KODMOD."}</UiText></p>
           </div>
-          <Link href="/admin/pengguna" className="text-link">
-            Lihat semua <ArrowUpRight size={16} aria-hidden="true" />
+          <Link href="/admin/pengguna" className="text-link"><UiText>{"Lihat semua"}</UiText><ArrowUpRight size={16} aria-hidden="true" />
           </Link>
         </div>
         {users.length ? (
           <table>
             <thead>
               <tr>
-                <th>Pengguna</th>
-                <th>Peran</th>
-                <th>Bergabung</th>
-                <th>Status</th>
+                <th><UiText>{"Pengguna"}</UiText></th>
+                <th><UiText>{"Peran"}</UiText></th>
+                <th><UiText>{"Bergabung"}</UiText></th>
+                <th><UiText>{"Status"}</UiText></th>
               </tr>
             </thead>
             <tbody>
@@ -125,11 +114,11 @@ export default async function AdminPage() {
                       </span>
                     </Link>
                   </td>
-                  <td data-label="Peran">{roleLabel[u.role]}</td>
-                  <td data-label="Bergabung">{dateLabel(u.created_at)}</td>
+                  <td data-label="Peran">{<UiText>{roleLabel[u.role]}</UiText>}</td>
+                  <td data-label="Bergabung">{<UiDate value={u.created_at} />}</td>
                   <td>
                     <Badge active={u.is_active}>
-                      {u.is_active ? "Aktif" : "Nonaktif"}
+                      {u.is_active ? <UiText>{"Aktif"}</UiText> : <UiText>{"Nonaktif"}</UiText>}
                     </Badge>
                   </td>
                 </tr>
@@ -137,9 +126,7 @@ export default async function AdminPage() {
             </tbody>
           </table>
         ) : (
-          <Empty title="Belum ada pengguna">
-            Tambahkan akun untuk mulai menyiapkan akses sekolah.
-          </Empty>
+          <Empty title={<UiText>{"Belum ada pengguna"}</UiText>}><UiText>{"Tambahkan akun untuk mulai menyiapkan akses sekolah."}</UiText></Empty>
         )}
       </section>
       <AdminInsights initialOverview={overview} initialActivity={activity} />

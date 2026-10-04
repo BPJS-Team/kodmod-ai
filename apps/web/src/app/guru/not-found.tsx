@@ -1,15 +1,12 @@
+
+import { UiText } from "@/components/language-provider";
 import Link from "next/link";
 export default function NotFound() {
   return (
     <section className="panel learning-section">
-      <h1>Ruang ini tidak tersedia.</h1>
-      <p className="muted">
-        Kelas atau materi mungkin sudah diarsipkan, belum diterbitkan, atau
-        tidak dapat diakses akun Anda.
-      </p>
-      <Link className="button primary" href="/guru/kelas">
-        Kembali ke kelas saya
-      </Link>
+      <h1><UiText>{"Ruang ini tidak tersedia."}</UiText></h1>
+      <p className="muted"><UiText>{"Kelas atau materi mungkin sudah diarsipkan, belum diterbitkan, atau tidak dapat diakses akun Anda."}</UiText></p>
+      <Link className="button primary" href="/guru/kelas"><UiText>{"Kembali ke kelas saya"}</UiText></Link>
     </section>
   );
 }

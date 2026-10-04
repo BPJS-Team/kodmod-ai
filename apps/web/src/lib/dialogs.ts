@@ -1,6 +1,9 @@
 "use client";
 
 import Swal from "sweetalert2";
+import { translate, type Language } from "@/lib/i18n.mjs";
+
+const t = (text: string) => translate(text, document.documentElement.lang as Language);
 
 const dialog = () =>
   Swal.mixin({
@@ -13,8 +16,8 @@ const dialog = () =>
       actions: "kodmod-dialog-actions",
     },
     buttonsStyling: false,
-    confirmButtonText: "Mengerti",
-    cancelButtonText: "Batal",
+    confirmButtonText: t("Mengerti"),
+    cancelButtonText: t("Batal"),
     heightAuto: false,
     returnFocus: true,
     allowOutsideClick: false,
@@ -30,22 +33,22 @@ export type Confirmation = {
 export async function confirmAction(options: Confirmation) {
   if (Swal.isVisible()) return false;
   const result = await dialog().fire({
-    titleText: options.title,
-    text: options.text,
+    titleText: t(options.title),
+    text: t(options.text),
     icon: options.destructive ? "warning" : "question",
     iconColor: options.destructive ? "#b66b11" : "#2565e9",
     showCancelButton: true,
     focusCancel: true,
     reverseButtons: true,
-    confirmButtonText: options.confirmText || "Ya, lanjutkan",
+    confirmButtonText: t(options.confirmText || "Ya, lanjutkan"),
   });
   return result.isConfirmed;
 }
 
 export async function notifyResult(message: string, error = false) {
   await dialog().fire({
-    titleText: error ? "Belum berhasil" : "Berhasil",
-    text: message,
+    titleText: t(error ? "Belum berhasil" : "Berhasil"),
+    text: t(message),
     icon: error ? "error" : "success",
     iconColor: error ? "#c44343" : "#23856d",
   });

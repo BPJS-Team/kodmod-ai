@@ -7,6 +7,7 @@ import { backend, BackendError } from "@/lib/server-api";
 import { requireSession, SESSION_COOKIE } from "@/lib/session";
 import { sessionCookieSecure } from "@/lib/cookie-security";
 import { homeFor, type ActionState, type User } from "@/lib/types";
+import { LANGUAGE_COOKIE, validLanguage } from "@/lib/i18n.mjs";
 
 const text = (data: FormData, key: string) =>
   String(data.get(key) ?? "").trim();
@@ -47,6 +48,9 @@ export async function login(
     path: "/",
     maxAge: Math.max(0, result.expires_in),
   });
+  (await cookies()).set(LANGUAGE_COOKIE, validLanguage(result.user.preferred_language)
+    ? result.user.preferred_language : "id", { sameSite: "lax", path: "/", maxAge: 365 * 86400,
+      secure: sessionCookieSecure() });
   redirect(`${homeFor(result.user.role)}?success=signed-in`);
 }
 export async function logout() {
@@ -82,6 +86,7 @@ export async function register(
         full_name,
         password,
         role,
+        preferred_language: (await cookies()).get(LANGUAGE_COOKIE)?.value === "en" ? "en" : "id",
       }),
     });
   } catch (error) {
@@ -106,6 +111,9 @@ export async function register(
     path: "/",
     maxAge: Math.max(0, result.expires_in),
   });
+  (await cookies()).set(LANGUAGE_COOKIE, validLanguage(result.user.preferred_language)
+    ? result.user.preferred_language : "id", { sameSite: "lax", path: "/", maxAge: 365 * 86400,
+      secure: sessionCookieSecure() });
   redirect(`${homeFor(result.user.role)}?success=registered`);
 }
 export async function saveUser(

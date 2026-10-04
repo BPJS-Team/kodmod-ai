@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import Link from "next/link";
 import { classroomData } from "@/lib/classrooms";
 import type { ClassDetail } from "@/lib/class-types";
@@ -15,17 +17,14 @@ export default async function Page({
   );
   return (
     <>
-      <Link className="learning-back" href={`/guru/kelas/${id}`}>
-        Kembali ke {row.name}
+      <Link className="learning-back" href={`/guru/kelas/${id}`}><UiText>{"Kembali ke "}</UiText>{row.name}
       </Link>
       <Heading
-        title="Bagikan pengetahuan baru."
-        description="Tulis materi atau unggah dokumen, tinjau isinya, lalu tentukan kapan siswa dapat membacanya."
+        title={<UiText>{"Bagikan pengetahuan baru."}</UiText>}
+        description={<UiText>{"Tulis materi atau unggah dokumen, tinjau isinya, lalu tentukan kapan siswa dapat membacanya."}</UiText>}
       />
       {row.is_archived ? (
-        <p className="info-note">
-          Aktifkan kelas kembali untuk menambahkan materi.
-        </p>
+        <p className="info-note"><UiText>{"Aktifkan kelas kembali untuk menambahkan materi."}</UiText></p>
       ) : (
         <MaterialForm classId={id} />
       )}

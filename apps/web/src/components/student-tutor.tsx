@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n, UiDate } from "@/components/language-provider";
+
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -11,7 +13,6 @@ import {
   MessageCircle,
   Plus,
   Send,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
@@ -23,7 +24,6 @@ import type {
   TutorContext,
 } from "@/lib/chat-types";
 import type { StudentMaterial } from "@/lib/class-types";
-import { dateLabel } from "@/lib/types";
 import { VoiceControls } from "./voice-controls";
 
 const prompts = [
@@ -64,6 +64,7 @@ export function StudentTutor({
   materials: StudentMaterial[];
   initialMaterialId?: string;
 }) {
+  const { t } = useI18n();
   const [sessions, setSessions] = useState(initialSessions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -75,6 +76,8 @@ export function StudentTutor({
   const [endingId, setEndingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [autoPlayKey, setAutoPlayKey] = useState<string | null>(null);
+  const replySequence = useRef(0);
   const initialMaterial = materials.find((item) => item.id === initialMaterialId);
   const [context, setContext] = useState<TutorContext | null>(initialMaterial ? {
     class_id: initialMaterial.class_id, material_id: initialMaterial.id,
@@ -94,6 +97,7 @@ export function StudentTutor({
     .find((turn) => turn.role === "assistant" || turn.role === "tutor")?.text ?? "";
 
   function startNew() {
+    setAutoPlayKey(null);
     selectionRef.current += 1;
     setSelectedId(null);
     setTurns([]);
@@ -112,6 +116,7 @@ export function StudentTutor({
   }
 
   async function loadSession(id: string) {
+    setAutoPlayKey(null);
     if (busy) return;
     const requestId = selectionRef.current + 1;
     selectionRef.current = requestId;
@@ -184,10 +189,11 @@ export function StudentTutor({
         },
       ]);
       setSelectedId(result.session_id);
+      setAutoPlayKey(`${result.session_id}:${++replySequence.current}`);
       if (result.context !== undefined) setContext(result.context);
       try {
         await refreshSessions();
-        setNotice("Jawaban tutor sudah siap. Kamu bisa mendengarkannya dengan kontrol suara.");
+        setNotice("Jawaban tutor sudah siap.");
       } catch {
         setNotice("Jawaban tutor sudah siap. Riwayat akan diperbarui saat kamu memuat ulang halaman.");
       }
@@ -264,28 +270,25 @@ export function StudentTutor({
   }
 
   return (
-    <section className="tutor-workspace" aria-label="Tutor AI siswa">
-      <aside className="panel tutor-sidebar" aria-label="Riwayat percakapan">
+    <section className="tutor-workspace" aria-label={t("Tutor AI siswa")}>
+      <aside className="panel tutor-sidebar" aria-label={t("Riwayat percakapan")}>
         <div className="tutor-sidebar-heading">
           <div>
-            <span className="tutor-kicker">RUANG BELAJAR</span>
-            <h2>Riwayat tutor</h2>
+            <h2><UiText>{"Riwayat tutor"}</UiText></h2>
           </div>
           <button
             type="button"
             className="icon-button tutor-add"
             onClick={startNew}
             disabled={busy}
-            aria-label="Mulai percakapan baru"
-            title="Percakapan baru"
+            aria-label={t("Mulai percakapan baru")}
+            title={t("Percakapan baru")}
           >
             <Plus size={19} aria-hidden="true" />
           </button>
         </div>
         <button type="button" className="button primary tutor-new" onClick={startNew} disabled={busy}>
-          <MessageCircle size={17} aria-hidden="true" />
-          Mulai pertanyaan baru
-        </button>
+          <MessageCircle size={17} aria-hidden="true" /><UiText>{"Mulai pertanyaan baru"}</UiText></button>
         <div className="tutor-session-list" role="list">
           {sessions.length ? (
             sessions.map((item) => (
@@ -301,9 +304,9 @@ export function StudentTutor({
                   disabled={busy}
                   aria-current={selectedId === item.id ? "true" : undefined}
                 >
-                  <strong>{item.title || "Sesi tanpa judul"}</strong>
+                  <strong>{item.title || <UiText>{"Sesi tanpa judul"}</UiText>}</strong>
                   <span>
-                    <Clock3 size={13} aria-hidden="true" /> {dateLabel(item.started_at)}
+                    <Clock3 size={13} aria-hidden="true" /> {<UiDate value={item.started_at} />}
                   </span>
                 </button>
                 <button
@@ -311,8 +314,8 @@ export function StudentTutor({
                   className="icon-button tutor-delete"
                   onClick={() => void removeSession(item)}
                   disabled={deletingId === item.id || busy}
-                  aria-label={`Hapus percakapan ${item.title || "tanpa judul"}`}
-                  title="Hapus percakapan"
+                  aria-label={`${t("Hapus percakapan")} ${item.title || t("tanpa judul")}`}
+                  title={t("Hapus percakapan")}
                 >
                   {deletingId === item.id ? (
                     <LoaderCircle className="spin" size={16} aria-hidden="true" />
@@ -325,29 +328,23 @@ export function StudentTutor({
           ) : (
             <div className="tutor-sidebar-empty">
               <Bot size={22} aria-hidden="true" />
-              <p>Belum ada riwayat. Mulai dari pertanyaan sederhana.</p>
+              <p><UiText>{"Belum ada riwayat. Mulai dari pertanyaan sederhana."}</UiText></p>
             </div>
           )}
         </div>
       </aside>
 
-      <section className="panel tutor-thread" aria-label="Percakapan">
+      <section className="panel tutor-thread" aria-label={t("Percakapan")}>
         <header className="tutor-thread-heading">
           <div>
-            <span className="tutor-kicker">
-              <Sparkles size={14} aria-hidden="true" /> TUTOR ADAPTIF
-            </span>
-            <h2>{selectedSession?.title || "Mulai dari satu pertanyaan"}</h2>
-            <p>
-              Tutor membantu menyusun penjelasan. Kamu tetap memegang kendali atas setiap langkah belajar.
-            </p>
+            <h2>{selectedSession?.title || <UiText>{"Mulai dari satu pertanyaan"}</UiText>}</h2>
+            <p><UiText>{"Tutor membantu menyusun penjelasan. Kamu tetap memegang kendali atas setiap langkah belajar."}</UiText></p>
           </div>
           <div className="tutor-thread-actions">
             {selectedSession && (
               sessionEnded ? (
                 <span className="tutor-ended-badge">
-                  <CheckCircle2 size={14} aria-hidden="true" /> Sesi selesai
-                </span>
+                  <CheckCircle2 size={14} aria-hidden="true" /><UiText>{"Sesi selesai"}</UiText></span>
               ) : (
                 <button
                   type="button"
@@ -359,48 +356,45 @@ export function StudentTutor({
                     <LoaderCircle className="spin" size={15} aria-hidden="true" />
                   ) : (
                     <CheckCircle2 size={15} aria-hidden="true" />
-                  )}
-                  Akhiri sesi
-                </button>
+                  )}<UiText>{" Akhiri sesi"}</UiText></button>
               )
             )}
             <span className="tutor-live-status">
-              <span aria-hidden="true" /> {pending ? "Menyiapkan jawaban" : sessionEnded ? "Mode baca" : "Siap membantu"}
+              <span aria-hidden="true" /> {pending ? <UiText>{"Menyiapkan jawaban"}</UiText> : sessionEnded ? <UiText>{"Mode baca"}</UiText> : <UiText>{"Siap membantu"}</UiText>}
             </span>
           </div>
         </header>
 
-        <section className="tutor-material-context" aria-label="Materi untuk percakapan">
-          <div className="tutor-context-copy"><BookOpen size={20} aria-hidden="true" /><div><strong>{context?.material_title || "Belajar topik umum"}</strong><p>{context ? `${context.subject_name} · Jawaban mengacu pada materi kelasmu.` : "Pilih materi dari guru agar penjelasan mengikuti bacaan yang kamu pelajari."}</p></div></div>
-          <label className="field">Materi belajar
-            <select value={selectedMaterial?.id || (context ? "unavailable" : "")} onChange={(event) => void selectMaterial(event.target.value)} disabled={busy}>
-              <option value="">Topik umum</option>
-              {materialUnavailable && <option value="unavailable" disabled>Materi tidak lagi tersedia</option>}
+        <section className="tutor-material-context" aria-label={t("Materi untuk percakapan")}>
+          <div className="tutor-context-copy"><BookOpen size={20} aria-hidden="true" /><div><strong>{context?.material_title || <UiText>{"Belajar topik umum"}</UiText>}</strong><p>{context ? <>{context.subject_name} · {t("Jawaban mengacu pada materi kelasmu.")}</> : <UiText>{"Pilih materi dari guru agar penjelasan mengikuti bacaan yang kamu pelajari."}</UiText>}</p></div></div>
+          <label className="field"><UiText>{"Materi belajar"}</UiText><select value={selectedMaterial?.id || (context ? "unavailable" : "")} onChange={(event) => void selectMaterial(event.target.value)} disabled={busy}>
+              <option value=""><UiText>{"Topik umum"}</UiText></option>
+              {materialUnavailable && <option value="unavailable" disabled><UiText>{"Materi tidak lagi tersedia"}</UiText></option>}
               {materials.map((item) => <option key={item.id} value={item.id}>{item.subject} · {item.title}</option>)}
             </select>
           </label>
-          {selectedMaterial && <Link className="tutor-material-link" href={`/siswa/kelas/${selectedMaterial.class_id}/materi/${selectedMaterial.id}`}>Buka materi</Link>}
-          {materialUnavailable && <p className="tutor-context-warning" role="alert">Akses materi ini sudah tidak tersedia. Pilih materi lain untuk memulai sesi baru.</p>}
-          {materialNotReady && <p className="tutor-context-warning" role="status">Materi belum siap digunakan Tutor. Coba perbarui halaman setelah guru selesai menyiapkannya.</p>}
+          {selectedMaterial && <Link className="tutor-material-link" href={`/siswa/kelas/${selectedMaterial.class_id}/materi/${selectedMaterial.id}`}><UiText>{"Buka materi"}</UiText></Link>}
+          {materialUnavailable && <p className="tutor-context-warning" role="alert"><UiText>{"Akses materi ini sudah tidak tersedia. Pilih materi lain untuk memulai sesi baru."}</UiText></p>}
+          {materialNotReady && <p className="tutor-context-warning" role="status"><UiText>{"Materi belum siap digunakan Tutor. Coba perbarui halaman setelah guru selesai menyiapkannya."}</UiText></p>}
         </section>
 
-        <div className="tutor-messages" role="log" aria-live="polite" aria-label="Isi percakapan">
+        <div className="tutor-messages" role="log" aria-live="polite" aria-label={t("Isi percakapan")}>
           {loadingSession ? (
             <div className="tutor-empty">
               <LoaderCircle className="spin" size={25} aria-hidden="true" />
-              <p>Membuka riwayat percakapan…</p>
+              <p><UiText>{"Membuka riwayat percakapan…"}</UiText></p>
             </div>
           ) : !turns.length && !pending ? (
             <div className="tutor-empty">
               <span className="tutor-empty-icon" aria-hidden="true">
                 <Bot size={27} />
               </span>
-              <h3>Apa yang ingin kamu pahami hari ini?</h3>
-              <p>Tuliskan pertanyaanmu dengan kata-kata sendiri. Tutor akan membantumu memecahnya menjadi langkah kecil.</p>
+              <h3><UiText>{"Apa yang ingin kamu pahami hari ini?"}</UiText></h3>
+              <p><UiText>{"Tuliskan pertanyaanmu dengan kata-kata sendiri. Tutor akan membantumu memecahnya menjadi langkah kecil."}</UiText></p>
               <div className="tutor-prompts">
                 {prompts.map((prompt) => (
-                  <button type="button" className="tutor-prompt" key={prompt} onClick={() => setDraft(prompt)}>
-                    {prompt}
+                  <button type="button" className="tutor-prompt" key={prompt} onClick={() => setDraft(t(prompt))}>
+                    {t(prompt)}
                   </button>
                 ))}
               </div>
@@ -410,20 +404,20 @@ export function StudentTutor({
               {turns.map((turn, index) => (
                 <article className={`tutor-message ${turn.role === "student" ? "student" : "assistant"}`} key={`${turn.timestamp || "turn"}-${index}`}>
                   <span className="tutor-message-avatar" aria-hidden="true">
-                    {turn.role === "student" ? "K" : <Bot size={17} />}
+                    {turn.role === "student" ? <UiText>{"K"}</UiText> : <Bot size={17} />}
                   </span>
                   <div className="tutor-message-content">
-                    <span className="tutor-message-label">{turnLabel(turn.role)}</span>
+                    <span className="tutor-message-label">{t(turnLabel(turn.role))}</span>
                     <p className="tutor-bubble">{turn.text}</p>
-                    {!!turn.sources?.length && <div className="tutor-sources" aria-label="Sumber jawaban"><strong>Sumber materi</strong><ul>{turn.sources.map((source, sourceIndex) => <li key={`${source.material_id || source.source}-${sourceIndex}`}>{source.class_id && source.material_id && materials.some((item) => item.id === source.material_id && item.class_id === source.class_id) ? <Link href={`/siswa/kelas/${source.class_id}/materi/${source.material_id}`}>{source.title || source.source || "Materi kelas"}{source.section_title ? ` · ${source.section_title}` : ""}</Link> : <span>{source.title || source.source || "Materi pembelajaran"}{source.section_title ? ` · ${source.section_title}` : ""}</span>}</li>)}</ul></div>}
+                    {!!turn.sources?.length && <div className="tutor-sources" aria-label={t("Sumber jawaban")}><strong><UiText>{"Sumber materi"}</UiText></strong><ul>{turn.sources.map((source, sourceIndex) => <li key={`${source.material_id || source.source}-${sourceIndex}`}>{source.class_id && source.material_id && materials.some((item) => item.id === source.material_id && item.class_id === source.class_id) ? <Link href={`/siswa/kelas/${source.class_id}/materi/${source.material_id}`}>{source.title || source.source || <UiText>{"Materi kelas"}</UiText>}{source.section_title ? ` · ${source.section_title}` : ""}</Link> : <span>{source.title || source.source || <UiText>{"Materi pembelajaran"}</UiText>}{source.section_title ? ` · ${source.section_title}` : ""}</span>}</li>)}</ul></div>}
                   </div>
                 </article>
               ))}
               {pending && (
                 <article className="tutor-message student pending">
-                  <span className="tutor-message-avatar" aria-hidden="true">K</span>
+                  <span className="tutor-message-avatar" aria-hidden="true"><UiText>{"K"}</UiText></span>
                   <div className="tutor-message-content">
-                    <span className="tutor-message-label">Kamu</span>
+                    <span className="tutor-message-label"><UiText>{"Kamu"}</UiText></span>
                     <p className="tutor-bubble">{pendingText}</p>
                   </div>
                 </article>
@@ -432,19 +426,17 @@ export function StudentTutor({
           )}
         </div>
 
-        <VoiceControls text={latestTutorText} onTranscript={setDraft} />
+        <VoiceControls text={latestTutorText} onTranscript={setDraft} autoPlayKey={autoPlayKey} />
 
         <form className="tutor-composer" onSubmit={(event) => void submit(event)}>
-          <label className="sr-only" htmlFor="tutor-question">
-            Tulis pertanyaan untuk tutor
-          </label>
+          <label className="sr-only" htmlFor="tutor-question"><UiText>{"Tulis pertanyaan untuk tutor"}</UiText></label>
           <textarea
             ref={inputRef}
             id="tutor-question"
             value={draft}
             maxLength={4_000}
             rows={3}
-            placeholder="Contoh: Kenapa satu per dua sama dengan dua per empat?"
+            placeholder={t("Contoh: Kenapa satu per dua sama dengan dua per empat?")}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -457,17 +449,17 @@ export function StudentTutor({
           <div className="tutor-composer-footer">
             <span>
               {sessionEnded
-                ? "Sesi selesai · mulai pertanyaan baru untuk melanjutkan"
-                : `${draft.length}/4.000 karakter · Shift + Enter untuk baris baru`}
+                ? <UiText>{"Sesi selesai · mulai pertanyaan baru untuk melanjutkan"}</UiText>
+                : `${draft.length}${t("/4.000 karakter · Shift + Enter untuk baris baru")}`}
             </span>
             <button className="button primary" type="submit" disabled={busy || sessionEnded || materialUnavailable || materialNotReady || !draft.trim()}>
               {pending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}
-              {pending ? "Mengirim…" : "Kirim pertanyaan"}
+              {pending ? <UiText>{"Mengirim…"}</UiText> : <UiText>{"Kirim pertanyaan"}</UiText>}
             </button>
           </div>
         </form>
-        {error && <p className="alert error-message tutor-feedback" role="alert">{error}</p>}
-        {notice && !error && <p className="tutor-feedback" role="status">{notice}</p>}
+        {error && <p className="alert error-message tutor-feedback" role="alert">{t(error)}</p>}
+        {notice && !error && <p className="tutor-feedback" role="status">{t(notice)}</p>}
       </section>
     </section>
   );

@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { StudentAnalytics } from "@/components/student-analytics";
 import { Heading } from "@/components/ui";
 import type { StudentAnalytics as StudentAnalyticsData, StudentAnalyticsSpoken } from "@/lib/analytics-types";
@@ -14,8 +16,8 @@ export default async function StudentProgressPage() {
   return (
     <>
       <Heading
-        title="Progres belajar"
-        description="Lihat pola belajar, kekuatan, dan langkah berikutnya yang paling membantu untukmu."
+        title={<UiText>{"Progres belajar"}</UiText>}
+        description={<UiText>{"Lihat pola belajar, kekuatan, dan langkah berikutnya yang paling membantu untukmu."}</UiText>}
       />
       <StudentAnalytics initial={initial} initialSpoken={spokenPayload.spoken} />
     </>

@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n, UiDate } from "@/components/language-provider";
+
 
 import { useState } from "react";
 import {
@@ -14,11 +16,6 @@ import {
 } from "lucide-react";
 import { notifyResult } from "@/lib/dialogs";
 import type { AdminActivity, AdminOverview } from "@/lib/admin-insights-types";
-
-function dateLabel(value: string | null) {
-  if (!value) return "Belum tersedia";
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
 
 function actionLabel(action: string) {
   return action
@@ -42,6 +39,7 @@ export function AdminInsights({
   initialOverview: AdminOverview;
   initialActivity: AdminActivity;
 }) {
+  const { t } = useI18n();
   const [overview, setOverview] = useState(initialOverview);
   const [activity, setActivity] = useState(initialActivity);
   const [loading, setLoading] = useState(false);
@@ -67,36 +65,35 @@ export function AdminInsights({
 
   const provider = overview.providers.elevenlabs;
   return (
-    <section className="admin-insights" aria-label="Insight operasional admin">
+    <section className="admin-insights" aria-label={t("Insight operasional admin")}>
       <div className="admin-insights-heading">
         <div>
-          <span className="analytics-kicker"><Activity size={14} aria-hidden="true" /> OPERASIONAL</span>
-          <h2>Semua sinyal penting dalam satu pandangan.</h2>
-          <p>Angka agregat untuk memantau kesehatan ruang belajar dan layanan pendukung.</p>
+          <span className="analytics-kicker"><Activity size={14} aria-hidden="true" /><UiText>{" OPERASIONAL"}</UiText></span>
+          <h2><UiText>{"Semua sinyal penting dalam satu pandangan."}</UiText></h2>
+          <p><UiText>{"Angka agregat untuk memantau kesehatan ruang belajar dan layanan pendukung."}</UiText></p>
         </div>
         <button type="button" className="button secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" /> Perbarui
-        </button>
+          <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" /><UiText>{"Perbarui"}</UiText></button>
       </div>
       {error && <p className="alert error-message" role="alert">{error}</p>}
 
       <div className="admin-insight-grid">
         <article className="panel admin-insight-card">
           <span className="admin-insight-icon blue"><Users size={19} aria-hidden="true" /></span>
-          <span>Pengguna aktif</span>
+          <span><UiText>{"Pengguna aktif"}</UiText></span>
           <strong>{overview.users.active}</strong>
-          <small>{overview.users.total} akun · {overview.users.students} siswa · {overview.users.teachers} guru</small>
+          <small>{overview.users.total}<UiText>{" akun · "}</UiText>{overview.users.students}<UiText>{" siswa · "}</UiText>{overview.users.teachers}<UiText>{" guru"}</UiText></small>
         </article>
         <article className="panel admin-insight-card">
           <span className="admin-insight-icon purple"><GraduationCap size={19} aria-hidden="true" /></span>
-          <span>Ruang belajar</span>
+          <span><UiText>{"Ruang belajar"}</UiText></span>
           <strong>{overview.learning.classrooms}</strong>
-          <small>{overview.learning.sessions} sesi · {overview.learning.open_sessions} masih terbuka</small>
+          <small>{overview.learning.sessions}<UiText>{" sesi · "}</UiText>{overview.learning.open_sessions}<UiText>{" masih terbuka"}</UiText></small>
         </article>
         <article className="panel admin-insight-card">
           <span className="admin-insight-icon green"><ShieldCheck size={19} aria-hidden="true" /></span>
-          <span>Kesiapan suara</span>
-            <strong>{!provider.enabled ? "Fallback aktif" : provider.configured ? "Siap" : "Perlu setup"}</strong>
+          <span><UiText>{"Kesiapan suara"}</UiText></span>
+            <strong>{!provider.enabled ? <UiText>{"Fallback aktif"}</UiText> : provider.configured ? <UiText>{"Siap"}</UiText> : <UiText>{"Perlu setup"}</UiText>}</strong>
           <small>{provider.tts_backend} · {provider.stt_backend}</small>
         </article>
       </div>
@@ -104,7 +101,7 @@ export function AdminInsights({
       <div className="admin-insight-columns">
         <article className="panel admin-activity-card">
           <div className="panel-heading">
-            <div><h2>Aktivitas terbaru</h2><p>Metadata operasional tanpa isi percakapan atau kredensial.</p></div>
+            <div><h2><UiText>{"Aktivitas terbaru"}</UiText></h2><p><UiText>{"Metadata operasional tanpa isi percakapan atau kredensial."}</UiText></p></div>
             <Activity size={20} aria-hidden="true" />
           </div>
           {activity.items.length ? (
@@ -115,30 +112,30 @@ export function AdminInsights({
                   <div>
                     <strong>{actionLabel(item.action)}</strong>
                     <p>{item.actor_name} · {item.target_name}</p>
-                    <small>{dateLabel(item.occurred_at)}</small>
+                    <small><UiDate value={item.occurred_at} time empty="Belum tersedia" /></small>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="admin-insight-empty"><Clock3 size={22} aria-hidden="true" /><p>Belum ada aktivitas terbaru.</p></div>
+            <div className="admin-insight-empty"><Clock3 size={22} aria-hidden="true" /><p><UiText>{"Belum ada aktivitas terbaru."}</UiText></p></div>
           )}
         </article>
         <article className="panel admin-activity-card">
           <div className="panel-heading">
-            <div><h2>Status layanan</h2><p>Konfigurasi provider dibaca dari backend dan tidak menampilkan API key.</p></div>
+            <div><h2><UiText>{"Status layanan"}</UiText></h2><p><UiText>{"Konfigurasi provider dibaca dari backend dan tidak menampilkan API key."}</UiText></p></div>
             <Sparkles size={20} aria-hidden="true" />
           </div>
           <div className="admin-provider-status">
             <div className={provider.enabled ? (provider.configured ? "ready" : "attention") : "idle"}>
               {provider.enabled && provider.configured ? <CheckCircle2 size={21} aria-hidden="true" /> : <CircleAlert size={21} aria-hidden="true" />}
-              <div><strong>ElevenLabs</strong><span>{!provider.enabled ? "Belum dipilih; fallback lokal tetap aktif" : provider.configured ? "TTS dan STT siap digunakan" : "API key atau voice ID belum lengkap"}</span></div>
+              <div><strong><UiText>{"ElevenLabs"}</UiText></strong><span>{!provider.enabled ? <UiText>{"Belum dipilih; fallback lokal tetap aktif"}</UiText> : provider.configured ? <UiText>{"TTS dan STT siap digunakan"}</UiText> : <UiText>{"API key atau voice ID belum lengkap"}</UiText>}</span></div>
             </div>
             <dl>
-              <div><dt>Text to speech</dt><dd>{provider.tts_backend}</dd></div>
-              <div><dt>Speech to text</dt><dd>{provider.stt_backend}</dd></div>
-              <div><dt>Kuis tersimpan</dt><dd>{overview.learning.quiz_sessions}</dd></div>
-              <div><dt>Undangan aktif</dt><dd>{overview.invitations.active}</dd></div>
+              <div><dt><UiText>{"Text to speech"}</UiText></dt><dd>{provider.tts_backend}</dd></div>
+              <div><dt><UiText>{"Speech to text"}</UiText></dt><dd>{provider.stt_backend}</dd></div>
+              <div><dt><UiText>{"Kuis tersimpan"}</UiText></dt><dd>{overview.learning.quiz_sessions}</dd></div>
+              <div><dt><UiText>{"Guru terdaftar"}</UiText></dt><dd>{overview.users.teachers}</dd></div>
             </dl>
           </div>
         </article>

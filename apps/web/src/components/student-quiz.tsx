@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n } from "@/components/language-provider";
+
 
 import { useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, Lightbulb, LoaderCircle, RefreshCw, Send, Sparkles, XCircle } from "lucide-react";
@@ -28,6 +30,7 @@ async function readJson<T>(response: Response, fallback: string) {
 }
 
 export function StudentQuiz() {
+  const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>("idle");
   const [question, setQuestion] = useState<QuizQuestion | null>(null);
   const [nextQuestion, setNextQuestion] = useState<QuizQuestion | null>(null);
@@ -184,62 +187,54 @@ export function StudentQuiz() {
           <div className="quiz-start-icon" aria-hidden="true">
             <Sparkles size={28} />
           </div>
-          <span className="quiz-kicker">LATIHAN ADAPTIF</span>
-          <h2>Siap mengecek pemahamanmu?</h2>
-          <p>
-            Jawab dengan kata-katamu sendiri. Tutor akan memberi umpan balik di setiap langkah, bukan sekadar nilai akhir.
-          </p>
+          <span className="quiz-kicker"><UiText>{"LATIHAN ADAPTIF"}</UiText></span>
+          <h2><UiText>{"Siap mengecek pemahamanmu?"}</UiText></h2>
+          <p><UiText>{"Jawab dengan kata-katamu sendiri. Tutor akan memberi umpan balik di setiap langkah, bukan sekadar nilai akhir."}</UiText></p>
           <form className="quiz-settings" onSubmit={(event) => void startQuiz(event)}>
-            <label className="field">
-              Jumlah soal
-              <select value={count} onChange={(event) => setCount(event.target.value)} disabled={phase === "starting"}>
-                <option value="3">3 soal · cepat</option>
-                <option value="5">5 soal · seimbang</option>
-                <option value="10">10 soal · mendalam</option>
+            <label className="field"><UiText>{"Jumlah soal"}</UiText><select value={count} onChange={(event) => setCount(event.target.value)} disabled={phase === "starting"}>
+                <option value="3"><UiText>{"3 soal · cepat"}</UiText></option>
+                <option value="5"><UiText>{"5 soal · seimbang"}</UiText></option>
+                <option value="10"><UiText>{"10 soal · mendalam"}</UiText></option>
               </select>
             </label>
-            <label className="field">
-              Tingkat tantangan
-              <select value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={phase === "starting"}>
-                <option value="adaptive">Adaptif sesuai progres</option>
-                <option value="easy">Santai</option>
-                <option value="medium">Seimbang</option>
-                <option value="hard">Menantang</option>
+            <label className="field"><UiText>{"Tingkat tantangan"}</UiText><select value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={phase === "starting"}>
+                <option value="adaptive"><UiText>{"Adaptif sesuai progres"}</UiText></option>
+                <option value="easy"><UiText>{"Santai"}</UiText></option>
+                <option value="medium"><UiText>{"Seimbang"}</UiText></option>
+                <option value="hard"><UiText>{"Menantang"}</UiText></option>
               </select>
             </label>
             <button className="button primary quiz-start-button" type="submit" disabled={phase === "starting"}>
               {phase === "starting" ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Lightbulb size={18} aria-hidden="true" />}
-              {phase === "starting" ? "Menyiapkan soal…" : "Mulai latihan"}
+              {phase === "starting" ? <UiText>{"Menyiapkan soal…"}</UiText> : <UiText>{"Mulai latihan"}</UiText>}
             </button>
           </form>
           <ul className="quiz-benefits">
-            <li><CheckCircle2 size={17} aria-hidden="true" /> Bisa menjawab lewat teks atau suara.</li>
-            <li><CheckCircle2 size={17} aria-hidden="true" /> Feedback diberikan setelah setiap jawaban.</li>
-            <li><CheckCircle2 size={17} aria-hidden="true" /> Hasil membantu membentuk rekomendasi belajar.</li>
+            <li><CheckCircle2 size={17} aria-hidden="true" /><UiText>{" Bisa menjawab lewat teks atau suara."}</UiText></li>
+            <li><CheckCircle2 size={17} aria-hidden="true" /><UiText>{" Feedback diberikan setelah setiap jawaban."}</UiText></li>
+            <li><CheckCircle2 size={17} aria-hidden="true" /><UiText>{" Hasil membantu membentuk rekomendasi belajar."}</UiText></li>
           </ul>
         </section>
       )}
 
       {question && phase !== "idle" && phase !== "starting" && (
         <>
-          <section className="panel quiz-progress" aria-label="Progres latihan">
+          <section className="panel quiz-progress" aria-label={t("Progres latihan")}>
             <div>
-              <span className="quiz-kicker">PERJALANANMU</span>
-              <strong>
-                Soal {questionNumber} dari {totalQuestions}
+              <span className="quiz-kicker"><UiText>{"PERJALANANMU"}</UiText></span>
+              <strong><UiText>{"Soal "}</UiText>{questionNumber}<UiText>{" dari "}</UiText>{totalQuestions}
               </strong>
             </div>
-            <span className="quiz-score-label">Skor sementara {Math.round(cumulativeScore * 100)}%</span>
+            <span className="quiz-score-label"><UiText>{"Skor sementara "}</UiText>{Math.round(cumulativeScore * 100)}%</span>
             <progress value={answeredQuestions} max={totalQuestions || 1} aria-label={`${answeredQuestions} dari ${totalQuestions} soal selesai`} />
             <button type="button" className="button secondary small" onClick={() => void startQuiz()} disabled={phase === "submitting"}>
-              <RefreshCw size={16} aria-hidden="true" /> Latihan baru
-            </button>
+              <RefreshCw size={16} aria-hidden="true" /><UiText>{"Latihan baru"}</UiText></button>
           </section>
 
           <section className="panel quiz-question-card">
             <div className="quiz-question-meta">
-              <span>Soal {questionNumber}</span>
-              <span>{question.difficulty === "medium" ? "Seimbang" : question.difficulty}</span>
+              <span><UiText>{"Soal "}</UiText>{questionNumber}</span>
+              <span>{question.difficulty === "medium" ? <UiText>{"Seimbang"}</UiText> : question.difficulty}</span>
             </div>
             <h2>{question.question}</h2>
             <VoiceControls
@@ -252,7 +247,7 @@ export function StudentQuiz() {
               <form className="quiz-answer-form" onSubmit={(event) => void submitAnswer(event)}>
                 {question.options.length ? (
                   <fieldset className="quiz-options">
-                    <legend>Pilih atau ucapkan jawaban</legend>
+                    <legend><UiText>{"Pilih atau ucapkan jawaban"}</UiText></legend>
                     {question.options.map((option, index) => (
                       <label className={`quiz-option ${answer === option ? "selected" : ""}`} key={option}>
                         <input
@@ -269,40 +264,37 @@ export function StudentQuiz() {
                     ))}
                   </fieldset>
                 ) : (
-                  <label className="field quiz-answer-field">
-                    Jawabanmu
-                    <textarea rows={4} maxLength={4000} value={answer} onChange={(event) => changeAnswer(event.target.value)} disabled={answerLocked} placeholder="Jelaskan dengan kata-katamu sendiri…" />
+                  <label className="field quiz-answer-field"><UiText>{"Jawabanmu"}</UiText><textarea rows={4} maxLength={4000} value={answer} onChange={(event) => changeAnswer(event.target.value)} disabled={answerLocked} placeholder={t("Jelaskan dengan kata-katamu sendiri…")} />
                   </label>
                 )}
                 <div className="quiz-answer-footer">
-                  <span>{answer.length}/4.000 karakter</span>
+                  <span>{answer.length}<UiText>{"/4.000 karakter"}</UiText></span>
                   <button className="button primary" type="submit" disabled={phase === "submitting" || restartRequired || !answer.trim()}>
                     {phase === "submitting" ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}
-                    {phase === "submitting" ? "Menilai…" : submissionPending ? "Coba kirim kembali" : "Kirim jawaban"}
+                    {phase === "submitting" ? <UiText>{"Menilai…"}</UiText> : submissionPending ? <UiText>{"Coba kirim kembali"}</UiText> : <UiText>{"Kirim jawaban"}</UiText>}
                   </button>
                 </div>
                 {submissionPending && phase === "active" && !restartRequired && (
-                  <p role="status">Jawaban dikunci sampai hasil diterima. Kirim kembali untuk memeriksa hasil jawaban yang sama.</p>
+                  <p role="status"><UiText>{"Jawaban dikunci sampai hasil diterima. Kirim kembali untuk memeriksa hasil jawaban yang sama."}</UiText></p>
                 )}
               </form>
             ) : (
               <section className={`quiz-feedback ${isCorrect ? "correct" : "incorrect"}`} aria-live="polite">
                 <div className="quiz-feedback-heading">
                   {isCorrect ? <CheckCircle2 size={22} aria-hidden="true" /> : <XCircle size={22} aria-hidden="true" />}
-                  <strong>{isCorrect ? "Jawabanmu tepat" : "Mari kita periksa lagi"}</strong>
-                  <span>{Math.round(score * 100)} poin</span>
+                  <strong>{isCorrect ? <UiText>{"Jawabanmu tepat"}</UiText> : <UiText>{"Mari kita periksa lagi"}</UiText>}</strong>
+                  <span>{Math.round(score * 100)}<UiText>{" poin"}</UiText></span>
                 </div>
                 <p>{feedback}</p>
                 {phase === "complete" ? (
                   <div className="quiz-complete-summary">
-                    <strong>{summary || "Latihan selesai."}</strong>
+                    <strong>{summary || <UiText>{"Latihan selesai."}</UiText>}</strong>
                     <button type="button" className="button primary" onClick={() => void startQuiz()}>
-                      <RefreshCw size={17} aria-hidden="true" /> Coba lagi
-                    </button>
+                      <RefreshCw size={17} aria-hidden="true" /><UiText>{"Coba lagi"}</UiText></button>
                   </div>
                 ) : (
                   <button type="button" className="button primary" onClick={continueQuiz}>
-                    {nextQuestion?.order_index === question.order_index ? "Coba jawab lagi" : "Lanjut ke soal berikutnya"}
+                    {nextQuestion?.order_index === question.order_index ? <UiText>{"Coba jawab lagi"}</UiText> : <UiText>{"Lanjut ke soal berikutnya"}</UiText>}
                   </button>
                 )}
               </section>

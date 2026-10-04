@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import { backend } from "@/lib/server-api";
@@ -21,7 +23,7 @@ export default async function UserPage({
         description={`@${user.username} · Terakhir masuk: ${dateLabel(user.last_login_at)}`}
       >
         <Badge active={user.is_active}>
-          {user.is_active ? "Aktif" : "Nonaktif"}
+          {user.is_active ? <UiText>{"Aktif"}</UiText> : <UiText>{"Nonaktif"}</UiText>}
         </Badge>
       </Heading>
       <UserForm user={user} self={user.id === admin.id} />

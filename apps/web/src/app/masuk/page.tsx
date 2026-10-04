@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth-shell";
 import { LoginForm } from "@/components/forms";
@@ -8,11 +10,9 @@ export default async function LoginPage() {
   if (current) redirect(homeFor(current.user.role));
   return (
     <AuthShell>
-      <span className="auth-label">Ruang belajar Anda</span>
-      <h1>Senang bertemu lagi.</h1>
-      <p className="auth-description">
-        Masuk untuk melanjutkan perjalananmu di KODMOD.
-      </p>
+      <span className="auth-label"><UiText>{"Ruang belajar Anda"}</UiText></span>
+      <h1><UiText>{"Senang bertemu lagi."}</UiText></h1>
+      <p className="auth-description"><UiText>{"Masuk untuk melanjutkan perjalananmu di KODMOD."}</UiText></p>
       <LoginForm />
     </AuthShell>
   );

@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import Link from "next/link";
 import { Plus, Search, ArrowUpRight } from "lucide-react";
 import { backend } from "@/lib/server-api";
@@ -24,21 +26,18 @@ export default async function UsersPage({
   return (
     <>
       <Heading
-        title="Pengguna"
-        description="Orang-orang di balik setiap perjalanan belajar."
+        title={<UiText>{"Pengguna"}</UiText>}
+        description={<UiText>{"Orang-orang di balik setiap perjalanan belajar."}</UiText>}
       >
         <Link className="button primary" href="/admin/pengguna/baru">
-          <Plus size={18} aria-hidden="true" /> Tambah pengguna
-        </Link>
+          <Plus size={18} aria-hidden="true" /><UiText>{"Tambah pengguna"}</UiText></Link>
       </Heading>
       {params.success === "saved" && (
-        <p className="alert success-message" role="status">
-          Data pengguna berhasil disimpan.
-        </p>
+        <p className="alert success-message" role="status"><UiText>{"Data pengguna berhasil disimpan."}</UiText></p>
       )}
       <form className="filters" action="/admin/pengguna">
         <div className="field search-field">
-          <label htmlFor="q">Cari pengguna</label>
+          <label htmlFor="q"><UiText>{"Cari pengguna"}</UiText></label>
           <div>
             <Search size={18} aria-hidden="true" />
             <input
@@ -51,9 +50,9 @@ export default async function UsersPage({
           </div>
         </div>
         <div className="field">
-          <label htmlFor="role">Peran</label>
+          <label htmlFor="role"><UiText>{"Peran"}</UiText></label>
           <select id="role" name="role" defaultValue={role}>
-            <option value="">Semua peran</option>
+            <option value=""><UiText>{"Semua peran"}</UiText></option>
             {Object.entries(roleLabel).map(([value, label]) => (
               <option value={value} key={value}>
                 {label}
@@ -61,29 +60,24 @@ export default async function UsersPage({
             ))}
           </select>
         </div>
-        <button className="button secondary" type="submit">
-          Terapkan
-        </button>
+        <button className="button secondary" type="submit"><UiText>{"Terapkan"}</UiText></button>
         {(q || role) && (
-          <Link href="/admin/pengguna" className="text-link">
-            Reset filter
-          </Link>
+          <Link href="/admin/pengguna" className="text-link"><UiText>{"Reset filter"}</UiText></Link>
         )}
       </form>
       <section className="panel table-panel">
         <div className="panel-heading">
-          <h2>
-            Daftar pengguna <span className="count">{users.length}</span>
+          <h2><UiText>{"Daftar pengguna"}</UiText><span className="count">{users.length}</span>
           </h2>
         </div>
         {users.length ? (
           <table>
             <thead>
               <tr>
-                <th>Nama pengguna</th>
-                <th>Peran</th>
-                <th>Status</th>
-                <th>Aksi</th>
+                <th><UiText>{"Nama pengguna"}</UiText></th>
+                <th><UiText>{"Peran"}</UiText></th>
+                <th><UiText>{"Status"}</UiText></th>
+                <th><UiText>{"Aksi"}</UiText></th>
               </tr>
             </thead>
             <tbody>
@@ -100,10 +94,10 @@ export default async function UsersPage({
                       </span>
                     </div>
                   </td>
-                  <td data-label="Peran">{roleLabel[u.role]}</td>
+                  <td data-label="Peran">{<UiText>{roleLabel[u.role]}</UiText>}</td>
                   <td>
                     <Badge active={u.is_active}>
-                      {u.is_active ? "Aktif" : "Nonaktif"}
+                      {u.is_active ? <UiText>{"Aktif"}</UiText> : <UiText>{"Nonaktif"}</UiText>}
                     </Badge>
                   </td>
                   <td>
@@ -111,8 +105,7 @@ export default async function UsersPage({
                       className="text-link"
                       href={`/admin/pengguna/${u.id}`}
                       aria-label={`Kelola ${u.full_name}`}
-                    >
-                      Kelola <ArrowUpRight size={16} aria-hidden="true" />
+                    ><UiText>{"Kelola"}</UiText><ArrowUpRight size={16} aria-hidden="true" />
                     </Link>
                   </td>
                 </tr>
@@ -128,11 +121,11 @@ export default async function UsersPage({
             }
           >
             {q || role
-              ? "Coba nama lain atau reset filter untuk melihat seluruh pengguna."
-              : "Tambahkan akun siswa, guru, atau administrator melalui tombol di atas."}
+              ? <UiText>{"Coba nama lain atau reset filter untuk melihat seluruh pengguna."}</UiText>
+              : <UiText>{"Tambahkan akun siswa, guru, atau administrator melalui tombol di atas."}</UiText>}
           </Empty>
         )}
-        <div className="table-footer">{users.length} pengguna ditampilkan</div>
+        <div className="table-footer">{users.length}<UiText>{" pengguna ditampilkan"}</UiText></div>
       </section>
     </>
   );

@@ -1,314 +1,116 @@
 "use client";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { Headphones, Mic, Pause, Play, Settings2, Square, LoaderCircle } from "lucide-react";
+import { speechOutput } from "@/lib/browser-speech";
+import { useVoicePreferences } from "./voice-preferences-provider";
+import { useI18n } from "./language-provider";
 
-import { useEffect, useRef, useState } from "react";
-import { Headphones, Mic, Pause, Play, Settings2, Square, Volume2 } from "lucide-react";
-import { getSpeechAudio } from "@/lib/speech-audio-cache";
-import { useVoicePreferences } from "@/components/voice-preferences-provider";
-
-type VoiceStatus =
-  | "idle"
-  | "loading"
-  | "playing"
-  | "paused"
-  | "recording"
-  | "transcribing"
-  | "error";
-
-function errorMessage(response: Response, fallback: string) {
-  return response
-    .json()
-    .then((body) => (typeof body?.message === "string" ? body.message : fallback))
-    .catch(() => fallback);
-}
-
-function withTextFallback(message: string) {
-  return `${message} Kamu tetap bisa menggunakan jalur teks.`;
-}
-
-export function VoiceControls({
-  text,
-  onTranscript,
-}: {
-  text: string;
-  onTranscript?: (transcript: string) => void;
+export function VoiceControls({ text, onTranscript, autoPlayKey }: {
+  text: string; onTranscript?: (transcript: string) => void; autoPlayKey?: string | null;
 }) {
-  const [status, setStatus] = useState<VoiceStatus>("idle");
-  const [message, setMessage] = useState("Siap membantu membacakan atau menuliskan jawabanmu.");
+  const owner = useId();
+  const { engine, tutorEnabled, openVoicePreferences } = useVoicePreferences();
+  const { language, t } = useI18n();
+  const output = useSyncExternalStore(speechOutput.subscribe, speechOutput.getState, speechOutput.getState);
+  const state = output.owner === owner ? output.status : "idle";
+  const [capture, setCapture] = useState<"idle" | "permission" | "recording" | "transcribing">("idle");
+  const [message, setMessage] = useState("");
   const [transcript, setTranscript] = useState("");
-  const { engine, openVoicePreferences } = useVoicePreferences();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const recorder = useRef<MediaRecorder | null>(null), stream = useRef<MediaStream | null>(null);
+  const sequence = useRef(0), controller = useRef<AbortController | null>(null), autoPlayed = useRef<string | null>(null);
 
-  const releaseAudio = () => {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = null;
-  };
-
-  const stopRecording = () => {
-    const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") recorder.stop();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  };
-
-  const stopDeviceSpeech = () => {
-    if (!utteranceRef.current) return;
-    utteranceRef.current = null;
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      releaseAudio();
-      stopDeviceSpeech();
-      stopRecording();
-    };
+  const cancelCapture = useCallback(() => {
+    sequence.current++; controller.current?.abort(); controller.current = null;
+    if (recorder.current && recorder.current.state !== "inactive") recorder.current.stop();
+    stream.current?.getTracks().forEach(track => track.stop()); stream.current = null;
+    setCapture("idle");
   }, []);
+  const play = useCallback(() => speechOutput.play({ owner, text, engine, language }), [owner, text, engine, language]);
+  useEffect(() => () => { speechOutput.stop(owner); cancelCapture(); }, [owner, text, engine, language, cancelCapture]);
+  useEffect(() => {
+    if (!autoPlayKey || autoPlayed.current === autoPlayKey) return;
+    autoPlayed.current = autoPlayKey;
+    if (tutorEnabled && text.trim()) void play();
+  }, [autoPlayKey, text, tutorEnabled, play]);
+  useEffect(() => { if (!tutorEnabled && autoPlayKey) speechOutput.stop(owner); }, [tutorEnabled, autoPlayKey, owner]);
 
   async function listen() {
     if (!text.trim()) return;
-    if (status === "playing" && engine === "device" && utteranceRef.current) {
-      window.speechSynthesis.pause();
-      setStatus("paused");
-      setMessage("Pembacaan dijeda. Tekan Putar lagi untuk melanjutkan.");
-      return;
-    }
-    if (status === "paused" && engine === "device" && utteranceRef.current) {
-      window.speechSynthesis.resume();
-      setStatus("playing");
-      setMessage("Sedang membacakan materi dari perangkat.");
-      return;
-    }
-    if (status === "playing" && audioRef.current) {
-      audioRef.current.pause();
-      setStatus("paused");
-      setMessage("Pembacaan dijeda. Tekan Putar lagi untuk melanjutkan.");
-      return;
-    }
-    if (status === "paused" && audioRef.current) {
-      await audioRef.current.play();
-      setStatus("playing");
-      setMessage("Sedang membacakan materi.");
-      return;
-    }
-
-    stopDeviceSpeech();
-    stopRecording();
-    releaseAudio();
-    setStatus("loading");
-    setMessage(engine === "device" ? "Memulai suara perangkat…" : "Menyiapkan audio…");
-
-    if (engine === "device") {
-      const supportsDeviceSpeech =
-        "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
-      if (supportsDeviceSpeech) {
-        try {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text.trim());
-          utterance.lang = "id-ID";
-          utterance.onstart = () => {
-            if (utteranceRef.current !== utterance) return;
-            setStatus("playing");
-            setMessage("Sedang membacakan materi dengan suara perangkat.");
-          };
-          utterance.onend = () => {
-            if (utteranceRef.current !== utterance) return;
-            utteranceRef.current = null;
-            setStatus("idle");
-            setMessage("Pembacaan selesai.");
-          };
-          utterance.onerror = (event) => {
-            if (utteranceRef.current !== utterance) return;
-            utteranceRef.current = null;
-            if (event.error === "canceled" || event.error === "interrupted") return;
-            setMessage("Suara perangkat tidak tersedia. Menyiapkan suara KODMOD.");
-            void playAppSpeech();
-          };
-          utteranceRef.current = utterance;
-          window.speechSynthesis.speak(utterance);
-          return;
-        } catch {
-          setMessage("Suara perangkat tidak tersedia. Menyiapkan suara KODMOD.");
-        }
-      } else {
-        setMessage("Peramban ini tidak menyediakan suara perangkat. Menyiapkan suara KODMOD.");
-      }
-    }
-
-    await playAppSpeech();
+    if (state === "playing" || state === "paused") { await speechOutput.togglePause(owner); return; }
+    cancelCapture(); setCapture("idle"); setMessage(""); await play();
   }
-
-  async function playAppSpeech() {
-    try {
-      const result = await getSpeechAudio(text);
-      const url = URL.createObjectURL(result.blob);
-      const audio = new Audio(url);
-      objectUrlRef.current = url;
-      audioRef.current = audio;
-      audio.onended = () => {
-        setStatus("idle");
-        setMessage("Pembacaan selesai.");
-      };
-      audio.onpause = () => {
-        if (!audio.ended) setStatus("paused");
-      };
-      await audio.play();
-      setStatus("playing");
-      setMessage(
-        result.cached
-          ? "Memutar audio tersimpan di perangkat ini."
-          : "Sedang membacakan materi.",
-      );
-    } catch (error) {
-      releaseAudio();
-      setStatus("error");
-      setMessage(
-        withTextFallback(error instanceof Error ? error.message : "Audio belum dapat dibuat. Coba lagi."),
-      );
-    }
+  function stop() {
+    speechOutput.stop(owner); cancelCapture(); setCapture("idle"); setMessage("Suara dihentikan.");
   }
-
   async function record() {
-    if (status === "recording") {
-      stopRecording();
-      return;
-    }
+    if (capture === "recording") { recorder.current?.stop(); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setStatus("error");
-      setMessage("Peramban ini belum mendukung rekaman suara. Gunakan kolom jawaban teks.");
-      return;
+      setMessage("Peramban ini belum mendukung rekaman suara. Gunakan kolom jawaban teks."); return;
     }
-
-    releaseAudio();
-    setTranscript("");
-    setMessage("Izinkan mikrofon jika ingin menjawab dengan suara.");
+    speechOutput.stop(); cancelCapture(); setCapture("permission"); setMessage(""); setTranscript("");
+    const ticket = sequence.current;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((value) =>
-        MediaRecorder.isTypeSupported(value),
-      );
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      recorderRef.current = recorder;
-      chunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
-      };
-      recorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        if (!blob.size) {
-          setStatus("error");
-          setMessage("Rekaman kosong. Coba tekan rekam lalu bicara lebih dekat ke mikrofon.");
-          return;
-        }
-        setStatus("transcribing");
-        setMessage("Membaca jawabanmu…");
-        const form = new FormData();
-        form.append("audio", blob, "jawaban.webm");
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (ticket !== sequence.current) { media.getTracks().forEach(track => track.stop()); return; }
+      stream.current = media;
+      const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(mime => MediaRecorder.isTypeSupported(mime));
+      const device = new MediaRecorder(media, type ? { mimeType: type } : undefined);
+      recorder.current = device;
+      const chunks: Blob[] = [];
+      device.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      device.onstop = async () => {
+        media.getTracks().forEach(track => track.stop()); stream.current = null;
+        if (ticket !== sequence.current) return;
+        const blob = new Blob(chunks, { type: device.mimeType || "audio/webm" });
+        if (!blob.size) { setCapture("idle"); setMessage("Rekaman kosong. Coba tekan rekam lalu bicara lebih dekat ke mikrofon."); return; }
+        setCapture("transcribing");
+        const data = new FormData(); data.append("audio", blob, type?.includes("mp4") ? "answer.m4a" : "answer.webm");
+        controller.current = new AbortController();
         try {
-          const response = await fetch("/api/voice/stt", { method: "POST", body: form });
-          if (!response.ok) {
-            throw new Error(await errorMessage(response, "Suara belum dapat dibaca."));
-          }
-          const body = (await response.json()) as { text?: string };
-          const nextTranscript = body.text?.trim() ?? "";
-          setTranscript(nextTranscript);
-          onTranscript?.(nextTranscript);
-          setStatus("idle");
-          setMessage(
-            nextTranscript
-              ? "Tinjau teks jawabanmu sebelum mengirimkannya."
-              : "Belum ada kata yang terbaca. Coba rekam ulang.",
-          );
-        } catch (error) {
-          setStatus("error");
-          setMessage(
-            withTextFallback(error instanceof Error ? error.message : "Suara belum dapat dibaca."),
-          );
-        }
+          const response = await fetch("/api/voice/stt", { method: "POST", body: data, signal: controller.current.signal });
+          if (!response.ok) throw new Error("Speech transcription failed.");
+          const body = await response.json() as { text?: string };
+          if (ticket !== sequence.current) return;
+          const value = body.text?.trim() ?? "";
+          setTranscript(value); onTranscript?.(value);
+          setMessage(value ? "Tinjau teks jawabanmu sebelum mengirimkannya." : "Belum ada kata yang terbaca. Coba rekam ulang.");
+        } catch {
+          if (ticket === sequence.current) setMessage("Suara belum tersedia. Kamu tetap bisa membaca teks.");
+        } finally { if (ticket === sequence.current) setCapture("idle"); }
       };
-      recorder.start();
-      setStatus("recording");
+      device.start(); setCapture("recording");
       setMessage("Sedang merekam. Tekan Berhenti setelah selesai berbicara.");
     } catch {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      setStatus("error");
+      if (ticket !== sequence.current) return;
+      cancelCapture(); setCapture("idle");
       setMessage("Mikrofon tidak dapat digunakan. Kamu tetap bisa menjawab lewat teks.");
     }
   }
-
-  const listening = status === "loading" || status === "playing" || status === "paused";
-  const recording = status === "recording" || status === "transcribing";
-
-  return (
-    <section className="voice-panel" aria-label="Bantuan suara">
-      <div className="voice-panel-heading">
-        <div>
-          <span className="voice-kicker">
-            <Volume2 size={15} aria-hidden="true" />
-            Akses suara
-          </span>
-          <h2>Dengarkan atau jawab dengan suara</h2>
-          <p>Kontrol tetap manual. Tidak ada audio yang diputar atau dikirim tanpa tindakanmu.</p>
-          <span className="voice-engine-indicator">
-            {engine === "app" ? "Suara KODMOD" : "Suara bawaan perangkat"}
-          </span>
-        </div>
-        <Headphones className="voice-panel-icon" size={30} aria-hidden="true" />
-      </div>
-      <div className="voice-actions">
-        <button
-          type="button"
-          className="button primary"
-          onClick={listen}
-          disabled={recording || status === "loading"}
-          aria-pressed={status === "playing"}
-        >
-          {status === "playing" ? <Pause size={18} aria-hidden="true" /> : status === "paused" ? <Play size={18} aria-hidden="true" /> : <Headphones size={18} aria-hidden="true" />}
-          {status === "loading" ? "Menyiapkan…" : status === "playing" ? "Jeda" : status === "paused" ? "Putar lagi" : "Dengarkan"}
-        </button>
-        {onTranscript && (
-          <button
-            type="button"
-            className={`button ${status === "recording" ? "danger" : "secondary"}`}
-            onClick={record}
-            disabled={listening || recording}
-            aria-pressed={status === "recording"}
-          >
-            {status === "recording" ? <Square size={18} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
-            {status === "recording" ? "Berhenti" : status === "transcribing" ? "Membaca…" : "Jawab dengan suara"}
-          </button>
-        )}
-        <button
-          type="button"
-          className="button secondary voice-settings-action"
-          onClick={openVoicePreferences}
-        >
-          <Settings2 size={18} aria-hidden="true" />
-          Pengaturan suara
-        </button>
-      </div>
-      <p className={`voice-status ${status === "error" ? "voice-status-error" : ""}`} role="status" aria-live="polite">
-        {message}
-      </p>
-      {transcript && (
-        <div className="voice-transcript">
-          <strong>Hasil rekaman</strong>
-          <p>{transcript}</p>
-          <small>Periksa kembali hasil ini sebelum digunakan sebagai jawaban.</small>
-        </div>
-      )}
-    </section>
-  );
+  const busy = capture === "permission" || capture === "transcribing";
+  const active = ["loading", "playing", "paused"].includes(state);
+  return <section className="voice-panel voice-panel-compact" aria-label={t("Bantuan suara")}
+    data-voice-ignore="true" data-recording={capture === "recording"}>
+    <div className="voice-panel-heading"><Headphones size={21} aria-hidden="true" />
+      <strong>{t(engine === "app" ? "Suara KODMOD" : "Suara perangkat")}</strong>
+      <button type="button" className="icon-button" aria-label={t("Pengaturan suara")} title={t("Pengaturan suara")} onClick={openVoicePreferences}><Settings2 size={18} aria-hidden="true" /></button>
+    </div>
+    <div className="voice-actions">
+      <button type="button" className="button primary" onClick={() => void listen()}
+        disabled={!text.trim() || busy || capture === "recording" || state === "loading"} aria-pressed={state === "playing"}>
+        {state === "loading" ? <LoaderCircle size={17} className="spin" aria-hidden="true" /> : state === "playing" ? <Pause size={17} aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
+        {t(state === "loading" ? "Menyiapkan…" : state === "playing" ? "Jeda" : state === "paused" ? "Putar lagi" : "Dengarkan")}
+      </button>
+      {onTranscript && <button type="button" className={`button ${capture === "recording" ? "danger" : "secondary"}`}
+        onClick={() => void record()} disabled={busy || active} aria-pressed={capture === "recording"}>
+        {capture === "recording" ? <Square size={17} aria-hidden="true" /> : <Mic size={17} aria-hidden="true" />}
+        {t(capture === "recording" ? "Berhenti" : busy ? "Membaca…" : "Jawab dengan suara")}
+      </button>}
+      {(active || capture !== "idle") && <button type="button" className="button secondary" onClick={stop}><Square size={16} aria-hidden="true" />{t("Hentikan suara")}</button>}
+      {active && state !== "loading" && <button type="button" className="button secondary" onClick={() => void play()}>{t("Ulangi")}</button>}
+    </div>
+    <p className={`voice-status ${state === "error" || state === "blocked" ? "voice-status-error" : ""}`} role="status">
+      {t(output.owner === owner && output.message ? output.message : message || (state === "loading" ? "Menyiapkan…" : state === "playing" ? "Sedang membacakan." : state === "paused" ? "Pembacaan dijeda." : ""))}
+    </p>
+    {transcript && <div className="voice-transcript"><strong>{t("Hasil rekaman")}</strong><p>{transcript}</p><small>{t("Periksa kembali hasil ini sebelum digunakan sebagai jawaban.")}</small></div>}
+  </section>;
 }

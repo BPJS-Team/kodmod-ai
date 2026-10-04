@@ -9,7 +9,7 @@ globalThis.kodmodCookieTestBoundary = boundary;
 const stubs = new Map([
   ["server-only", "export {};"],
   ["next/headers", `export async function cookies() {
-    return { set(...args) { globalThis.kodmodCookieTestBoundary.writes.push(args); } };
+    return { get() { return { value: "id" }; }, set(...args) { globalThis.kodmodCookieTestBoundary.writes.push(args); } };
   }`],
   ["next/navigation", `export function redirect(url) {
     const error = new Error(url); error.name = "TestRedirect"; throw error;
@@ -22,7 +22,7 @@ const stubs = new Map([
   ["@/lib/server-api", `export class BackendError extends Error {}
     export async function backend() {
       return { access_token: "fixture-token", expires_in: 3600,
-        user: { id: "student-1", role: "student", is_active: true } };
+        user: { id: "student-1", role: "student", is_active: true, preferred_language: "en" } };
     }`],
 ]);
 
@@ -37,7 +37,7 @@ const hooks = registerHooks({
     }
     if (specifier.startsWith("@/")) {
       return {
-        url: new URL(`../src/${specifier.slice(2)}.ts`, import.meta.url).href,
+        url: new URL(`../src/${specifier.slice(2)}${/\.(?:mjs|ts)$/.test(specifier) ? "" : ".ts"}`, import.meta.url).href,
         shortCircuit: true,
       };
     }
@@ -78,7 +78,7 @@ function submittedForm() {
   const form = new FormData();
   for (const [key, value] of Object.entries({
     username: "student.test", password: "fixture-password", full_name: "Siswa Uji",
-    role: "student", invitation_code: "FIXTURE", size: "24", spacing: "1.95", contrast: "on",
+    role: "student", size: "24", spacing: "1.95", contrast: "on",
   })) form.set(key, value);
   return form;
 }
@@ -89,13 +89,20 @@ async function invokeAction(name, action, form) {
   } else {
     await assert.rejects(action({}, form), { name: "TestRedirect" });
   }
-  assert.equal(boundary.writes.length, 1);
+  assert.equal(boundary.writes.length, name === "reading" ? 1 : 2);
   const [cookieName, , options] = boundary.writes[0];
   assert.equal(cookieName, name === "reading" ? "kodmod_reading_student-1" : "kodmod_session");
   assert.equal(options.httpOnly, true);
   assert.equal(options.sameSite, "lax");
   assert.equal(options.path, name === "reading" ? "/siswa" : "/");
   assert.ok(options.maxAge > 0);
+  if (name !== "reading") {
+    const [languageCookie, language, languageOptions] = boundary.writes[1];
+    assert.equal(languageCookie, "kodmod_language");
+    assert.equal(language, "en", "Account language takes priority at sign-in.");
+    assert.equal(languageOptions.secure, options.secure);
+    assert.equal(languageOptions.sameSite, "lax");
+  }
   return options;
 }
 

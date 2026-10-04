@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useI18n } from "./language-provider";
 import {
   LayoutDashboard,
   Library,
@@ -10,9 +11,10 @@ import {
   LineChart,
 } from "lucide-react";
 export function LearningNav({ base }: { base: string }) {
+  const { t } = useI18n();
   const path = usePathname();
   return (
-    <nav className="admin-nav" aria-label="Menu ruang belajar">
+    <nav className="admin-nav" aria-label={t("Menu ruang belajar")}>
       {[
         { href: base, title: "Dashboard", icon: LayoutDashboard },
       { href: `${base}/kelas`, title: "Kelas saya", icon: Library },
@@ -38,11 +40,12 @@ export function LearningNav({ base }: { base: string }) {
           <Link
             key={href}
             href={href}
+            data-voice-menu={href === base ? "dashboard" : ({ kelas: "classes", materi: "materials", tutor: "tutor", latihan: "practice", tugas: "assignments", progres: "progress", kuis: "quizzes", "review-kuis": "review", analitik: "analytics" } as Record<string, string>)[href.split("/").at(-1) ?? ""]}
             className={active ? "active" : ""}
             aria-current={active ? "page" : undefined}
           >
             <Icon size={19} aria-hidden="true" />
-            {title}
+            {t(title)}
           </Link>
         );
       })}

@@ -1,3 +1,5 @@
+
+import { UiText } from "@/components/language-provider";
 import { StudentTutor } from "@/components/student-tutor";
 import { Heading } from "@/components/ui";
 import type { ChatSessionSummary } from "@/lib/chat-types";
@@ -19,8 +21,8 @@ export default async function StudentTutorPage({ searchParams }: { searchParams:
   return (
     <>
       <Heading
-        title="Tutor KODMOD"
-        description="Tanyakan materi, minta contoh, dan susun langkah belajar yang lebih mudah dipahami."
+        title={<UiText>{"Tutor KODMOD"}</UiText>}
+        description={<UiText>{"Tanyakan materi, minta contoh, dan susun langkah belajar yang lebih mudah dipahami."}</UiText>}
       />
       <StudentTutor key={`${query.class_id || ""}:${query.material_id || ""}`} initialSessions={sessions} materials={materials} initialMaterialId={selected?.id} />
     </>

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { confirmAction, notifyResult, type Confirmation } from "@/lib/dialogs";
 import type { ActionState } from "@/lib/types";
+import { useI18n } from "@/components/language-provider";
 
 export function useConfirmedAction(
   action: (state: ActionState, data: FormData) => Promise<ActionState>,
@@ -25,6 +26,7 @@ export function useConfirmedAction(
 }
 
 export function ActionFeedback({ state }: { state: ActionState }) {
+  const { t } = useI18n();
   const shown = useRef<ActionState | null>(null);
   useEffect(() => {
     if (shown.current === state) return;
@@ -34,9 +36,9 @@ export function ActionFeedback({ state }: { state: ActionState }) {
   }, [state]);
   return (
     <div aria-live="polite" aria-atomic="true">
-      {state.error && <p className="alert error-message">{state.error}</p>}
+      {state.error && <p className="alert error-message">{t(state.error)}</p>}
       {state.success && (
-        <p className="alert success-message">{state.success}</p>
+        <p className="alert success-message">{t(state.success)}</p>
       )}
     </div>
   );
@@ -51,8 +53,6 @@ const messages: Record<string, string> = {
     "Akun berhasil dibuat. Selamat memulai perjalanan bersama KODMOD.",
   "signed-out": "Anda sudah keluar dari akun dengan aman.",
   saved: "Data pengguna berhasil disimpan.",
-  created: "Undangan berhasil dibuat. Salin kode untuk dibagikan.",
-  revoked: "Kode undangan dicabut. Akun yang sudah terdaftar tetap ada.",
 };
 
 export function RedirectFeedback() {

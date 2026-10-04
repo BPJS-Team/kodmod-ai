@@ -20,8 +20,8 @@ export function Heading({
   description,
   children,
 }: {
-  title: string;
-  description: string;
+  title: ReactNode;
+  description: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -38,7 +38,7 @@ export function Empty({
   title,
   children,
 }: {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
 }) {
   return (

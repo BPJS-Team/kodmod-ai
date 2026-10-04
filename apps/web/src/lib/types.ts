@@ -7,6 +7,7 @@ export type User = {
   is_active: boolean;
   created_at: string;
   last_login_at: string | null;
+  preferred_language?: "id" | "en";
 };
 export type Invitation = {
   id: string;

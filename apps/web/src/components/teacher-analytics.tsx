@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n } from "@/components/language-provider";
+
 
 import Link from "next/link";
 import { useState } from "react";
@@ -27,6 +29,7 @@ async function readJson<T>(response: Response, fallback: string) {
 }
 
 export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
+  const { t } = useI18n();
   const [data, setData] = useState(initial);
   const [window, setWindow] = useState<AnalyticsWindow>(initial.window);
   const [loading, setLoading] = useState(false);
@@ -55,20 +58,18 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
   }
 
   return (
-    <section className="teacher-analytics-workspace" aria-label="Analitik siswa">
+    <section className="teacher-analytics-workspace" aria-label={t("Analitik siswa")}>
       <div className="analytics-toolbar">
         <div>
-          <span className="analytics-kicker"><BarChart3 size={14} aria-hidden="true" /> RUANG GURU</span>
-          <h2>Pahami kelas, dampingi dengan tepat.</h2>
-          <p>Mulai dari pola cohort, lalu buka detail siswa yang membutuhkan tindak lanjut.</p>
+          <span className="analytics-kicker"><BarChart3 size={14} aria-hidden="true" /><UiText>{" RUANG GURU"}</UiText></span>
+          <h2><UiText>{"Pahami kelas, dampingi dengan tepat."}</UiText></h2>
+          <p><UiText>{"Mulai dari pola cohort, lalu buka detail siswa yang membutuhkan tindak lanjut."}</UiText></p>
         </div>
         <button type="button" className="button secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" />
-          Perbarui data
-        </button>
+          <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" /><UiText>{"Perbarui data"}</UiText></button>
       </div>
 
-      <div className="analytics-window-tabs" role="tablist" aria-label="Rentang waktu cohort">
+      <div className="analytics-window-tabs" role="tablist" aria-label={t("Rentang waktu cohort")}>
         {windows.map((item) => (
           <button
             key={item.value}
@@ -79,7 +80,7 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
             onClick={() => void load(item.value)}
             disabled={loading}
           >
-            {item.label}
+            {t(item.label)}
           </button>
         ))}
       </div>
@@ -89,21 +90,21 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
       <div className="analytics-stat-grid">
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon blue"><Users size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label">Siswa aktif</span>
+          <span className="analytics-stat-label"><UiText>{"Siswa aktif"}</UiText></span>
           <strong>{data.n_students}</strong>
-          <small>akun siswa terpantau</small>
+          <small><UiText>{"akun siswa terpantau"}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon purple"><BarChart3 size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label">Rata-rata mastery</span>
+          <span className="analytics-stat-label"><UiText>{"Rata-rata mastery"}</UiText></span>
           <strong>{percent(data.avg_mastery)}</strong>
-          <small>penguasaan konsep cohort</small>
+          <small><UiText>{"penguasaan konsep cohort"}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon green"><ArrowRight size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label">Akurasi latihan</span>
+          <span className="analytics-stat-label"><UiText>{"Akurasi latihan"}</UiText></span>
           <strong>{percent(data.avg_quiz_accuracy)}</strong>
-          <small>jawaban benar rata-rata</small>
+          <small><UiText>{"jawaban benar rata-rata"}</UiText></small>
         </article>
       </div>
 
@@ -111,8 +112,8 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
         <article className="panel analytics-card teacher-roster-card">
           <div className="analytics-card-heading">
             <div>
-              <span className="analytics-kicker">DAFTAR SISWA</span>
-              <h3>Siapa yang perlu kamu dampingi?</h3>
+              <span className="analytics-kicker"><UiText>{"DAFTAR SISWA"}</UiText></span>
+              <h3><UiText>{"Siapa yang perlu kamu dampingi?"}</UiText></h3>
             </div>
             <Users size={20} aria-hidden="true" />
           </div>
@@ -123,7 +124,7 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
                   <span className="teacher-student-avatar" aria-hidden="true">{student.student_name.slice(0, 1).toUpperCase()}</span>
                   <span className="teacher-student-main">
                     <strong>{student.student_name}</strong>
-                    <small>{student.n_sessions} sesi · akurasi {percent(student.quiz_accuracy)}</small>
+                    <small>{student.n_sessions}<UiText>{" sesi · akurasi "}</UiText>{percent(student.quiz_accuracy)}</small>
                   </span>
                   <span className={`teacher-risk ${student.overall_mastery < 0.5 ? "needs-help" : ""}`}>
                     {percent(student.overall_mastery)}
@@ -133,15 +134,15 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
               ))}
             </div>
           ) : (
-            <p className="analytics-empty">Belum ada siswa aktif pada periode ini.</p>
+            <p className="analytics-empty"><UiText>{"Belum ada siswa aktif pada periode ini."}</UiText></p>
           )}
         </article>
 
         <article className="panel analytics-card">
           <div className="analytics-card-heading">
             <div>
-              <span className="analytics-kicker">KONSEP PRIORITAS</span>
-              <h3>Topik yang paling sering tersendat</h3>
+              <span className="analytics-kicker"><UiText>{"KONSEP PRIORITAS"}</UiText></span>
+              <h3><UiText>{"Topik yang paling sering tersendat"}</UiText></h3>
             </div>
             <AlertTriangle size={20} aria-hidden="true" />
           </div>
@@ -149,14 +150,14 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
             <div className="teacher-weak-list">
               {data.cohort_weak_concepts.map((concept) => (
                 <div className="teacher-weak-item" key={concept.concept_name}>
-                  <div><strong>{concept.concept_name}</strong><span>{concept.n_students} siswa</span></div>
+                  <div><strong>{concept.concept_name}</strong><span>{concept.n_students}<UiText>{" siswa"}</UiText></span></div>
                   <progress max={1} value={concept.avg_mastery} aria-label={`${concept.concept_name} ${percent(concept.avg_mastery)}`} />
-                  <small>Rata-rata mastery {percent(concept.avg_mastery)}</small>
+                  <small><UiText>{"Rata-rata mastery "}</UiText>{percent(concept.avg_mastery)}</small>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="analytics-empty">Belum ada topik prioritas dari data ini.</p>
+            <p className="analytics-empty"><UiText>{"Belum ada topik prioritas dari data ini."}</UiText></p>
           )}
         </article>
       </div>

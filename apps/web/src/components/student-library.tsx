@@ -1,4 +1,6 @@
 "use client";
+import { UiText, useI18n } from "@/components/language-provider";
+
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -16,6 +18,7 @@ export function StudentLibrary({
 }: {
   materials: StudentMaterial[];
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [classId, setClassId] = useState("");
@@ -36,15 +39,13 @@ export function StudentLibrary({
   );
   return (
     <>
-      <section className="panel library-filters" aria-label="Cari materi">
+      <section className="panel library-filters" aria-label={t("Cari materi")}>
         <label className="field library-search">
           <span>
-            <Search size={16} aria-hidden="true" />
-            Cari materi
-          </span>
+            <Search size={16} aria-hidden="true" /><UiText>{"Cari materi"}</UiText></span>
           <input
             type="search"
-            placeholder="Judul, kelas, atau mata pelajaran"
+            placeholder={t("Judul, kelas, atau mata pelajaran")}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -52,16 +53,14 @@ export function StudentLibrary({
             }}
           />
         </label>
-        <label className="field">
-          Kelas
-          <select
+        <label className="field"><UiText>{"Kelas"}</UiText><select
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
               setLimit(12);
             }}
           >
-            <option value="">Semua kelas</option>
+            <option value=""><UiText>{"Semua kelas"}</UiText></option>
             {classes.map(([id, name]) => (
               <option key={id} value={id}>
                 {name}
@@ -69,37 +68,29 @@ export function StudentLibrary({
             ))}
           </select>
         </label>
-        <label className="field">
-          Status bacaan
-          <select
+        <label className="field"><UiText>{"Status bacaan"}</UiText><select
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
               setLimit(12);
             }}
           >
-            <option value="all">Semua materi</option>
-            <option value="pending">Belum selesai</option>
-            <option value="done">Sudah dipelajari</option>
-            <option value="saved">Bookmark</option>
+            <option value="all"><UiText>{"Semua materi"}</UiText></option>
+            <option value="pending"><UiText>{"Belum selesai"}</UiText></option>
+            <option value="done"><UiText>{"Sudah dipelajari"}</UiText></option>
+            <option value="saved"><UiText>{"Bookmark"}</UiText></option>
           </select>
         </label>
       </section>
       <p className="library-result" role="status">
-        {filtered.length} materi ditemukan
-      </p>
+        {filtered.length}<UiText>{" materi ditemukan"}</UiText></p>
       {!materials.length ? (
         <div className="panel">
-          <Empty title="Bacaan pertama Anda akan hadir di sini.">
-            Materi yang diterbitkan guru di kelas Anda akan otomatis muncul.
-            Hubungi guru jika kelas belum tersedia.
-          </Empty>
+          <Empty title={<UiText>{"Bacaan pertama Anda akan hadir di sini."}</UiText>}><UiText>{"Materi yang diterbitkan guru di kelas Anda akan otomatis muncul. Hubungi guru jika kelas belum tersedia."}</UiText></Empty>
         </div>
       ) : !filtered.length ? (
         <div className="panel">
-          <Empty title="Belum ada materi yang cocok.">
-            Coba kata kunci lain atau ubah filter kelas dan status bacaan.
-          </Empty>
+          <Empty title={<UiText>{"Belum ada materi yang cocok."}</UiText>}><UiText>{"Coba kata kunci lain atau ubah filter kelas dan status bacaan."}</UiText></Empty>
           <button
             className="button secondary library-reset"
             onClick={() => {
@@ -108,9 +99,7 @@ export function StudentLibrary({
               setStatus("all");
               setLimit(12);
             }}
-          >
-            Reset filter
-          </button>
+          ><UiText>{"Reset filter"}</UiText></button>
         </div>
       ) : (
         <div className="student-material-grid">
@@ -126,7 +115,7 @@ export function StudentLibrary({
                 </span>
                 <span>{m.subject}</span>
                 {m.progress.bookmarked && (
-                  <Bookmark size={18} aria-label="Tersimpan di bookmark" />
+                  <Bookmark size={18} aria-label={t("Tersimpan di bookmark")} />
                 )}
               </div>
               <h2>{m.title}</h2>
@@ -135,9 +124,7 @@ export function StudentLibrary({
                 <span>
                   {m.progress.completed ? (
                     <>
-                      <CheckCircle2 size={16} aria-hidden="true" />
-                      Sudah dipelajari
-                    </>
+                      <CheckCircle2 size={16} aria-hidden="true" /><UiText>{"Sudah dipelajari"}</UiText></>
                   ) : (
                     "Belum selesai"
                   )}
@@ -152,9 +139,7 @@ export function StudentLibrary({
         <button
           className="button secondary library-more"
           onClick={() => setLimit(limit + 12)}
-        >
-          Tampilkan lebih banyak
-        </button>
+        ><UiText>{"Tampilkan lebih banyak"}</UiText></button>
       )}
     </>
   );
