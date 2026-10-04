@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { forwardMaterial, teacherMaterialSession } from "@/lib/material-proxy";
-import { MATERIAL_UPLOAD_LIMIT, validateMaterialFile } from "@/lib/material-flow.mjs";
+import { MATERIAL_UPLOAD_LIMIT, validateMaterialFile, parseMaterialPageRange } from "@/lib/material-flow.mjs";
 
 export const runtime = "nodejs";
 export async function POST(request: Request, { params }: { params: Promise<{ classId: string }> }) {
@@ -16,5 +16,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
   if (error || !(file instanceof File)) return NextResponse.json({ message: error || "Pilih berkas materi." }, { status: 400 });
   const payload = new FormData();
   payload.set("file", file);
+  try {
+    const selection = parseMaterialPageRange(data.get("first_page"), data.get("last_page"));
+    if (selection) {
+      payload.set("first_page", String(selection.first));
+      payload.set("last_page", String(selection.last));
+    }
+  } catch (error) {
+    return NextResponse.json({ message: error instanceof Error ? error.message : "Pilihan halaman tidak valid." }, { status: 400 });
+  }
   return forwardMaterial(current, `/classes/${classId}/materials/import`, payload);
 }

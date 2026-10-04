@@ -8,7 +8,7 @@ import { createClass, changeClass, saveMaterial } from "@/app/class-actions";
 import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 import type { Material } from "@/lib/class-types";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
-import { materialTutorStatus, validateMaterialFile } from "@/lib/material-flow.mjs";
+import { materialTutorStatus, validateMaterialFile, parseMaterialPageRange, type MaterialSection } from "@/lib/material-flow.mjs";
 
 export function ClassForm() {
   const { t } = useI18n();
@@ -148,6 +148,9 @@ export function MaterialForm({
   const [sourceFilename, setSourceFilename] = useState(material?.source_filename || "");
   const [importNotice, setImportNotice] = useState("");
   const [importError, setImportError] = useState("");
+  const [book, setBook] = useState<{ file: File; totalPages: number; sections: MaterialSection[] } | null>(null);
+  const [pageRange, setPageRange] = useState({ first: "1", last: "30" });
+  const [sectionChoice, setSectionChoice] = useState("");
   const [indexing, setIndexing] = useState(false);
   const tutorStatus = material ? materialTutorStatus(material) : null;
   const router = useRouter();
@@ -164,7 +167,7 @@ export function MaterialForm({
     },
   );
 
-  async function importFile(file: File) {
+  async function importFile(file: File, selection?: { first: number; last: number }) {
     const validation = validateMaterialFile(file);
     if (validation) {
       setImportError(validation);
@@ -178,14 +181,31 @@ export function MaterialForm({
     try {
       const body = new FormData();
       body.set("file", file);
+      if (selection) {
+        body.set("first_page", String(selection.first)); body.set("last_page", String(selection.last));
+      }
       const response = await fetch(`/api/classes/${encodeURIComponent(classId)}/materials/import`, { method: "POST", body });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Dokumen belum dapat dibaca.");
+      if (result.preview_type === "book") {
+        const sections = Array.isArray(result.sections) ? result.sections as MaterialSection[] : [];
+        setBook({ file, totalPages: result.total_pages, sections });
+        const first = sections[0]?.first ?? 1, last = Math.min(sections[0]?.last ?? 30, first + 149);
+        setPageRange({ first: String(first), last: String(last) }); setSectionChoice(sections.length ? "0" : "");
+        setImportNotice(t("Pilih bab atau halaman yang ingin dijadikan materi. Isi editor belum berubah."));
+        return;
+      }
       if (typeof result.content !== "string" || !result.content.trim() || result.content.length > 100000) throw new Error("Teks dokumen harus berisi 1 sampai 100.000 karakter.");
       if (content.trim() && !(await confirmAction({ title: "Ganti isi editor dengan dokumen?", text: "Isi editor saat ini akan diganti dengan hasil pembacaan dokumen. Perubahan baru tersimpan setelah Anda menekan Simpan materi.", confirmText: "Ya, gunakan dokumen" }))) return;
       setContent(result.content);
-      if (!title.trim()) setTitle(typeof result.title === "string" ? result.title.slice(0, 200) : file.name.replace(/\.[^.]+$/, ""));
-      setSourceFilename(typeof result.filename === "string" ? result.filename : file.name);
+      if (!title.trim()) {
+        const chapter = selection && book?.sections[Number(sectionChoice)];
+        setTitle(chapter && chapter.first === selection.first && chapter.last === selection.last ? chapter.title
+          : `${typeof result.title === "string" ? result.title.slice(0, 170) : file.name.replace(/\.[^.]+$/, "")}${selection ? ` · ${t("Halaman {first}–{last}", selection)}` : ""}`);
+      }
+      const source = typeof result.filename === "string" ? result.filename : file.name;
+      setSourceFilename(`${source}${selection ? ` · ${t("Halaman {first}–{last}", selection)}` : ""}`.slice(0, 300));
+      if (!selection) setBook(null);
       const warnings = Array.isArray(result.warnings) ? result.warnings.filter((item: unknown) => typeof item === "string").join(" ") : "";
       setImportNotice(`${t("Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.")}${warnings ? ` ${warnings}` : ""}`);
       await notifyResult("Dokumen siap ditinjau di editor.");
@@ -194,6 +214,15 @@ export function MaterialForm({
       setImportError(message);
       await notifyResult(message, true);
     } finally { setImporting(false); }
+  }
+
+  async function importPages() {
+    if (!book) return;
+    try {
+      const selection = parseMaterialPageRange(pageRange.first, pageRange.last);
+      if (!selection || selection.last > book.totalPages) throw new Error(t("Pilihan halaman tidak valid."));
+      await importFile(book.file, selection);
+    } catch (error) { setImportError(error instanceof Error ? error.message : "Pilihan halaman tidak valid."); }
   }
 
   async function retryIndex() {
@@ -254,6 +283,33 @@ export function MaterialForm({
         />
         <small><UiText>{"PDF dengan teks, DOCX, Markdown, atau TXT. Maksimal 25 MB. PDF hasil scan perlu diubah menjadi teks terlebih dahulu."}</UiText></small>
         </label>
+        {book && <fieldset className="book-import-picker" disabled={importing || pending}>
+          <legend>{t("Pilih bagian buku")}</legend>
+          <p>{book.file.name} · {t("{count} halaman", { count: book.totalPages })}</p>
+          <label className="field">{t("Saran pembagian")}
+            <select value={sectionChoice} onChange={event => {
+              const next = event.target.value; setSectionChoice(next);
+              const section = book.sections[Number(next)];
+              if (next !== "" && section) setPageRange({ first: String(section.first), last: String(Math.min(section.last, section.first + 149)) });
+            }}>
+              <option value="">{t("Pilih halaman sendiri")}</option>
+              {book.sections.map((section, index) => <option key={`${section.first}-${index}`} value={String(index)}>
+                {section.title} · {t("Halaman {first}–{last}", section)}</option>)}
+            </select>
+          </label>
+          <div className="book-import-range">
+            <label className="field">{t("Halaman awal")}<input type="number" min={1} max={book.totalPages} value={pageRange.first}
+              onChange={event => { setSectionChoice(""); setPageRange({ ...pageRange, first: event.target.value }); }} /></label>
+            <label className="field">{t("Halaman akhir")}<input type="number" min={1} max={book.totalPages} value={pageRange.last}
+              onChange={event => { setSectionChoice(""); setPageRange({ ...pageRange, last: event.target.value }); }} /></label>
+          </div>
+          <small>{t("Gunakan nomor halaman PDF, termasuk sampul. Maksimal 150 halaman dan 100.000 karakter per materi. Bab yang panjang bisa dibagi lagi.")}</small>
+          <small>{t("Tinjau saran bab sebelum menyimpan. Simpan setiap bab sebagai materi tersendiri; modul pendek dapat langsung menjadi satu materi.")}</small>
+          <div className="material-status-actions">
+            <button type="button" className="button primary" onClick={() => void importPages()}>{t("Baca halaman terpilih")}</button>
+            <button type="button" className="button secondary" onClick={() => setBook(null)}>{t("Batal")}</button>
+          </div>
+        </fieldset>}
         {importing && <p className="material-import-progress" role="status"><LoaderCircle className="spin" size={18} aria-hidden="true" /><UiText>{" Membaca dokumen, mohon tunggu…"}</UiText></p>}
         {sourceFilename && <p className="material-source-file"><FileText size={17} aria-hidden="true" /><span>{sourceFilename}</span></p>}
         {importNotice && <p className="material-import-notice" role="status">{importNotice}</p>}

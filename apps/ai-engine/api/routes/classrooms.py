@@ -6,7 +6,7 @@ Every nested resource repeats the class membership check on the server.
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -321,12 +321,14 @@ async def create_material(
 async def preview_material_import(
     class_id: uuid.UUID,
     file: UploadFile,
+    first_page: int | None = Form(None, ge=1, le=500),
+    last_page: int | None = Form(None, ge=1, le=500),
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
     """Extract a document for review; importing does not save or publish it."""
     await accessible(session, class_id, user, write=True)
-    return await import_document(file)
+    return await import_document(file, first_page=first_page, last_page=last_page)
 
 
 @router.get("/{class_id}/materials/{material_id}")

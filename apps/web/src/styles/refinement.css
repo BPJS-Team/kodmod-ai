@@ -78,3 +78,12 @@ html[data-low-vision=true] .muted,html[data-low-vision=true] .field small,html[d
 @media (max-width: 480px) { .landing-refined .lp-nav-wrap { padding: 12px 18px; flex-wrap: wrap; gap: 12px; } .lp-header-actions { order: 3; width: 100%; justify-content: space-between; } .lp-header-actions .lp-login { min-height: 42px; } .landing-refined .lp-mobile-nav { margin-left: auto; } .landing-refined .lp-container { padding-inline: 22px; } .lp-capability-grid { gap: 20px; } .lp-capability h3 { font-size: 1rem; } .lp-capability p { font-size: .92rem; } .landing-refined .lp-floating-top { right: 0; } .landing-refined .lp-floating-bottom { left: 0; } .landing-refined .lp-principles { flex-direction: column; gap: 14px; } .workspace-header .workspace-title { width: 100%; } .workspace-header .account { width: 100%; } .workspace-header .account .experience-toolbar { margin-right: auto; } .workspace-header .account > .avatar,.workspace-header .account > span:not(.avatar) { display: none; } .voice-preferences-content { border-radius: 20px; } .voice-choice-row .voice-preference-option { padding: 12px 10px; gap: 10px; } .voice-setting-row { gap: 12px; } .voice-setting-row select { max-width: 150px; } .auth-main { padding-inline: 22px; } }
 @media (prefers-reduced-motion: reduce) { .kodmod-switch-thumb,.kodmod-switch { transition: none; } }
 @media (max-width: 480px) { .voice-choice-row { grid-template-columns: 1fr; gap: 8px; padding: 12px; } .voice-choice-row .voice-preference-option { padding: 0; } .voice-preview-button { justify-self: start; margin-left: 52px; } }
+/* Review a book section before saving it as a classroom material. */
+.book-import-picker { margin: 1rem 0; padding: 1.1rem; border: 1px solid #c3d7f6; border-radius: 18px; background: #f2f7ff; display: grid; gap: 1rem; min-width: 0; }
+.book-import-picker legend { padding: 0 .4rem; color: #15365c; font-weight: 750; }
+.book-import-picker > p { margin: 0; overflow-wrap: anywhere; color: #31567c; }
+.book-import-picker small { color: #42617e; line-height: 1.6; }
+.book-import-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.book-import-picker select, .book-import-range input { width: 100%; min-width: 0; }
+.book-import-picker .material-status-actions { flex-wrap: wrap; }
+@media (max-width: 420px) { .book-import-range { grid-template-columns: minmax(0, 1fr); } }

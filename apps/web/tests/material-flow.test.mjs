@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatMessagePayload, materialTutorStatus, validateMaterialFile } from "../src/lib/material-flow.mjs";
+import { chatMessagePayload, materialTutorStatus, validateMaterialFile, parseMaterialPageRange } from "../src/lib/material-flow.mjs";
 
 const classId = "10000000-0000-4000-8000-000000000001";
 const materialId = "20000000-0000-4000-8000-000000000001";
@@ -24,4 +24,12 @@ test("material import accepts supported documents and rejects empty or oversized
   assert.match(validateMaterialFile({ name: "macro.docm", size: 1024 }), /PDF, DOCX, Markdown, atau TXT/);
   assert.match(validateMaterialFile({ name: "materi.pdf", size: 25 * 1024 * 1024 + 1 }), /25 MB/);
   assert.match(validateMaterialFile({ name: "materi.pdf", size: 0 }), /kosong/);
+});
+
+test("book selections forward a bounded integer range and reject partial or malformed fields", () => {
+  assert.equal(parseMaterialPageRange(null, null), null);
+  assert.deepEqual(parseMaterialPageRange("12", "23"), { first: 12, last: 23 });
+  for (const [first, last] of [[null, "23"], ["1", null], ["0", "3"], ["3", "1"],
+    ["1", "151"], ["500", "501"], ["1e2", "120"], [new Blob(["2"]), "3"]])
+    assert.throws(() => parseMaterialPageRange(first, last));
 });

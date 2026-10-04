@@ -1,6 +1,15 @@
 // Interface copy only. Lesson text, quiz questions, and conversation turns keep
 // their original language. New interface strings belong here or in i18n.mjs.
 export const englishUi = {
+  "Pilih bagian buku": "Choose a book section", "{count} halaman": "{count} pages",
+  "Saran pembagian": "Suggested sections", "Pilih halaman sendiri": "Choose your own pages",
+  "Halaman {first}–{last}": "Pages {first}–{last}", "Halaman awal": "First page", "Halaman akhir": "Last page",
+  "Baca halaman terpilih": "Read selected pages", "Pilihan halaman tidak valid.": "Invalid page selection.",
+  "Pilih halaman awal dan akhir yang valid.": "Choose valid first and last pages.",
+  "Pilih halaman awal dan akhir yang valid, maksimal 150 halaman per materi.": "Choose valid first and last pages, up to 150 pages per material.",
+  "Pilih bab atau halaman yang ingin dijadikan materi. Isi editor belum berubah.": "Choose a chapter or page range for your material. The editor content has not changed yet.",
+  "Gunakan nomor halaman PDF, termasuk sampul. Maksimal 150 halaman dan 100.000 karakter per materi. Bab yang panjang bisa dibagi lagi.": "Use PDF page numbers, including the cover. Each material supports up to 150 pages and 100,000 characters. Long chapters can be split further.",
+  "Tinjau saran bab sebelum menyimpan. Simpan setiap bab sebagai materi tersendiri; modul pendek dapat langsung menjadi satu materi.": "Review the suggested chapters before saving. Save each chapter as a separate material; a short module can stay as one material.",
   "Halo,": "Hello,", "Siapkan kelas dan materi belajar.": "Prepare your classes and lessons.", "Lanjutkan belajar dari kelasmu.": "Continue learning with your class.",
   "Kelas aktif": "Active classes", "Materi di kelas aktif": "Materials in active classes", "Materi tersedia": "Available materials", "Keanggotaan siswa": "Student memberships", "Username Anda": "Your username",
   "/4.000 karakter · Shift + Enter untuk baris baru": "/4,000 characters · Shift + Enter for a new line",

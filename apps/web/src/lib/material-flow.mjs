@@ -17,6 +17,16 @@ export function validateMaterialFile(file) {
   return null;
 }
 
+export function parseMaterialPageRange(first, last) {
+  if (first == null && last == null) return null;
+  if (!/^\d{1,3}$/.test(String(first ?? "")) || !/^\d{1,3}$/.test(String(last ?? "")))
+    throw new Error("Pilih halaman awal dan akhir yang valid.");
+  const start = Number(first), end = Number(last);
+  if (start < 1 || end < start || end > 500 || end - start + 1 > 150)
+    throw new Error("Pilih halaman awal dan akhir yang valid, maksimal 150 halaman per materi.");
+  return { first: start, last: end };
+}
+
 export function chatMessagePayload(incoming) {
   const text = typeof incoming?.text === "string" ? incoming.text.trim() : "";
   if (!text || text.length > 4000) throw new Error("Pertanyaan harus berisi 1 sampai 4.000 karakter.");
