@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, RotateCcw, Save } from "lucide-react";
@@ -42,8 +45,8 @@ export function AdminMaterialEditor({ material }: { material: AdminMaterial }) {
       }}>{t("Lihat asal halaman")}</Button></div>
       {source && <div><p>{source.filename}</p><ul>{source.preview?.pages?.map(page => <li key={page.page}>{t("Halaman {page}", { page: page.page })} · {page.method === "ocr" ? t("Dibaca dari gambar") : t("Teks asli")}{page.confidence != null && ` · ${t("Keyakinan pembacaan {confidence}%", { confidence: page.confidence })}`}</li>)}</ul></div>}
     </section>}
-    <label className="field"><UiText>{"Judul materi"}</UiText><input required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} disabled={busy || material.is_archived} /></label>
-    <label className="field"><UiText>{"Isi materi"}</UiText><textarea required rows={20} maxLength={100000} value={content} onChange={(event) => setContent(event.target.value)} disabled={busy || material.is_archived} /></label>
+    <label className="field"><UiText>{"Judul materi"}</UiText><Input required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} disabled={busy || material.is_archived} /></label>
+    <label className="field"><UiText>{"Isi materi"}</UiText><Textarea required rows={20} maxLength={100000} value={content} onChange={(event) => setContent(event.target.value)} disabled={busy || material.is_archived} /></label>
     <label className="admin-material-publish"><Switch checked={published} onCheckedChange={setPublished} disabled={busy || material.is_archived} aria-label="Terbitkan materi" /><span><strong><UiText>{"Terbitkan materi"}</UiText></strong><small><UiText>{"Siswa hanya dapat membuka materi yang terbit di kelasnya."}</UiText></small></span></label>
     <div className="guided-actions"><Button type="submit" disabled={busy || material.is_archived || !title.trim() || !content.trim()}>{busy ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}<UiText>{"Simpan perubahan"}</UiText></Button><Button variant="outline" type="button" onClick={() => void update(true)} disabled={busy || material.is_archived || !material.published}><RotateCcw size={17} aria-hidden="true" /><UiText>{"Proses ulang"}</UiText></Button></div>
   </form>;

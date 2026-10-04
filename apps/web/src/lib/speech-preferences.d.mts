@@ -1,6 +1,10 @@
 export type SpeechEngine = "app" | "device";
 export type VoiceSettings = { engine: SpeechEngine; menuEnabled: boolean; tutorEnabled: boolean;
-  lowVision: boolean; guidedNavigation: boolean };
+  lowVision: boolean; guidedNavigation: boolean; fontScale: "default" | "large" | "extra-large";
+  highContrast: boolean; spacious: boolean; reducedMotion: boolean };
+export type DisplaySettings = Pick<VoiceSettings, "lowVision" | "fontScale" | "highContrast" | "spacious" | "reducedMotion">;
+export const DISPLAY_COOKIE: string;
+export function parseDisplaySettings(value?: Partial<VoiceSettings>): DisplaySettings;
 export const VOICE_SETTINGS_KEY: string;
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings;
 export function readVoiceSettingsSnapshot(): string | null;

@@ -1,4 +1,5 @@
 import { englishUi } from "./i18n-ui.mjs";
+import { englishScope } from "./i18n-scope.mjs";
 
 export const LANGUAGE_COOKIE = "kodmod_language";
 export const languages = ["id", "en"];
@@ -9,6 +10,7 @@ export const localeFor = (language) => language === "en" ? "en-US" : "id-ID";
 // passed to this function; it remains in its original language.
 export const english = {
   ...englishUi,
+  ...englishScope,
   "Kelola kelas, materi, dan tugas siswa.": "Manage your classes, lessons, and student assignments.",
   "Buka materi, tanyakan pada Tutor, dan lanjutkan belajarmu.": "Open a lesson, ask your Tutor, and keep learning.",
   "Ringkasan bacaan": "Reading overview",

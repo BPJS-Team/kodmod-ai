@@ -1,17 +1,20 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Headphones, Smartphone, Volume2, X, Play, Square, ChevronDown } from "lucide-react";
 import { DEFAULT_VOICE_SETTINGS, parseVoiceSettings, readVoiceSettingsSnapshot, writeVoiceSettings,
-  type VoiceSettings, type SpeechEngine } from "@/lib/speech-preferences.mjs";
+  parseDisplaySettings, type DisplaySettings, type VoiceSettings, type SpeechEngine } from "@/lib/speech-preferences.mjs";
 import { clearSpeechAudioCache, pruneExpiredSpeechAudioCache } from "@/lib/speech-audio-cache";
 import { speechOutput } from "@/lib/browser-speech";
 import { attachMenuNarration, announceLanguageChange } from "@/lib/menu-narration.mjs";
 import type { Language } from "@/lib/i18n.mjs";
 import { useI18n } from "./language-provider";
 import { Switch } from "./ui/switch";
+import { Dialog } from "./ui/dialog";
 
 type Preferences = VoiceSettings & { openVoicePreferences: () => void; toggleMenu: () => void };
 const VoicePreferencesContext = createContext<Preferences | null>(null);
@@ -40,15 +43,15 @@ export function useVoicePreferences() {
   return value;
 }
 
-export function VoicePreferencesProvider({ children }: { children: ReactNode }) {
+export function VoicePreferencesProvider({ children, initialDisplay = parseDisplaySettings() }: { children: ReactNode; initialDisplay?: DisplaySettings }) {
   const { language, t, changeLanguage } = useI18n();
   const pathname = usePathname();
   const ready = useSyncExternalStore(readiness, clientReady, serverReady);
   const snapshot = useSyncExternalStore(subscribe, readVoiceSettingsSnapshot, getServerSnapshot);
   const saved = useMemo(() => parseVoiceSettings(snapshot), [snapshot]);
-  const preferences = saved ?? DEFAULT_VOICE_SETTINGS;
+  const preferences = useMemo(() => saved ?? { ...DEFAULT_VOICE_SETTINGS, ...initialDisplay }, [saved, initialDisplay]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [draft, setDraft] = useState<VoiceSettings>(DEFAULT_VOICE_SETTINGS);
+  const [draft, setDraft] = useState<VoiceSettings>({ ...DEFAULT_VOICE_SETTINGS, ...initialDisplay });
   const [warning, setWarning] = useState("");
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -104,8 +107,14 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.lowVision = String(preferences.lowVision);
-  }, [preferences.lowVision]);
+    const display = opened ? draft : preferences;
+    const root = document.documentElement;
+    root.dataset.lowVision = String(display.lowVision);
+    root.dataset.textSize = display.fontScale;
+    root.dataset.highContrast = String(display.highContrast);
+    root.dataset.spacious = String(display.spacious);
+    root.dataset.reducedMotion = String(display.reducedMotion);
+  }, [opened, draft, preferences]);
   useEffect(() => () => speechOutput.stop(), [pathname, language]);
 
   useEffect(() => {
@@ -175,7 +184,7 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
   return <VoicePreferencesContext.Provider value={value}>
     {children}
     {warning && !opened && <div className="global-voice-notice" role="status">{t(warning)}</div>}
-    <dialog ref={dialog} className="voice-preferences-dialog" aria-labelledby="voice-preferences-title"
+    <Dialog ref={dialog} className="voice-preferences-dialog" aria-labelledby="voice-preferences-title"
       aria-describedby="voice-preferences-description" data-voice-ignore="true"
       onCancel={event => { event.preventDefault(); if (!saved) save(); else closeSettings(); }}>
       <div className="voice-preferences-content">
@@ -211,17 +220,21 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
             <small>{t("Bacakan jawaban baru saat belajar.")}</small></label>
             <Switch id="tutor-reader" checked={draft.tutorEnabled} onCheckedChange={tutorEnabled => setDraft({ ...draft, tutorEnabled })} /></div>
           <div className="voice-setting-row"><label htmlFor="voice-language"><strong>{t("Bahasa")}</strong></label>
-            <select id="voice-language" value={language} disabled={languagePending} onChange={async event => {
+            <NativeSelect id="voice-language" value={language} disabled={languagePending} onChange={async event => {
               setLanguagePending(true); speechOutput.stop();
               try { await changeLanguage(event.target.value as "id" | "en"); setWarning(""); }
               catch { setWarning("Bahasa belum dapat disimpan. Coba lagi."); } finally { setLanguagePending(false); }
-            }}><option value="id">Bahasa Indonesia</option><option value="en">English</option></select></div>
+            }}><option value="id">Bahasa Indonesia</option><option value="en">English</option></NativeSelect></div>
         </div>
-        <details className="voice-extra-settings"><summary>{language === "en" ? "Display and navigation" : "Tampilan dan navigasi"}<ChevronDown size={17} aria-hidden="true" /></summary>
-          <div className="voice-setting-row"><label htmlFor="voice-low-vision"><strong>{language === "en" ? "Larger, clearer text" : "Teks lebih besar dan jelas"}</strong></label>
-            <Switch id="voice-low-vision" checked={draft.lowVision} onCheckedChange={lowVision => setDraft({ ...draft, lowVision })} /></div>
-          <div className="voice-setting-row"><label htmlFor="voice-guided"><strong>{language === "en" ? "Swipe between controls" : "Geser untuk berpindah menu"}</strong>
-            <small>{language === "en" ? "Swipe left or right to move focus." : "Geser kiri atau kanan untuk memindahkan fokus."}</small></label>
+        <details className="voice-extra-settings"><summary>{t("Tampilan dan navigasi")}<ChevronDown size={17} aria-hidden="true" /></summary>
+          <div className="voice-setting-row"><label htmlFor="voice-text-size"><strong>{t("Ukuran teks")}</strong></label>
+            <NativeSelect id="voice-text-size" value={draft.fontScale} onChange={event => setDraft({ ...draft, fontScale: event.target.value as VoiceSettings["fontScale"], lowVision: event.target.value !== "default" })}>
+              <option value="default">{t("Standar")}</option><option value="large">{t("Besar")}</option><option value="extra-large">{t("Sangat besar")}</option></NativeSelect></div>
+          <div className="voice-setting-row"><label htmlFor="voice-contrast"><strong>{t("Kontras tinggi")}</strong></label><Switch id="voice-contrast" checked={draft.highContrast} onCheckedChange={highContrast => setDraft({ ...draft, highContrast })} /></div>
+          <div className="voice-setting-row"><label htmlFor="voice-spacing"><strong>{t("Jarak bacaan lebih lega")}</strong></label><Switch id="voice-spacing" checked={draft.spacious} onCheckedChange={spacious => setDraft({ ...draft, spacious })} /></div>
+          <div className="voice-setting-row"><label htmlFor="voice-motion"><strong>{t("Kurangi animasi")}</strong></label><Switch id="voice-motion" checked={draft.reducedMotion} onCheckedChange={reducedMotion => setDraft({ ...draft, reducedMotion })} /></div>
+          <div className="voice-setting-row"><label htmlFor="voice-guided"><strong>{t("Geser untuk berpindah menu")}</strong>
+            <small>{t("Geser kiri atau kanan untuk memindahkan fokus.")}</small></label>
             <Switch id="voice-guided" checked={draft.guidedNavigation} onCheckedChange={guidedNavigation => setDraft({ ...draft, guidedNavigation })} /></div>
         </details>
         {(previewActive && output.status !== "idle") && <div className="voice-preview-status" role="status">
@@ -237,6 +250,6 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
         {warning && <p className="voice-preferences-warning" role="status">{t(warning)}</p>}
       </div>
       <div className="voice-preferences-actions"><button type="button" className="button primary" onClick={save} disabled={languagePending}>{t(saved ? "Simpan pengaturan" : "Gunakan pilihan ini")}</button></div>
-    </dialog>
+    </Dialog>
   </VoicePreferencesContext.Provider>;
 }

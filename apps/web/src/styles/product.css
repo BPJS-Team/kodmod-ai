@@ -23,13 +23,13 @@
 }
 .admin-insights-heading h2 {
   color: #1b3155;
-  font-size: clamp(23px, 3vw, 31px);
+  font-size: clamp(1.4375rem, 3vw, 1.9375rem);
   letter-spacing: -0.04em;
   margin: 9px 0 6px;
 }
 .admin-insights-heading p {
   color: #6e819d;
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 0;
 }
 .admin-insight-grid {
@@ -58,17 +58,17 @@
 .admin-insight-icon.green { color: #23856d; background: #e6f7f0; }
 .admin-insight-card > span:not(.admin-insight-icon) {
   color: #72849d;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .admin-insight-card strong {
   color: #1d3a68;
-  font-size: 21px;
+  font-size: 1.3125rem;
   letter-spacing: -0.035em;
 }
 .admin-insight-card small {
   grid-column: 2;
   color: #8b9ab0;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .admin-insight-columns {
   display: grid;
@@ -107,13 +107,13 @@
 }
 .admin-activity-item strong {
   color: #2c466d;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .admin-activity-item p,
 .admin-activity-item small {
   display: block;
   color: #798ba4;
-  font-size: 10px;
+  font-size: 0.625rem;
   line-height: 1.5;
   margin: 3px 0 0;
 }
@@ -126,7 +126,7 @@
   text-align: center;
 }
 .admin-insight-empty p {
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 0;
 }
 .admin-provider-status > div {
@@ -154,11 +154,11 @@
 }
 .admin-provider-status strong {
   color: #2d466c;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .admin-provider-status span {
   color: #6f819b;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.5;
 }
 .admin-provider-status dl {
@@ -176,7 +176,7 @@
 .admin-provider-status dt,
 .admin-provider-status dd {
   color: #71839d;
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin: 0;
 }
 .admin-provider-status dd {

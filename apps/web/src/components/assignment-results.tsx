@@ -1,4 +1,6 @@
 "use client";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+
 import { UiText, UiDate } from "@/components/language-provider";
 
 import { useRef, useState } from "react";
@@ -114,22 +116,22 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
         </div>
         {data.results.length ? (
           <div className="editorial-table-scroll">
-            <table className="editorial-table">
+            <Table className="editorial-table">
               <caption className="sr-only"><UiText>{"Hasil anggota aktif kelas "}</UiText>{data.assignment.class_name}
               </caption>
-              <thead>
-                <tr>
-                  <th scope="col"><UiText>{"Siswa"}</UiText></th>
-                  <th scope="col"><UiText>{"Status"}</UiText></th>
-                  <th scope="col"><UiText>{"Nilai"}</UiText></th>
-                  <th scope="col"><UiText>{"Dikirim pada"}</UiText></th>
-                </tr>
-              </thead>
-              <tbody>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col"><UiText>{"Siswa"}</UiText></TableHead>
+                  <TableHead scope="col"><UiText>{"Status"}</UiText></TableHead>
+                  <TableHead scope="col"><UiText>{"Nilai"}</UiText></TableHead>
+                  <TableHead scope="col"><UiText>{"Dikirim pada"}</UiText></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {data.results.map((r) => (
-                  <tr key={r.student_id}>
-                    <th scope="row">{r.full_name}</th>
-                    <td>
+                  <TableRow key={r.student_id}>
+                    <TableHead scope="row">{r.full_name}</TableHead>
+                    <TableCell>
                       <Badge active={r.state === "submitted"}>
                         {r.state === "submitted"
                           ? <UiText>{"Selesai"}</UiText>
@@ -137,19 +139,19 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
                             ? <UiText>{"Sedang dikerjakan"}</UiText>
                             : <UiText>{"Belum mulai"}</UiText>}
                       </Badge>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       {r.score === null ? <UiText>{"Belum dinilai"}</UiText> : `${r.score}/100`}
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       {r.submitted_at
                         ? scheduleLabel(r.submitted_at)
                         : <UiText>{"Belum mengirim"}</UiText>}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <Empty title={<UiText>{"Belum ada anggota aktif"}</UiText>}><UiText>{"Tambahkan siswa ke kelas untuk membagikan penugasan ini."}</UiText></Empty>

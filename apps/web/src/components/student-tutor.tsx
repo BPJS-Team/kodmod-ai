@@ -1,4 +1,7 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+
 import { UiText, useI18n, UiDate } from "@/components/language-provider";
 
 
@@ -367,11 +370,11 @@ export function StudentTutor({
 
         <section className="tutor-material-context" aria-label={t("Materi untuk percakapan")}>
           <div className="tutor-context-copy"><BookOpen size={20} aria-hidden="true" /><div><strong>{context?.material_title || <UiText>{"Belajar topik umum"}</UiText>}</strong><p>{context ? <>{context.subject_name} · {t("Jawaban mengacu pada materi kelasmu.")}</> : <UiText>{"Pilih materi dari guru agar penjelasan mengikuti bacaan yang kamu pelajari."}</UiText>}</p></div></div>
-          <label className="field"><UiText>{"Materi belajar"}</UiText><select value={selectedMaterial?.id || (context ? "unavailable" : "")} onChange={(event) => void selectMaterial(event.target.value)} disabled={busy}>
+          <label className="field"><UiText>{"Materi belajar"}</UiText><NativeSelect value={selectedMaterial?.id || (context ? "unavailable" : "")} onChange={(event) => void selectMaterial(event.target.value)} disabled={busy}>
               <option value=""><UiText>{"Topik umum"}</UiText></option>
               {materialUnavailable && <option value="unavailable" disabled><UiText>{"Materi tidak lagi tersedia"}</UiText></option>}
               {materials.map((item) => <option key={item.id} value={item.id}>{item.subject} · {item.title}</option>)}
-            </select>
+            </NativeSelect>
           </label>
           {selectedMaterial && <Link className="tutor-material-link" href={`/siswa/kelas/${selectedMaterial.class_id}/materi/${selectedMaterial.id}`}><UiText>{"Buka materi"}</UiText></Link>}
           {materialUnavailable && <p className="tutor-context-warning" role="alert"><UiText>{"Akses materi ini sudah tidak tersedia. Pilih materi lain untuk memulai sesi baru."}</UiText></p>}
@@ -430,7 +433,7 @@ export function StudentTutor({
 
         <form className="tutor-composer" onSubmit={(event) => void submit(event)}>
           <label className="sr-only" htmlFor="tutor-question"><UiText>{"Tulis pertanyaan untuk tutor"}</UiText></label>
-          <textarea
+          <Textarea
             ref={inputRef}
             id="tutor-question"
             value={draft}

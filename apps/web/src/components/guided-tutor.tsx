@@ -1,4 +1,7 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+
 
 import { useRef, useState } from "react";
 import Link from "next/link";
@@ -113,10 +116,10 @@ export function GuidedTutor({ materials, initialSessions, initialMaterialId }: {
     <aside className="guided-sidebar">
       <Card className="guided-material-picker">
         <CardHeader><BookOpen size={22} aria-hidden="true" /><CardTitle><UiText>{"Materi belajarmu"}</UiText></CardTitle><CardDescription><UiText>{"Pilih materi, lalu Tutor akan mengajarkannya secara bertahap."}</UiText></CardDescription></CardHeader>
-        <CardContent><label className="field"><UiText>{"Materi belajar"}</UiText><select value={materialId} onChange={(event) => setMaterialId(event.target.value)} disabled={busy || locked || uncertain}>
+        <CardContent><label className="field"><UiText>{"Materi belajar"}</UiText><NativeSelect value={materialId} onChange={(event) => setMaterialId(event.target.value)} disabled={busy || locked || uncertain}>
           <option value=""><UiText>{"Pilih materi"}</UiText></option>
           {materials.map((row) => <option key={row.id} value={row.id}>{row.subject} · {row.title}</option>)}
-        </select></label>
+        </NativeSelect></label>
         {selected && !ready && <p className="info-note" role="status"><UiText>{"Materi sedang disiapkan. Coba lagi setelah guru selesai memprosesnya."}</UiText></p>}
         {!materials.length && <p className="info-note"><UiText>{"Minta guru membagikan materi di kelasmu untuk mulai belajar."}</UiText></p>}
         <Button type="button" onClick={() => void begin()} disabled={busy || locked || uncertain || !ready}>{busy ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Headphones size={17} aria-hidden="true" />}<UiText>{"Mulai belajar"}</UiText></Button>
@@ -148,7 +151,7 @@ export function GuidedTutor({ materials, initialSessions, initialMaterialId }: {
           <Link className="guided-source" href={`/siswa/kelas/${lesson.class_id}/materi/${lesson.material_id}`}><BookOpen size={16} aria-hidden="true" /><UiText>{"Buka materi sumber"}</UiText>{lesson.source_filename ? `: ${lesson.source_filename}` : ""}</Link>
           {lesson.quiz?.status === "completed" && <div className="guided-check-result" role="status"><CheckCircle2 size={20} aria-hidden="true" /><div><strong><UiText>{"Mini kuis selesai"}</UiText> · {Math.round((lesson.quiz.last_result?.cumulative_score ?? 0) * 100)}%</strong><p>{lesson.quiz.last_result?.feedback}</p></div></div>}
           {lesson.phase === "learning" ? <>
-            <form onSubmit={(event) => { event.preventDefault(); void act("question"); }} className="guided-question-form"><label className="field"><UiText>{"Ada yang belum jelas?"}</UiText><textarea value={draft} maxLength={4000} rows={3} onChange={(event) => setDraft(event.target.value)} disabled={busy || uncertain} placeholder={t("Tuliskan pertanyaan atau gunakan tombol suara.")} /></label><Button type="submit" disabled={busy || uncertain || !draft.trim()}><Send size={17} aria-hidden="true" /><UiText>{"Tanyakan pada Tutor"}</UiText></Button></form>
+            <form onSubmit={(event) => { event.preventDefault(); void act("question"); }} className="guided-question-form"><label className="field"><UiText>{"Ada yang belum jelas?"}</UiText><Textarea value={draft} maxLength={4000} rows={3} onChange={(event) => setDraft(event.target.value)} disabled={busy || uncertain} placeholder={t("Tuliskan pertanyaan atau gunakan tombol suara.")} /></label><Button type="submit" disabled={busy || uncertain || !draft.trim()}><Send size={17} aria-hidden="true" /><UiText>{"Tanyakan pada Tutor"}</UiText></Button></form>
             <footer className="guided-actions" aria-label={t("Langkah belajar berikutnya")}>{Object.entries(actions).filter(([action]) => lesson.available_actions.includes(action)).map(([action, { label, Icon }]) => <Button key={action} type="button" variant={action === "continue" || action === "finish" ? "default" : "outline"} disabled={busy || uncertain} onClick={() => void act(action)}><Icon size={17} aria-hidden="true" />{t(label)}</Button>)}</footer>
           </> : <div className="guided-check-result" role="status"><CheckCircle2 size={20} aria-hidden="true" /><UiText>{"Sesi belajar selesai. Pilih materi lain untuk melanjutkan."}</UiText></div>}
         </Card>}

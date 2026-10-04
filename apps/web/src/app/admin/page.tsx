@@ -1,4 +1,6 @@
 
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+
 import { UiText, UiDate } from "@/components/language-provider";
 import Link from "next/link";
 import {
@@ -90,19 +92,19 @@ export default async function AdminPage() {
           </Link>
         </div>
         {users.length ? (
-          <table>
-            <thead>
-              <tr>
-                <th><UiText>{"Pengguna"}</UiText></th>
-                <th><UiText>{"Peran"}</UiText></th>
-                <th><UiText>{"Bergabung"}</UiText></th>
-                <th><UiText>{"Status"}</UiText></th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead><UiText>{"Pengguna"}</UiText></TableHead>
+                <TableHead><UiText>{"Peran"}</UiText></TableHead>
+                <TableHead><UiText>{"Bergabung"}</UiText></TableHead>
+                <TableHead><UiText>{"Status"}</UiText></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {users.slice(0, 5).map((u) => (
-                <tr key={u.id}>
-                  <td>
+                <TableRow key={u.id}>
+                  <TableCell>
                     <Link
                       className="user-link"
                       href={`/admin/pengguna/${u.id}`}
@@ -115,18 +117,18 @@ export default async function AdminPage() {
                         <small>@{u.username}</small>
                       </span>
                     </Link>
-                  </td>
-                  <td data-label="Peran">{<UiText>{roleLabel[u.role]}</UiText>}</td>
-                  <td data-label="Bergabung">{<UiDate value={u.created_at} />}</td>
-                  <td>
+                  </TableCell>
+                  <TableCell data-label="Peran">{<UiText>{roleLabel[u.role]}</UiText>}</TableCell>
+                  <TableCell data-label="Bergabung">{<UiDate value={u.created_at} />}</TableCell>
+                  <TableCell>
                     <Badge active={u.is_active}>
                       {u.is_active ? <UiText>{"Aktif"}</UiText> : <UiText>{"Nonaktif"}</UiText>}
                     </Badge>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         ) : (
           <Empty title={<UiText>{"Belum ada pengguna"}</UiText>}><UiText>{"Tambahkan akun untuk mulai menyiapkan akses sekolah."}</UiText></Empty>
         )}

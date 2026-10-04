@@ -1,4 +1,7 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+
 import { UiText, useI18n } from "@/components/language-provider";
 
 
@@ -208,22 +211,22 @@ export function StudentQuiz({ materials = [], initialSession = null, embedded = 
           <h2><UiText>{"Asesmen mandiri"}</UiText></h2>
           <p><UiText>{"Jawab dengan kata-katamu sendiri. Tutor akan memberi umpan balik di setiap langkah, bukan sekadar nilai akhir."}</UiText></p>
           <form className="quiz-settings" onSubmit={(event) => void startQuiz(event)}>
-            <label className="field"><UiText>{"Materi belajar"}</UiText><select value={materialId} onChange={(event) => setMaterialId(event.target.value)} disabled={phase === "starting"} required>
+            <label className="field"><UiText>{"Materi belajar"}</UiText><NativeSelect value={materialId} onChange={(event) => setMaterialId(event.target.value)} disabled={phase === "starting"} required>
               <option value=""><UiText>{"Pilih materi"}</UiText></option>
               {materials.map((item) => <option value={item.id} key={item.id} disabled={item.rag_status !== "ready" || item.content_version !== item.indexed_version}>{item.subject} · {item.title}</option>)}
-            </select></label>
-            <label className="field"><UiText>{"Jumlah soal"}</UiText><select value={count} onChange={(event) => setCount(event.target.value)} disabled={phase === "starting"}>
+            </NativeSelect></label>
+            <label className="field"><UiText>{"Jumlah soal"}</UiText><NativeSelect value={count} onChange={(event) => setCount(event.target.value)} disabled={phase === "starting"}>
                 <option value="3"><UiText>{"3 soal · cepat"}</UiText></option>
                 <option value="5"><UiText>{"5 soal · seimbang"}</UiText></option>
                 <option value="10"><UiText>{"10 soal · mendalam"}</UiText></option>
-              </select>
+              </NativeSelect>
             </label>
-            <label className="field"><UiText>{"Tingkat tantangan"}</UiText><select value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={phase === "starting"}>
+            <label className="field"><UiText>{"Tingkat tantangan"}</UiText><NativeSelect value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={phase === "starting"}>
                 <option value="adaptive"><UiText>{"Adaptif sesuai progres"}</UiText></option>
                 <option value="easy"><UiText>{"Santai"}</UiText></option>
                 <option value="medium"><UiText>{"Seimbang"}</UiText></option>
                 <option value="hard"><UiText>{"Menantang"}</UiText></option>
-              </select>
+              </NativeSelect>
             </label>
             <button className="button primary quiz-start-button" type="submit" disabled={phase === "starting" || !materialId}>
               {phase === "starting" ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Lightbulb size={18} aria-hidden="true" />}
@@ -288,7 +291,7 @@ export function StudentQuiz({ materials = [], initialSession = null, embedded = 
                     ))}
                   </fieldset>
                 ) : (
-                  <label className="field quiz-answer-field"><UiText>{"Jawabanmu"}</UiText><textarea rows={4} maxLength={4000} value={answer} onChange={(event) => changeAnswer(event.target.value)} disabled={answerLocked} placeholder={t("Jelaskan dengan kata-katamu sendiri…")} />
+                  <label className="field quiz-answer-field"><UiText>{"Jawabanmu"}</UiText><Textarea rows={4} maxLength={4000} value={answer} onChange={(event) => changeAnswer(event.target.value)} disabled={answerLocked} placeholder={t("Jelaskan dengan kata-katamu sendiri…")} />
                   </label>
                 )}
                 <div className="quiz-answer-footer">

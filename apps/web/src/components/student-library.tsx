@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+
 import { UiText, useI18n } from "@/components/language-provider";
 
 import Link from "next/link";
@@ -43,7 +46,7 @@ export function StudentLibrary({
         <label className="field library-search">
           <span>
             <Search size={16} aria-hidden="true" /><UiText>{"Cari materi"}</UiText></span>
-          <input
+          <Input
             type="search"
             placeholder={t("Judul, kelas, atau mata pelajaran")}
             value={query}
@@ -53,7 +56,7 @@ export function StudentLibrary({
             }}
           />
         </label>
-        <label className="field"><UiText>{"Kelas"}</UiText><select
+        <label className="field"><UiText>{"Kelas"}</UiText><NativeSelect
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
@@ -66,9 +69,9 @@ export function StudentLibrary({
                 {name}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
-        <label className="field"><UiText>{"Status bacaan"}</UiText><select
+        <label className="field"><UiText>{"Status bacaan"}</UiText><NativeSelect
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -79,7 +82,7 @@ export function StudentLibrary({
             <option value="pending"><UiText>{"Belum selesai"}</UiText></option>
             <option value="done"><UiText>{"Sudah dipelajari"}</UiText></option>
             <option value="saved"><UiText>{"Bookmark"}</UiText></option>
-          </select>
+          </NativeSelect>
         </label>
       </section>
       <p className="library-result" role="status">

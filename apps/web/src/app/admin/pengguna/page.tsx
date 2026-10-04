@@ -1,4 +1,8 @@
 
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+
 import { UiText } from "@/components/language-provider";
 import Link from "next/link";
 import { Plus, Search, ArrowUpRight } from "lucide-react";
@@ -43,7 +47,7 @@ export default async function UsersPage({
           <label htmlFor="q"><UiText>{"Cari pengguna"}</UiText></label>
           <div>
             <Search size={18} aria-hidden="true" />
-            <input
+            <Input
               name="q"
               id="q"
               defaultValue={q}
@@ -54,14 +58,14 @@ export default async function UsersPage({
         </div>
         <div className="field">
           <label htmlFor="role"><UiText>{"Peran"}</UiText></label>
-          <select id="role" name="role" defaultValue={role}>
+          <NativeSelect id="role" name="role" defaultValue={role}>
             <option value=""><UiText>{"Semua peran"}</UiText></option>
             {Object.entries(roleLabel).map(([value, label]) => (
               <option value={value} key={value}>
                 {label}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
         <button className="button secondary" type="submit"><UiText>{"Terapkan"}</UiText></button>
         {(q || role) && (
@@ -74,19 +78,19 @@ export default async function UsersPage({
           </h2>
         </div>
         {users.length ? (
-          <table>
-            <thead>
-              <tr>
-                <th><UiText>{"Nama pengguna"}</UiText></th>
-                <th><UiText>{"Peran"}</UiText></th>
-                <th><UiText>{"Status"}</UiText></th>
-                <th><UiText>{"Aksi"}</UiText></th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead><UiText>{"Nama pengguna"}</UiText></TableHead>
+                <TableHead><UiText>{"Peran"}</UiText></TableHead>
+                <TableHead><UiText>{"Status"}</UiText></TableHead>
+                <TableHead><UiText>{"Aksi"}</UiText></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {users.map((u) => (
-                <tr key={u.id}>
-                  <td>
+                <TableRow key={u.id}>
+                  <TableCell>
                     <div className="user-link">
                       <span className="avatar" aria-hidden="true">
                         {u.full_name.slice(0, 1)}
@@ -96,25 +100,25 @@ export default async function UsersPage({
                         <small>@{u.username}</small>
                       </span>
                     </div>
-                  </td>
-                  <td data-label="Peran">{<UiText>{roleLabel[u.role]}</UiText>}</td>
-                  <td>
+                  </TableCell>
+                  <TableCell data-label="Peran">{<UiText>{roleLabel[u.role]}</UiText>}</TableCell>
+                  <TableCell>
                     <Badge active={u.is_active}>
                       {u.is_active ? <UiText>{"Aktif"}</UiText> : <UiText>{"Nonaktif"}</UiText>}
                     </Badge>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <Link
                       className="text-link"
                       href={`/admin/pengguna/${u.id}`}
                       aria-label={`Kelola ${u.full_name}`}
                     ><UiText>{"Kelola"}</UiText><ArrowUpRight size={16} aria-hidden="true" />
                     </Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         ) : (
           <Empty
             title={

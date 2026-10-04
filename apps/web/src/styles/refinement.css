@@ -71,7 +71,6 @@
 .voice-panel-compact .voice-panel-heading > .icon-button { margin-left: auto; }
 .voice-panel-compact .voice-status:empty { display: none; }
 .experience-button:focus-visible,.toolbar-language:focus-visible,.kodmod-switch:focus-visible,.voice-guide-button:focus-visible,.voice-preview-button:focus-visible,.voice-setting-row select:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }
-html[data-low-vision=true] { font-size: 19px; }
 html[data-low-vision=true] .muted,html[data-low-vision=true] .field small,html[data-low-vision=true] .voice-setting-row small { color: #324c70; }
 @media (max-width: 1100px) { .landing-refined .lp-desktop-nav { display: none; } .landing-refined .lp-mobile-nav { display: block; } .landing-refined .lp-nav-wrap { gap: 16px; } .lp-capability-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 760px) { .landing-refined .lp-hero-layout { grid-template-columns: 1fr; min-height: auto; padding-top: 48px; padding-bottom: 36px; } .landing-refined .lp-hero h1 { font-size: clamp(2rem,7vw,3.2rem); } .landing-refined .lp-hero-visual { max-width: 480px; margin: 20px auto 0; width: 100%; } .landing-refined .lp-floating { padding: 10px 12px; font-size: .8rem; } .landing-refined .lp-section { padding-block: 60px; } .workspace-header { gap: 12px; flex-wrap: wrap; } .account { flex-wrap: wrap; gap: 10px; } .auth-topbar { margin-bottom: 24px; } }

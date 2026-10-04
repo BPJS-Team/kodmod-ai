@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+
 import { UiText } from "@/components/language-provider";
 
 
@@ -91,7 +94,7 @@ export function LoginForm() {
     >
       <div className="field">
         <label htmlFor="username"><UiText>{"Username"}</UiText></label>
-        <input
+        <Input
           id="username"
           name="username"
           value={username}
@@ -145,7 +148,7 @@ export function UserForm({
       <div className="form-grid">
         <div className="field">
           <label htmlFor="full_name"><UiText>{"Nama lengkap"}</UiText></label>
-          <input
+          <Input
             id="full_name"
             name="full_name"
             required
@@ -157,7 +160,7 @@ export function UserForm({
         </div>
         <div className="field">
           <label htmlFor="username"><UiText>{"Username"}</UiText></label>
-          <input
+          <Input
             id="username"
             name="username"
             required
@@ -180,7 +183,7 @@ export function UserForm({
         </div>
         <div className="field">
           <label htmlFor="role"><UiText>{"Peran"}</UiText></label>
-          <select
+          <NativeSelect
             id="role"
             name="role"
             value={role}
@@ -192,7 +195,7 @@ export function UserForm({
                 <UiText>{t}</UiText>
               </option>
             ))}
-          </select>
+          </NativeSelect>
           {self && <input type="hidden" name="role" value="admin" />}
         </div>
         {!user && (

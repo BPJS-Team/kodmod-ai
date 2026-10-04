@@ -1,4 +1,8 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import { UiText, useI18n, UiDate } from "@/components/language-provider";
 
 
@@ -260,7 +264,7 @@ export function QuizWorkspace({
                 <section className="editorial-proposal" aria-label={t("Usulan soal dari materi")}>
                   <h3><UiText>{"Usulkan soal dari materi"}</UiText></h3>
                   <p><UiText>{"Soal yang dibuat tetap perlu Anda tinjau sebelum diajukan untuk review dan diterbitkan."}</UiText></p>
-                  <div className="quiz-settings"><label className="field"><UiText>{"Materi sumber"}</UiText><select value={proposalMaterial} onChange={(event) => setProposalMaterial(event.target.value)} disabled={busy}><option value=""><UiText>{"Pilih materi"}</UiText></option>{materials.filter((row) => !row.is_archived).map((row) => <option key={row.id} value={row.id}>{row.class_name} · {row.title}</option>)}</select></label><label className="field"><UiText>{"Jumlah soal"}</UiText><select value={proposalCount} onChange={(event) => setProposalCount(event.target.value)} disabled={busy}><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></label></div>
+                  <div className="quiz-settings"><label className="field"><UiText>{"Materi sumber"}</UiText><NativeSelect value={proposalMaterial} onChange={(event) => setProposalMaterial(event.target.value)} disabled={busy}><option value=""><UiText>{"Pilih materi"}</UiText></option>{materials.filter((row) => !row.is_archived).map((row) => <option key={row.id} value={row.id}>{row.class_name} · {row.title}</option>)}</NativeSelect></label><label className="field"><UiText>{"Jumlah soal"}</UiText><NativeSelect value={proposalCount} onChange={(event) => setProposalCount(event.target.value)} disabled={busy}><option value="3">3</option><option value="5">5</option><option value="10">10</option></NativeSelect></label></div>
                   <button type="button" className="button secondary" disabled={busy || !proposalMaterial} onClick={() => {
                     const source = materials.find((row) => row.id === proposalMaterial);
                     if (!source) return;
@@ -270,7 +274,7 @@ export function QuizWorkspace({
                     }, "Usulan soal siap ditinjau. Belum diterbitkan ke siswa.");
                   }}><Sparkles size={17} aria-hidden="true" /><UiText>{"Buat usulan soal"}</UiText></button>
                 </section>
-                <label className="field"><UiText>{"Judul kuis"}</UiText><input
+                <label className="field"><UiText>{"Judul kuis"}</UiText><Input
                     value={title}
                     onChange={(e) => {
                       setTitle(e.target.value);
@@ -282,7 +286,7 @@ export function QuizWorkspace({
                     placeholder={t("Contoh: Memahami pecahan di sekitar kita")}
                   />
                 </label>
-                <label className="field"><UiText>{"Deskripsi"}</UiText><textarea
+                <label className="field"><UiText>{"Deskripsi"}</UiText><Textarea
                     rows={3}
                     value={description}
                     onChange={(e) => {
@@ -295,7 +299,7 @@ export function QuizWorkspace({
                   />
                 </label>
                 <div className="editorial-two-fields">
-                  <label className="field"><UiText>{"Mata pelajaran"}</UiText><select
+                  <label className="field"><UiText>{"Mata pelajaran"}</UiText><NativeSelect
                       value={subjectId}
                       onChange={(e) => {
                         setSubjectId(e.target.value);
@@ -313,9 +317,9 @@ export function QuizWorkspace({
                           {s.name}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </label>
-                  <label className="field"><UiText>{"Pembahasan untuk siswa"}</UiText><select
+                  <label className="field"><UiText>{"Pembahasan untuk siswa"}</UiText><NativeSelect
                       value={release}
                       onChange={(e) => {
                         setRelease(e.target.value as typeof release);
@@ -325,12 +329,12 @@ export function QuizWorkspace({
                     >
                       <option value="after_submission"><UiText>{"Setelah jawaban dikirim"}</UiText></option>
                       <option value="after_due"><UiText>{"Setelah batas pengumpulan"}</UiText></option>
-                    </select>
+                    </NativeSelect>
                   </label>
                 </div>
                 <details className="editorial-details">
                   <summary><UiText>{"Tambah mata pelajaran"}</UiText></summary>
-                  <label className="field"><UiText>{"Nama mata pelajaran baru"}</UiText><input
+                  <label className="field"><UiText>{"Nama mata pelajaran baru"}</UiText><Input
                       value={newSubject}
                       onChange={(e) => setNewSubject(e.target.value)}
                       maxLength={120}
@@ -423,7 +427,7 @@ export function QuizWorkspace({
                         <Trash2 size={16} aria-hidden="true" />
                       </button>
                     </div>
-                    <label className="field"><UiText>{"Pertanyaan"}</UiText><textarea
+                    <label className="field"><UiText>{"Pertanyaan"}</UiText><Textarea
                         rows={3}
                         value={q.prompt}
                         onChange={(e) =>
@@ -456,7 +460,7 @@ export function QuizWorkspace({
                             <span className="sr-only"><UiText>{"Isi pilihan "}</UiText>{String.fromCharCode(65 + oi)}<UiText>{" soal"}</UiText>{" "}
                               {index + 1}
                             </span>
-                            <input
+                            <Input
                               value={option.label}
                               required
                               maxLength={1000}
@@ -518,7 +522,7 @@ export function QuizWorkspace({
                       }
                     >
                       <Plus size={15} aria-hidden="true" /><UiText>{"Tambah pilihan"}</UiText></button>
-                    <label className="field"><UiText>{"Pembahasan"}</UiText><textarea
+                    <label className="field"><UiText>{"Pembahasan"}</UiText><Textarea
                         rows={3}
                         maxLength={4000}
                         value={q.explanation}
@@ -530,7 +534,7 @@ export function QuizWorkspace({
                       />
                     </label>
                     <div className="editorial-two-fields">
-                      <label className="field"><UiText>{"Tingkat kesulitan"}</UiText><select
+                      <label className="field"><UiText>{"Tingkat kesulitan"}</UiText><NativeSelect
                           value={q.difficulty}
                           onChange={(e) =>
                             change(index, {
@@ -543,13 +547,13 @@ export function QuizWorkspace({
                           <option value="easy"><UiText>{"Mudah"}</UiText></option>
                           <option value="medium"><UiText>{"Sedang"}</UiText></option>
                           <option value="hard"><UiText>{"Sulit"}</UiText></option>
-                        </select>
+                        </NativeSelect>
                       </label>
                       <span className="editorial-help"><UiText>{"Nilai setiap soal berbobot sama. Belum ada batas waktu per soal."}</UiText></span>
                     </div>
                     <details className="editorial-details">
                       <summary><UiText>{"Narasi alternatif untuk audio"}</UiText></summary>
-                      <label className="field"><UiText>{"Narasi soal"}</UiText><textarea
+                      <label className="field"><UiText>{"Narasi soal"}</UiText><Textarea
                           rows={3}
                           maxLength={6000}
                           value={q.narration}
@@ -692,7 +696,7 @@ export function QuizWorkspace({
                   }}
                   className="editorial-assignment-form"
                 >
-                  <label className="field"><UiText>{"Kelas tujuan"}</UiText><select
+                  <label className="field"><UiText>{"Kelas tujuan"}</UiText><NativeSelect
                       required
                       value={classId}
                       onChange={(e) => setClassId(e.target.value)}
@@ -706,17 +710,17 @@ export function QuizWorkspace({
                             {c.name} · {c.subject}
                           </option>
                         ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                   <div className="editorial-two-fields">
-                    <label className="field"><UiText>{"Dibuka pada (waktu perangkat)"}</UiText><input
+                    <label className="field"><UiText>{"Dibuka pada (waktu perangkat)"}</UiText><Input
                         type="datetime-local"
                         value={opens}
                         onChange={(e) => setOpens(e.target.value)}
                         disabled={busy || dirty}
                       />
                     </label>
-                    <label className="field"><UiText>{"Batas pengumpulan (waktu perangkat)"}</UiText><input
+                    <label className="field"><UiText>{"Batas pengumpulan (waktu perangkat)"}</UiText><Input
                         type="datetime-local"
                         value={due}
                         onChange={(e) => setDue(e.target.value)}
@@ -795,7 +799,7 @@ export function QuizWorkspace({
             </ol>
             {owner ? (
               <div className="editorial-lifecycle-actions">
-                <label className="field"><UiText>{"Reviewer"}</UiText><select
+                <label className="field"><UiText>{"Reviewer"}</UiText><NativeSelect
                     value={reviewer}
                     onChange={(e) => setReviewer(e.target.value)}
                     disabled={busy || dirty || state !== "draft"}
@@ -808,7 +812,7 @@ export function QuizWorkspace({
                           {r.full_name}
                         </option>
                       ))}
-                  </select>
+                  </NativeSelect>
                 </label>
                 {draft && state === "draft" && (
                   <>
@@ -876,7 +880,7 @@ export function QuizWorkspace({
               </div>
             ) : (
               <div className="editorial-lifecycle-actions">
-                <label className="field"><UiText>{"Catatan review"}</UiText><textarea
+                <label className="field"><UiText>{"Catatan review"}</UiText><Textarea
                     rows={4}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
@@ -915,7 +919,7 @@ export function QuizWorkspace({
                 {admin && state === "in_review" && (
                   <details className="editorial-details">
                     <summary><UiText>{"Ganti reviewer"}</UiText></summary>
-                    <label className="field"><UiText>{"Reviewer pengganti"}</UiText><select
+                    <label className="field"><UiText>{"Reviewer pengganti"}</UiText><NativeSelect
                         value={reviewer}
                         onChange={(e) => setReviewer(e.target.value)}
                         disabled={busy}
@@ -928,7 +932,7 @@ export function QuizWorkspace({
                               {r.full_name}
                             </option>
                           ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     <button
                       type="button"

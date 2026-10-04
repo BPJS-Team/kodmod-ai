@@ -1,4 +1,6 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+
 import { useState, useSyncExternalStore } from "react";
 import { Volume2, VolumeX, Settings2, Square, Pause, Play } from "lucide-react";
 import { useI18n } from "./language-provider";
@@ -23,12 +25,12 @@ export function ExperienceToolbar() {
       aria-label={t(output.status === "paused" ? "Putar lagi" : "Jeda")} onClick={() => void speechOutput.togglePause()}>
       {output.status === "paused" ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>
       <button className="experience-button" type="button" data-voice-ignore="true" aria-label={t("Hentikan suara")} onClick={() => speechOutput.stop()}><Square size={15} aria-hidden="true" /></button></>}
-    <select className="toolbar-language" data-voice-menu="language" aria-label={t("Bahasa")} value={language} disabled={pending}
+    <NativeSelect className="toolbar-language" data-voice-menu="language" aria-label={t("Bahasa")} value={language} disabled={pending}
       onChange={async event => { setPending(true); speechOutput.stop();
         try { await changeLanguage(event.target.value as "id" | "en"); setError(""); }
         catch { setError(t("Bahasa belum dapat disimpan. Coba lagi.")); } finally { setPending(false); } }}>
       <option value="id">ID</option><option value="en">EN</option>
-    </select>
+    </NativeSelect>
     <button type="button" className="experience-button" onClick={openVoicePreferences}
       data-voice-menu="sound" aria-label={t("Pengaturan suara")} title={t("Pengaturan suara")}><Settings2 size={18} aria-hidden="true" /></button>
     {error && <span role="status" className="toolbar-error">{error}</span>}

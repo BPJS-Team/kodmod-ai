@@ -1,3 +1,5 @@
+
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { ArrowRight, BookOpen } from "lucide-react";
 import { UiText } from "@/components/language-provider";
@@ -18,7 +20,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const href = (value: number) => `/admin/materi?page=${value}&search=${encodeURIComponent(search)}`;
   return <>
     <Heading title={<UiText>{"Materi kelas"}</UiText>} description={<UiText>{"Lihat materi guru, tinjau isi, dan kelola kesiapan belajar siswa."}</UiText>} />
-    <form className="panel admin-material-search" action="/admin/materi"><label className="field"><UiText>{"Cari judul materi"}</UiText><input name="search" defaultValue={search} maxLength={120} type="search" /></label><Button type="submit"><UiText>{"Cari"}</UiText></Button><span>{catalog.total} <UiText>{"materi"}</UiText></span></form>
+    <form className="panel admin-material-search" action="/admin/materi"><label className="field"><UiText>{"Cari judul materi"}</UiText><Input name="search" defaultValue={search} maxLength={120} type="search" /></label><Button type="submit"><UiText>{"Cari"}</UiText></Button><span>{catalog.total} <UiText>{"materi"}</UiText></span></form>
     {catalog.items.length ? <div className="admin-material-grid">{catalog.items.map((material) => <article className="panel admin-material-card" key={material.id}>
       <header><BookOpen size={22} aria-hidden="true" /><Badge active={material.published}>{material.published ? <UiText>{"Terbit"}</UiText> : <UiText>{"Draft"}</UiText>}</Badge></header>
       <h2>{material.title}</h2><p>{material.subject} · {material.class_name}</p><small>{material.teacher_name}</small>

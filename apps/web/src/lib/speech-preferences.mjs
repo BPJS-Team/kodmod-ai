@@ -2,7 +2,16 @@ export const SPEECH_ENGINE_PREFERENCE_KEY = "kodmod.speech-engine.v1";
 export const SPEECH_AUDIO_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const VOICE_SETTINGS_KEY = "kodmod.voice-settings.v2";
 export const DEFAULT_VOICE_SETTINGS = Object.freeze({ engine: "app", menuEnabled: true,
-  tutorEnabled: true, lowVision: false, guidedNavigation: false });
+  tutorEnabled: true, lowVision: false, guidedNavigation: false, fontScale: "default",
+  highContrast: false, spacious: false, reducedMotion: false });
+export const DISPLAY_COOKIE = "kodmod_display";
+
+export function parseDisplaySettings(value = {}) {
+  if (!value || typeof value !== "object") value = {};
+  const fontScale = ["default", "large", "extra-large"].includes(value.fontScale) ? value.fontScale : value.lowVision === true ? "large" : "default";
+  return { fontScale, lowVision: fontScale !== "default", highContrast: value.highContrast === true,
+    spacious: value.spacious === true, reducedMotion: value.reducedMotion === true };
+}
 
 const AUDIO_CACHE_VERSION = "kodmod-elevenlabs-v2";
 const inFlightAudio = new Map();
@@ -24,7 +33,7 @@ export function parseVoiceSettings(snapshot) {
     return { engine: value.engine,
       menuEnabled: typeof value.menuEnabled === "boolean" ? value.menuEnabled : true,
       tutorEnabled: typeof value.tutorEnabled === "boolean" ? value.tutorEnabled : true,
-      lowVision: value.lowVision === true, guidedNavigation: value.guidedNavigation === true };
+      ...parseDisplaySettings(value), guidedNavigation: value.guidedNavigation === true };
   } catch { return null; }
 }
 
@@ -32,6 +41,9 @@ export function writeVoiceSettings(value) {
   const parsed = parseVoiceSettings(JSON.stringify(value));
   if (!parsed) return false;
   memorySettings = JSON.stringify(parsed);
+  try {
+    if (typeof document !== "undefined") document.cookie = `${DISPLAY_COOKIE}=${encodeURIComponent(JSON.stringify(parseDisplaySettings(parsed)))}; Path=/; Max-Age=31536000; SameSite=Lax${globalThis.location?.protocol === "https:" ? "; Secure" : ""}`;
+  } catch { /* In-memory settings still apply when device storage is unavailable. */ }
   let saved = true;
   try { globalThis.localStorage.setItem(VOICE_SETTINGS_KEY, memorySettings); memorySettingsDirty = false; }
   catch { saved = false; memorySettingsDirty = true; }

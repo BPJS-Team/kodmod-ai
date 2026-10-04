@@ -13,6 +13,8 @@ import "@fontsource-variable/source-sans-3";
 import SkipLink from "@/components/SkipLink";
 import { LanguageProvider } from "@/components/language-provider";
 import { getServerI18n } from "@/lib/server-language";
+import { serverDisplaySettings } from "@/lib/server-display";
+import "../styles/accessibility.css";
 
 export const metadata: Metadata = {
   title: "KODMOD - Asisten Belajar",
@@ -21,12 +23,13 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const { language } = await getServerI18n();
+  const display = await serverDisplaySettings();
   return (
-    <html lang={language}>
+    <html lang={language} data-text-size={display.fontScale} data-high-contrast={String(display.highContrast)} data-spacious={String(display.spacious)} data-reduced-motion={String(display.reducedMotion)}>
       <body>
         <LanguageProvider initialLanguage={language}>
         <SkipLink />
-        <VoicePreferencesProvider>
+        <VoicePreferencesProvider initialDisplay={display}>
           {children}
           <Suspense fallback={null}>
             <RedirectFeedback />

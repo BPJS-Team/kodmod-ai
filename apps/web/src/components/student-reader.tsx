@@ -1,4 +1,6 @@
 "use client";
+import { NativeSelect } from "@/components/ui/native-select";
+
 import { UiText, useI18n } from "@/components/language-provider";
 
 import { useState } from "react";
@@ -99,7 +101,7 @@ export function StudentReader({
           <strong><UiText>{"Nyaman dibaca, sesuai kebutuhanmu."}</UiText></strong>
           <p><UiText>{"Pratinjau langsung di bawah. Simpan untuk memakai tampilan ini pada materi lain di browser yang sama."}</UiText></p>
         </div>
-        <label className="field"><UiText>{"Ukuran teks"}</UiText><select
+        <label className="field"><UiText>{"Ukuran teks"}</UiText><NativeSelect
             name="size"
             value={size}
             disabled={saving}
@@ -109,9 +111,9 @@ export function StudentReader({
             <option value="20"><UiText>{"Besar"}</UiText></option>
             <option value="24"><UiText>{"Lebih besar"}</UiText></option>
             <option value="28"><UiText>{"Sangat besar"}</UiText></option>
-          </select>
+          </NativeSelect>
         </label>
-        <label className="field"><UiText>{"Jarak baris"}</UiText><select
+        <label className="field"><UiText>{"Jarak baris"}</UiText><NativeSelect
             name="spacing"
             value={spacing}
             disabled={saving}
@@ -120,7 +122,7 @@ export function StudentReader({
             <option value="1.65"><UiText>{"Rapat"}</UiText></option>
             <option value="1.95"><UiText>{"Nyaman"}</UiText></option>
             <option value="2.3"><UiText>{"Lega"}</UiText></option>
-          </select>
+          </NativeSelect>
         </label>
         <label className="reader-contrast">
           <input

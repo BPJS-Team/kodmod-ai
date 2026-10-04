@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+
 
 import { useState } from "react";
 import {
@@ -267,7 +270,7 @@ export function AdminAiMonitor({
 
           <div className="ai-search-box">
             <Search size={16} aria-hidden="true" />
-            <input
+            <Input
               type="text"
               placeholder={t("Cari berdasarkan nama siswa atau sesi…")}
               value={searchQuery}
@@ -279,54 +282,54 @@ export function AdminAiMonitor({
         {/* Tabel Request Log */}
         {filteredRequests.length > 0 ? (
           <div className="table-responsive">
-            <table>
-              <thead>
-                <tr>
-                  <th><UiText>{"Waktu"}</UiText></th>
-                  <th><UiText>{"Provider & Layanan"}</UiText></th>
-                  <th><UiText>{"Model / Voice"}</UiText></th>
-                  <th><UiText>{"Siswa / Target"}</UiText></th>
-                  <th><UiText>{"Volume"}</UiText></th>
-                  <th><UiText>{"Latensi"}</UiText></th>
-                  <th><UiText>{"Status"}</UiText></th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead><UiText>{"Waktu"}</UiText></TableHead>
+                  <TableHead><UiText>{"Provider & Layanan"}</UiText></TableHead>
+                  <TableHead><UiText>{"Model / Voice"}</UiText></TableHead>
+                  <TableHead><UiText>{"Siswa / Target"}</UiText></TableHead>
+                  <TableHead><UiText>{"Volume"}</UiText></TableHead>
+                  <TableHead><UiText>{"Latensi"}</UiText></TableHead>
+                  <TableHead><UiText>{"Status"}</UiText></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredRequests.map((req) => (
-                  <tr key={req.id}>
-                    <td>
+                  <TableRow key={req.id}>
+                    <TableCell>
                       <span className="log-time">
                         <Clock size={13} aria-hidden="true" />
                         <UiDate value={req.timestamp} time empty="Baru saja" />
                       </span>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <div className="log-service-info">
                         <span className={`provider-badge ${req.provider.toLowerCase()}`}>
                           {req.provider}
                         </span>
                         <strong>{req.service}</strong>
                       </div>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <code className="model-code">{req.model}</code>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <div className="log-target-cell">
                         <strong>{req.actor_name}</strong>
                         <small>{req.target}</small>
                       </div>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <span className="log-units">{req.units}</span>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <span className="log-latency">
                         <Zap size={13} aria-hidden="true" />
                         {req.latency}
                       </span>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <span className={`log-status-tag ${req.status}`}>
                         {req.status === "success" ? (
                           <UiText>{"Sukses"}</UiText>
@@ -336,11 +339,11 @@ export function AdminAiMonitor({
                           <UiText>{"Gagal"}</UiText>
                         )}
                       </span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <div className="ai-logs-empty">

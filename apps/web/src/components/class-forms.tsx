@@ -1,4 +1,8 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+
 import { UiText, useI18n } from "@/components/language-provider";
 
 import { useState } from "react";
@@ -32,7 +36,7 @@ export function ClassForm({ subjects = [] }: { subjects?: CurriculumSubject[] })
       className="panel form-panel form-stack"
     >
       <ActionFeedback state={state} />
-      <label className="field"><UiText>{"Nama kelas"}</UiText><input
+      <label className="field"><UiText>{"Nama kelas"}</UiText><Input
           required
           name="name"
           maxLength={120}
@@ -41,7 +45,7 @@ export function ClassForm({ subjects = [] }: { subjects?: CurriculumSubject[] })
           onChange={(e) => setValues({ ...values, name: e.target.value })}
         />
       </label>
-      <label className="field"><UiText>{"Mata pelajaran"}</UiText><input
+      <label className="field"><UiText>{"Mata pelajaran"}</UiText><Input
           required
           name="subject"
           maxLength={120}
@@ -50,11 +54,11 @@ export function ClassForm({ subjects = [] }: { subjects?: CurriculumSubject[] })
           onChange={(e) => setValues({ ...values, subject: e.target.value })}
         />
       </label>
-      <label className="field"><UiText>{"Hubungkan mata pelajaran"}</UiText><select name="subject_id" onChange={event => {
+      <label className="field"><UiText>{"Hubungkan mata pelajaran"}</UiText><NativeSelect name="subject_id" onChange={event => {
         const subject = subjects.find(row => row.id === event.target.value);
         if (subject) setValues(previous => ({ ...previous, subject: subject.name }));
-      }}><option value=""><UiText>{"Pilih nanti"}</UiText></option>{subjects.map(subject => <option value={subject.id} key={subject.id}>{subject.name}</option>)}</select></label>
-      <label className="field"><UiText>{"Tentang kelas"}</UiText><textarea
+      }}><option value=""><UiText>{"Pilih nanti"}</UiText></option>{subjects.map(subject => <option value={subject.id} key={subject.id}>{subject.name}</option>)}</NativeSelect></label>
+      <label className="field"><UiText>{"Tentang kelas"}</UiText><Textarea
           name="description"
           rows={4}
           maxLength={2000}
@@ -116,7 +120,7 @@ export function ClassAction({
       <input type="hidden" name="mode" value={mode} />
       {studentId && <input type="hidden" name="studentId" value={studentId} />}
       {mode === "add-member" && (
-        <label className="field"><UiText>{"Username siswa"}</UiText><input
+        <label className="field"><UiText>{"Username siswa"}</UiText><Input
             name="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -243,7 +247,7 @@ export function MaterialForm({
       const source = typeof result.filename === "string" ? result.filename : record.filename;
       setSourceFilename(`${source}${selection ? ` · ${t("Halaman {first}–{last}", selection)}` : ""}`.slice(0, 300));
       if (!selection) setBook(null);
-      const warnings = Array.isArray(result.warnings) ? result.warnings.filter((item: unknown) => typeof item === "string").join(" ") : "";
+      const warnings = Array.isArray(result.warnings) ? result.warnings.filter((item: unknown): item is string => typeof item === "string").map(item => t(item)).join(" ") : "";
       setImportNotice(`${t("Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.")}${warnings ? ` ${warnings}` : ""}`);
       await notifyResult("Dokumen siap ditinjau di editor.");
   }
@@ -296,7 +300,7 @@ export function MaterialForm({
           </div>
         </section>
       )}
-      <label className="field"><UiText>{"Judul materi"}</UiText><input
+      <label className="field"><UiText>{"Judul materi"}</UiText><Input
           required
           maxLength={200}
           name="title"
@@ -326,7 +330,7 @@ export function MaterialForm({
           <legend>{t("Pilih bagian buku")}</legend>
           <p>{book.filename} · {t("{count} halaman", { count: book.totalPages })}</p>
           <label className="field">{t("Saran pembagian")}
-            <select value={sectionChoice} onChange={event => {
+            <NativeSelect value={sectionChoice} onChange={event => {
               const next = event.target.value; setSectionChoice(next);
               const section = book.sections[Number(next)];
               if (next !== "" && section) setPageRange({ first: String(section.first), last: String(Math.min(section.last, section.first + 149)) });
@@ -334,12 +338,12 @@ export function MaterialForm({
               <option value="">{t("Pilih halaman sendiri")}</option>
               {book.sections.map((section, index) => <option key={`${section.first}-${index}`} value={String(index)}>
                 {section.title} · {t("Halaman {first}–{last}", section)}</option>)}
-            </select>
+            </NativeSelect>
           </label>
           <div className="book-import-range">
-            <label className="field">{t("Halaman awal")}<input type="number" min={1} max={book.totalPages} value={pageRange.first}
+            <label className="field">{t("Halaman awal")}<Input type="number" min={1} max={book.totalPages} value={pageRange.first}
               onChange={event => { setSectionChoice(""); setPageRange({ ...pageRange, first: event.target.value }); }} /></label>
-            <label className="field">{t("Halaman akhir")}<input type="number" min={1} max={book.totalPages} value={pageRange.last}
+            <label className="field">{t("Halaman akhir")}<Input type="number" min={1} max={book.totalPages} value={pageRange.last}
               onChange={event => { setSectionChoice(""); setPageRange({ ...pageRange, last: event.target.value }); }} /></label>
           </div>
           <small>{t("Gunakan nomor halaman PDF, termasuk sampul. Maksimal 150 halaman dan 100.000 karakter per materi. Bab yang panjang bisa dibagi lagi.")}</small>
@@ -355,7 +359,7 @@ export function MaterialForm({
         {importError && <p className="alert error-message" role="alert">{t(importError)}</p>}
       </section>
       <MaterialImportHistory classId={classId} refreshKey={importRefresh} onPreview={applyPreview} />
-      <label className="field"><UiText>{"Isi materi"}</UiText><textarea
+      <label className="field"><UiText>{"Isi materi"}</UiText><Textarea
           className="material-editor"
           required
           maxLength={100000}
@@ -370,14 +374,14 @@ export function MaterialForm({
           {content.length.toLocaleString("id-ID")}<UiText>{"/ 100.000 karakter"}</UiText></small>
         <small><UiText>{"Setelah disimpan, isi materi disiapkan untuk Tutor. Hanya materi terbit yang dapat digunakan siswa anggota kelas."}</UiText></small>
       </label>
-      <label className="field"><UiText>{"Visibilitas"}</UiText><select
+      <label className="field"><UiText>{"Visibilitas"}</UiText><NativeSelect
           name="published"
           value={published ? "yes" : "no"}
           onChange={(e) => setPublished(e.target.value === "yes")}
         >
           <option value="no"><UiText>{"Draft • hanya guru"}</UiText></option>
           <option value="yes"><UiText>{"Terbit • anggota kelas"}</UiText></option>
-        </select>
+        </NativeSelect>
       </label>
       <button className="button primary" disabled={pending || importing}>
         {pending ? <UiText>{"Menyimpan…"}</UiText> : <UiText>{"Simpan materi"}</UiText>}

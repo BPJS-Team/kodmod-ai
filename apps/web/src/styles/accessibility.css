@@ -1,0 +1,24 @@
+/* Shared, customized shadcn controls and opt-in display preferences. */
+.kodmod-input,.kodmod-select,.kodmod-textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: .75rem .9rem; background: var(--white); color: var(--ink); font: inherit; transition: border-color .16s, box-shadow .16s; }
+.kodmod-textarea { resize: vertical; min-height: 7rem; }
+.kodmod-input:disabled,.kodmod-select:disabled,.kodmod-textarea:disabled { opacity: .7; cursor: not-allowed; }
+.kodmod-input[aria-invalid=true],.kodmod-textarea[aria-invalid=true] { border-color: #b42318; }
+.kodmod-dropdown-content.profile-dropdown-menu { position: relative; top: auto; right: auto; z-index: 160; width: min(20rem,calc(100vw - 24px)); max-height: var(--radix-dropdown-menu-content-available-height); overflow-y: auto; }
+.profile-dropdown-item[data-highlighted] { background: #edf5ff; outline: 3px solid var(--blue); outline-offset: -3px; }
+.profile-dropdown-item[data-disabled] { opacity: .6; pointer-events: none; }
+.kodmod-dialog { max-width: calc(100vw - 24px); }
+html[data-text-size=large] { font-size: 125%; }
+html[data-text-size=extra-large] { font-size: 150%; }
+html[data-spacious=true] :where(p,li,label,.material-reader,.guided-explanation,.voice-preferences-content) { line-height: 1.95; letter-spacing: .015em; word-spacing: .05em; }
+html[data-text-size]:not([data-text-size=default]) :where(.workspace-header,.account,.toolbar,.guided-actions,.material-status-actions) { flex-wrap: wrap; }
+html[data-text-size]:not([data-text-size=default]) :where(.nav-link,.profile-dropdown-text,.admin-nav-link) { white-space: normal; overflow-wrap: anywhere; }
+html[data-high-contrast=true] { --ink: #06172c; --muted: #263f5d; --line: #5e7896; --canvas: #fff; --blue: #10469b; --white: #fff; }
+html[data-high-contrast=true] :where(.panel,.card,.voice-preferences-content,.voice-preferences-actions,.profile-dropdown-menu,.material-import-history,.import-records li,.guided-explanation,.material-reader,.admin-material-form) { background: #fff !important; color: #06172c !important; border-color: #5e7896 !important; }
+html[data-high-contrast=true] :where(.panel,.card,.voice-preferences-content,.profile-dropdown-menu,.material-reader) :where(p,small,label,h2,h3,h4) { color: #06172c !important; }
+html[data-high-contrast=true] :where(.muted,.field small,.voice-setting-row small) { color: #263f5d !important; opacity: 1; }
+html[data-high-contrast=true] .button.primary { background: #10469b !important; color: #fff !important; }
+html[data-high-contrast=true] .button.secondary { background: #fff !important; color: #10469b !important; border-color: #10469b !important; }
+html[data-high-contrast=true] :focus-visible { outline: 3px solid #10469b; outline-offset: 4px; box-shadow: 0 0 0 2px #fff; }
+html[data-reduced-motion=true] *,html[data-reduced-motion=true] *::before,html[data-reduced-motion=true] *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+@media (forced-colors: active) { .panel,.card,.kodmod-input,.kodmod-select,.kodmod-textarea { border: 1px solid CanvasText; } :focus-visible { outline-color: Highlight; } }

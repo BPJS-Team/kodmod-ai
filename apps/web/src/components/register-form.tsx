@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+
 import { useState } from "react";
 import Link from "next/link";
 import { register } from "@/app/actions";
@@ -33,7 +36,7 @@ export function RegisterForm() {
         ].map(({ key, label, max }) => (
           <div className="field" key={key}>
             <label htmlFor={key}>{t(label)}</label>
-            <input
+            <Input
               id={key}
               name={key}
               value={fields[key]}
@@ -52,7 +55,7 @@ export function RegisterForm() {
         ))}
         <div className="field">
           <label htmlFor="role">{t("Daftar sebagai")}</label>
-          <select
+          <NativeSelect
             id="role"
             name="role"
             value={fields.role}
@@ -60,7 +63,7 @@ export function RegisterForm() {
           >
             <option value="student">{t("Siswa")}</option>
             <option value="teacher">{t("Guru")}</option>
-          </select>
+          </NativeSelect>
         </div>
       </div>
       <Password label="Kata sandi" autoComplete="new-password" minLength={8} />

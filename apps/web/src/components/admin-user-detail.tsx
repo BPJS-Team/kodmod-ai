@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+
 
 import { useState } from "react";
 import Link from "next/link";
@@ -209,7 +212,7 @@ export function AdminUserDetail({
             <div className="form-grid-stacked">
               <div className="field">
                 <label htmlFor="full_name"><UiText>{"Nama lengkap"}</UiText></label>
-                <input
+                <Input
                   id="full_name"
                   name="full_name"
                   required
@@ -223,7 +226,7 @@ export function AdminUserDetail({
 
               <div className="field">
                 <label htmlFor="username"><UiText>{"Username"}</UiText></label>
-                <input
+                <Input
                   id="username"
                   name="username"
                   value={user.username}
@@ -237,7 +240,7 @@ export function AdminUserDetail({
 
               <div className="field">
                 <label htmlFor="role"><UiText>{"Peran pengguna"}</UiText></label>
-                <select
+                <NativeSelect
                   id="role"
                   name="role"
                   value={role}
@@ -249,7 +252,7 @@ export function AdminUserDetail({
                       {t(lbl)}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
                 {self ? (
                   <>
                     <input type="hidden" name="role" value="admin" />
