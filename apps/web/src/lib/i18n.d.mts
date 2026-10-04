@@ -4,4 +4,4 @@ export const languages: Language[];
 export const english: Record<string, string>;
 export function validLanguage(value: unknown): value is Language;
 export function localeFor(language: Language): "id-ID" | "en-US";
-export function translate(text: string, language?: Language): string;
+export function translate(text: string, language?: Language, values?: Record<string, string | number>): string;

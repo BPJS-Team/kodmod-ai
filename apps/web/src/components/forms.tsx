@@ -189,7 +189,7 @@ export function UserForm({
           >
             {Object.entries(roleLabel).map(([v, t]) => (
               <option value={v} key={v}>
-                {t}
+                <UiText>{t}</UiText>
               </option>
             ))}
           </select>

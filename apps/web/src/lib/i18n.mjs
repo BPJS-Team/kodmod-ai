@@ -9,6 +9,34 @@ export const localeFor = (language) => language === "en" ? "en-US" : "id-ID";
 // passed to this function; it remains in its original language.
 export const english = {
   ...englishUi,
+  "Kelola kelas, materi, dan tugas siswa.": "Manage your classes, lessons, and student assignments.",
+  "Buka materi, tanyakan pada Tutor, dan lanjutkan belajarmu.": "Open a lesson, ask your Tutor, and keep learning.",
+  "Ringkasan bacaan": "Reading overview",
+  "{count} dari {total} materi ditandai selesai": "{count} of {total} materials marked complete",
+  "Soal {number}": "Question {number}", "Pilihan {letter}": "Option {letter}",
+  "{count} dari {total} jawaban tersimpan": "{count} of {total} answers saved",
+  "Jawaban soal {number} tersimpan. {count} dari {total} soal sudah dijawab.": "Answer to question {number} saved. {count} of {total} questions answered.",
+  ", jawaban tersimpan": ", answer saved", ", belum dijawab": ", unanswered",
+  "Naikkan soal {number}": "Move question {number} up", "Turunkan soal {number}": "Move question {number} down",
+  "Hapus soal {number}": "Delete question {number}", "Hapus soal {number}?": "Delete question {number}?",
+  "Kunci jawaban pilihan {letter} soal {number}": "Correct answer option {letter} for question {number}",
+  "Hapus pilihan {letter} soal {number}": "Delete option {letter} from question {number}",
+  "Keluarkan {name}": "Remove {name}",
+  "Siswa @{username} akan mendapat akses ke seluruh materi yang diterbitkan di kelas ini.": "Student @{username} will have access to all published lessons in this class.",
+  "{name} akan kehilangan akses ke kelas dan seluruh materinya.": "{name} will lose access to this class and its lessons.",
+  "Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.": "Document imported. Review the content and reading order before saving.",
+  "Materi masih berupa draft": "This lesson is a draft",
+  "Materi siap digunakan Tutor": "This lesson is ready for your Tutor",
+  "Menyiapkan materi untuk Tutor": "Preparing this lesson for your Tutor",
+  "Materi belum siap untuk Tutor": "This lesson is not ready for your Tutor yet",
+  "Materi belum disiapkan untuk Tutor": "This lesson has not been prepared for your Tutor",
+  "Terbitkan materi setelah meninjau isinya. Setelah itu, materi akan disiapkan untuk Tutor.": "Review and publish the lesson to prepare it for your Tutor.",
+  "Tutor dapat menjawab berdasarkan isi materi yang terakhir disimpan.": "Your Tutor can answer questions about the saved lesson.",
+  "Materi tetap dapat dibaca. Perbarui status setelah proses selesai. Jika proses terhenti, Anda dapat menyiapkan ulang.": "The lesson is still readable. Refresh its status when preparation finishes, or retry if it stops.",
+  "Isi materi tetap tersimpan. Coba siapkan ulang atau periksa pengaturan layanan AI.": "The lesson is saved. Try preparing it again.",
+  "Materi sudah dapat dibaca siswa. Siapkan materi agar Tutor dapat memakai isinya.": "Students can read this lesson. Prepare it so the Tutor can use its contents.",
+  "Siapkan ulang jika terhenti": "Retry preparation", "Siapkan untuk Tutor": "Prepare for Tutor",
+  "KODMOD, halaman utama": "KODMOD, home",
   "Navigasi utama": "Main navigation", "Navigasi footer": "Footer navigation", "Navigasi seluler": "Mobile navigation", "Buka navigasi": "Open navigation",
   "Untuk guru": "For teachers", "Pahami pelajaran,": "Understand your lessons,",
   "selangkah demi selangkah.": "one step at a time.",
@@ -129,10 +157,10 @@ export const english = {
   "Sesi tidak valid. Hubungi administrator.": "Invalid session. Contact your administrator.",
 };
 
-export function translate(text, language = "id") {
-  if (language !== "en" || typeof text !== "string") return text;
+export function translate(text, language = "id", values = {}) {
+  if (typeof text !== "string") return text;
   const core = text.trim().replace(/\s+/g, " ");
-  const translated = english[core];
-  if (!translated) return text;
-  return text.match(/^\s*/)[0] + translated + text.match(/\s*$/)[0];
+  const translated = language === "en" ? english[core] : null;
+  const result = translated ? text.match(/^\s*/)[0] + translated + text.match(/\s*$/)[0] : text;
+  return result.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? String(values[key]) : match);
 }

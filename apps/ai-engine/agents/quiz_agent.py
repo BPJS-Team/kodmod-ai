@@ -53,12 +53,14 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     """Ask the next question in the quiz session."""
     questions = state.get("quiz_questions", [])
     idx = state.get("current_question_index", 0)
+    english = state.get("learning_profile", {}).get("language") == "en"
 
     if not questions or idx >= len(questions):
         log.info("Quiz session has no more questions")
         return {
             "generated_response": (
-                "Bagus! Kuis ini sudah selesai. Mari kita lihat hasilnya bersama."
+                "Great! This quiz is complete. Let's review the results together."
+                if english else "Bagus! Kuis ini sudah selesai. Mari kita lihat hasilnya bersama."
             ),
             "next_action": "analyze_quiz",
             "last_node": "quiz_ask",
@@ -93,13 +95,14 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     # questions, carry the previous answer's feedback forward so the student
     # hears it before the next question, instead of losing it.
     if idx == 0:
-        spoken_question = (
-            f"Baik, kita mulai kuis. Ada {total} soal. Soal pertama: " + spoken_question
-        )
+        intro = (f"Let's begin the quiz. There are {total} questions. First question: "
+                 if english else f"Baik, kita mulai kuis. Ada {total} soal. Soal pertama: ")
+        spoken_question = intro + spoken_question
     else:
         feedback = (state.get("generated_response") or "").strip()
         if feedback:
-            spoken_question = f"{feedback} Soal berikutnya: {spoken_question}"
+            transition = "Next question:" if english else "Soal berikutnya:"
+            spoken_question = f"{feedback} {transition} {spoken_question}"
 
     log.info(
         "Asking question %d/%d (concept=%s, difficulty=%s)",
@@ -197,6 +200,8 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     }
 
     log.info("Mini-quiz generated: %s", question["text"][:60])
+    check_label = ("Quick understanding check:" if state.get("learning_profile", {}).get("language") == "en"
+                   else "Cek pemahaman cepat:")
     out = {
         "quiz_question": question,
         "quiz_questions": [question],
@@ -208,7 +213,7 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
         "cumulative_quiz_score": 0.0,
         "quiz_session_id": f"mini-{uuid4().hex[:8]}",
         "generated_response": (
-            f"{last_explanation.rstrip()}\n\nCek pemahaman cepat: {question['text']}"
+            f"{last_explanation.rstrip()}\n\n{check_label} {question['text']}"
         ).strip(),
         "next_action": "speak",
         "last_node": "mini_quiz",

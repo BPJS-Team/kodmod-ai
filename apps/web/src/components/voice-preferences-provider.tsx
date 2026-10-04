@@ -107,15 +107,14 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     if (!ready || opened || !saved || !preferences.menuEnabled) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let last: Element | null = null, lastAt = 0;
     const narration = (event: Event) => {
       const element = (event.target as HTMLElement)?.closest<HTMLElement>(
         "[data-voice-menu],a,button,summary,input,select,textarea");
-      if (!element || element.closest("[data-voice-ignore],.swal2-container") || element.hasAttribute("disabled")) return;
-      if (document.querySelector(".voice-panel[data-recording=true]")) return;
+      if (!element || element.closest("[data-voice-ignore],.swal2-container") || element.hasAttribute("disabled")) { speechOutput.cancelQueuedMenu(); return; }
+      if (document.querySelector(".voice-panel[data-recording=true]")) { speechOutput.cancelQueuedMenu(); return; }
       const current = speechOutput.getState();
-      if (current.owner && current.owner !== "menu" && ["loading", "playing"].includes(current.status)) return;
+      if (current.owner && current.owner !== "menu" && ["loading", "playing", "paused"].includes(current.status)) { speechOutput.cancelQueuedMenu(); return; }
       const now = Date.now();
       if (last === element && now - lastAt < 800) return;
       last = element; lastAt = now;
@@ -125,14 +124,13 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
         ?? (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
           ? element.labels?.[0]?.textContent : element.textContent);
       const text = label?.trim().slice(0, 300);
-      if (!text || (!menuKey && !/^\/(siswa|guru|admin)(\/|$)/.test(pathname))) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => { void speechOutput.play({ owner: "menu", text,
-        engine: preferences.engine, language, menuKey }); }, 150);
+      if (!text || (!menuKey && !/^\/(siswa|guru|admin)(\/|$)/.test(pathname))) { speechOutput.cancelQueuedMenu(); return; }
+      speechOutput.queueMenu({ owner: "menu", text, engine: preferences.engine, language, menuKey },
+        () => !document.querySelector(".voice-panel[data-recording=true],dialog[open],.swal2-container"));
     };
     document.addEventListener("focusin", narration);
     document.addEventListener("click", narration);
-    return () => { clearTimeout(timer); document.removeEventListener("focusin", narration);
+    return () => { document.removeEventListener("focusin", narration);
       document.removeEventListener("click", narration); speechOutput.stop("menu"); };
   }, [ready, opened, saved, preferences.menuEnabled, preferences.engine, pathname, language]);
 
@@ -165,6 +163,11 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
     setSettingsOpen(false);
   }
 
+  function closeSettings() {
+    speechOutput.stop("voice-setup");
+    setSettingsOpen(false);
+  }
+
   async function clearAudio() {
     setClearing(true); speechOutput.stop();
     try { await clearSpeechAudioCache(); setWarning("Suara tersimpan sudah dihapus."); }
@@ -177,11 +180,11 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
     {warning && !opened && <div className="global-voice-notice" role="status">{t(warning)}</div>}
     <dialog ref={dialog} className="voice-preferences-dialog" aria-labelledby="voice-preferences-title"
       aria-describedby="voice-preferences-description" data-voice-ignore="true"
-      onCancel={event => { if (!saved) { event.preventDefault(); save(); } else setSettingsOpen(false); }}>
+      onCancel={event => { event.preventDefault(); if (!saved) save(); else closeSettings(); }}>
       <div className="voice-preferences-content">
         <div className="voice-preferences-heading">
           <span className="voice-preferences-mark" aria-hidden="true"><Volume2 size={23} /></span>
-          {saved && <button className="voice-preferences-close" aria-label={t("Tutup")} onClick={() => setSettingsOpen(false)}><X size={21} /></button>}
+          {saved && <button className="voice-preferences-close" aria-label={t("Tutup")} onClick={closeSettings}><X size={21} /></button>}
         </div>
         <h2 id="voice-preferences-title">{t(saved ? "Pengaturan suara" : "Pilih suara untuk belajar")}</h2>
         <p id="voice-preferences-description" className="voice-preferences-intro">{t("Dengarkan contoh, lalu pilih suara yang nyaman untukmu.")}</p>
@@ -235,8 +238,8 @@ export function VoicePreferencesProvider({ children }: { children: ReactNode }) 
               <button type="button" className="button danger" disabled={clearing} onClick={() => void clearAudio()}>{t("Ya, hapus")}</button></div>}
         </div>}
         {warning && <p className="voice-preferences-warning" role="status">{t(warning)}</p>}
-        <div className="voice-preferences-actions"><button type="button" className="button primary" onClick={save} disabled={languagePending}>{t(saved ? "Simpan pengaturan" : "Gunakan pilihan ini")}</button></div>
       </div>
+      <div className="voice-preferences-actions"><button type="button" className="button primary" onClick={save} disabled={languagePending}>{t(saved ? "Simpan pengaturan" : "Gunakan pilihan ini")}</button></div>
     </dialog>
   </VoicePreferencesContext.Provider>;
 }

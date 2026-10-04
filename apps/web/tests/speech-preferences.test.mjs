@@ -31,6 +31,19 @@ test("speech engine preference defaults to unset and persists either choice", ()
   assert.equal(readSpeechEnginePreference(storage), "app");
 });
 
+test("a quota failure keeps the latest voice choice for this page instead of rereading stale storage", async (t) => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, "localStorage", descriptor); else delete globalThis.localStorage; });
+  const settings = await import("../src/lib/speech-preferences.mjs?quota-test");
+  const old = JSON.stringify({ ...settings.DEFAULT_VOICE_SETTINGS, engine: "app" });
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+    getItem: () => old, setItem: () => { throw new Error("QuotaExceededError"); },
+  } });
+  assert.equal(settings.writeVoiceSettings({ ...settings.DEFAULT_VOICE_SETTINGS, engine: "device", menuEnabled: false }), false);
+  assert.equal(settings.parseVoiceSettings(settings.readVoiceSettingsSnapshot()).engine, "device");
+  assert.equal(settings.parseVoiceSettings(settings.readVoiceSettingsSnapshot()).menuEnabled, false);
+});
+
 test("changing the ElevenLabs voice profile invalidates previous cached audio", async () => {
   const key = await speechAudioCacheKey("Halo dunia!");
 

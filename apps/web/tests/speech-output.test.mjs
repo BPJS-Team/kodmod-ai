@@ -61,3 +61,39 @@ test("an output error after playback starts releases the audio and offers text",
   assert.equal(stopped, true);
   assert.match(coordinator.getState().message, /teks/);
 });
+
+test("delayed menu reading cannot replace a loading, playing or paused Tutor or preview", async () => {
+  for (const owner of ["tutor", "voice-setup"]) {
+    let resolve;
+    const { coordinator, played } = setup(request => new Promise(r => { resolve = () => r(request.text); }));
+    const started = coordinator.play({ owner, text: "Answer", language: "id", engine: "app" });
+    const complete = resolve;
+    const late = coordinator.play({ owner: "menu", text: "Late menu", language: "id", engine: "app" });
+    assert.equal(coordinator.getState().owner, owner);
+    await late;
+    complete(); await started;
+    await coordinator.play({ owner: "menu", text: "Late menu", language: "id", engine: "app" });
+    assert.equal(coordinator.getState().owner, owner);
+    await coordinator.togglePause(owner);
+    await coordinator.play({ owner: "menu", text: "Late menu", language: "id", engine: "app" });
+    assert.equal(coordinator.getState().status, "paused");
+    assert.deepEqual(played, ["Answer"]);
+  }
+});
+
+test("global stop or a new Tutor cancels queued menu reading; recording is checked at playback time", async () => {
+  const { coordinator, played } = setup(async request => request.text);
+  const menu = { owner: "menu", text: "Menu", language: "id", engine: "app" };
+  coordinator.queueMenu(menu, () => true, 10);
+  coordinator.stop();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(played, []);
+  coordinator.queueMenu(menu, () => true, 10);
+  await coordinator.play({ ...menu, owner: "tutor", text: "Answer" });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(played, ["Answer"]);
+  coordinator.stop();
+  coordinator.queueMenu(menu, () => false, 10);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(played, ["Answer"]);
+});

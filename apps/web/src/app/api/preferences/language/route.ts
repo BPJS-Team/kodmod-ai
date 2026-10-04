@@ -3,10 +3,13 @@ import { session } from "@/lib/session";
 import { backend, BackendError } from "@/lib/server-api";
 import { LANGUAGE_COOKIE, validLanguage } from "@/lib/i18n.mjs";
 import { sessionCookieSecure } from "@/lib/cookie-security";
+import { sameEditorialOrigin } from "@/lib/editorial-contract.mjs";
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return new Response(null, { status: 403 });
+  const protocol = request.headers.get("x-forwarded-proto")?.split(",")[0].trim()
+    || new URL(request.url).protocol.slice(0, -1);
+  if (!sameEditorialOrigin(request.headers.get("origin"), request.headers.get("host"), protocol + ":"))
+    return new Response(null, { status: 403 });
   let body;
   try { body = await request.json(); } catch { return new Response(null, { status: 400 }); }
   if (!validLanguage(body?.language)) return new Response(null, { status: 400 });

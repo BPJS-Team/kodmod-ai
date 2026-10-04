@@ -1,6 +1,7 @@
 // Local UI contract fixture only. Never import this file into the application.
 // Run: node apps/web/tests/api-fixture.mjs
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
 import { createLearningFixture } from "./learning-fixture.mjs";
 const quizFailureQueue = [];
 const quizRequests = [];
@@ -31,9 +32,12 @@ const users = [
   ...u,
   created_at: "2026-09-15T00:00:00Z",
   last_login_at: null,
+  preferred_language: "id",
 }));
 const invites = [];
 let serial = 1;
+const voiceRequests = [];
+const voiceBytes = process.env.FIXTURE_AUDIO_FILE ? readFileSync(process.env.FIXTURE_AUDIO_FILE) : Buffer.from([0xff, 0xfb, 0x90, 0x00]);
 const server = createServer(async (req, res) => {
   res.setHeader("Content-Type", "application/json");
   const send = (status, body) => {
@@ -61,6 +65,14 @@ const server = createServer(async (req, res) => {
     }
     return send(200, { requests: quizRequests, failures: quizFailureQueue });
   }
+  if (url.pathname === "/__fixture/voice") return send(200, { requests: voiceRequests });
+  if (url.pathname === "/voice/profile") return send(200, { profile: "fixture-bian-v2" });
+  if (url.pathname.startsWith("/voice/menu/")) {
+    if (!new Set(["welcome", "preview", "home", "about", "how", "features", "faq", "login", "register", "username", "password", "full-name", "role", "dashboard", "classes", "materials", "tutor", "practice", "assignments", "progress", "quizzes", "review", "analytics", "users", "activity", "sound", "logout"]).has(url.pathname.split("/").at(-1))) return send(404, {});
+    if (!["id", "en"].includes(url.searchParams.get("language") || "id")) return send(422, {});
+    voiceRequests.push({ menu: url.pathname.split("/").at(-1), language: url.searchParams.get("language") || "id" });
+    res.writeHead(200, { "Content-Type": "audio/mpeg" }); return res.end(voiceBytes);
+  }
   if (url.pathname === "/auth/login") {
     const user = users.find((u) => u.username === body.username);
     if (!user || body.password !== "fixture-only-123") return send(401, {});
@@ -72,13 +84,6 @@ const server = createServer(async (req, res) => {
     });
   }
   if (url.pathname === "/auth/register") {
-    const invite = invites.find(
-      (i) =>
-        i.code === body.invitation_code &&
-        i.used_count < i.max_uses &&
-        new Date(i.expires_at) > new Date(),
-    );
-    if (!invite) return send(400, {});
     if (!["student", "teacher"].includes(body.role)) return send(422, {});
     if (users.some((u) => u.username === body.username)) return send(409, {});
     const item = {
@@ -89,9 +94,9 @@ const server = createServer(async (req, res) => {
       is_active: true,
       created_at: new Date().toISOString(),
       last_login_at: null,
+      preferred_language: body.preferred_language === "en" ? "en" : "id",
     };
     users.push(item);
-    invite.used_count++;
     return send(201, {
       access_token: `fixture-${item.id}`,
       expires_in: 3600,
@@ -102,7 +107,18 @@ const server = createServer(async (req, res) => {
     (u) => `Bearer fixture-${u.id}` === req.headers.authorization,
   );
   if (!user?.is_active) return send(401, {});
-  if (url.pathname === "/auth/me") return send(200, user);
+  if (url.pathname === "/auth/me") {
+    if (req.method === "PATCH") {
+      if (!["id", "en"].includes(body.preferred_language)) return send(422, {});
+      user.preferred_language = body.preferred_language;
+    }
+    return send(200, user);
+  }
+  if (url.pathname === "/voice/tts" && req.method === "POST") {
+    if (typeof body.text !== "string" || !body.text.trim() || body.text.length > 5000 || (body.language && !["id", "en"].includes(body.language))) return send(422, {});
+    voiceRequests.push({ user: user.id, language: body.language || user.preferred_language, text: body.text });
+    res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" }); return res.end(voiceBytes);
+  }
   if (learning(req, url, body, user, send)) return;
   if (user.role !== "admin") return send(403, {});
   if (url.pathname === "/admin/users" && req.method === "GET") {

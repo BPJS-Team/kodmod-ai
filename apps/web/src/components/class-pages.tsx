@@ -99,8 +99,8 @@ export async function ClassIndex({
         description={
           dashboard
             ? teacher
-              ? <UiText>{"Satu ruang untuk menumbuhkan banyak kemungkinan."}</UiText>
-              : <UiText>{"Sedikit demi sedikit, pengetahuan baru dimulai di sini."}</UiText>
+              ? <UiText>{"Kelola kelas, materi, dan tugas siswa."}</UiText>
+              : <UiText>{"Buka materi, tanyakan pada Tutor, dan lanjutkan belajarmu."}</UiText>
             : <UiText>{"Materi, anggota, dan ruang belajar Anda dalam satu tempat."}</UiText>
         }
       >

@@ -10,5 +10,7 @@ export function createSpeechCoordinator(adapters: {
   makeAudio: (audio: Blob, ended: () => void, failed: (error: Error) => void) => SpeechOutput;
   speakDevice: (request: SpeechRequest, ended: () => void, failed: (error: Error) => void) => SpeechOutput;
 }): { play: (request: SpeechRequest) => Promise<void>; stop: (owner?: string) => void;
+  queueMenu: (request: SpeechRequest, canPlay?: () => boolean, delay?: number) => void;
+  cancelQueuedMenu: () => void;
   togglePause: (owner?: string) => Promise<void>; getState: () => OutputState;
   subscribe: (listener: () => void) => () => void };

@@ -1,10 +1,13 @@
+"use client";
+import { useI18n } from "./language-provider";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 export function Brand() {
+  const { t } = useI18n();
   return (
-    <Link className="brand" href="/" aria-label="KODMOD, halaman utama">
+    <Link className="brand" href="/" aria-label={t("KODMOD, halaman utama")}>
       <Image
         src="/brand/logo.png"
         alt="KODMOD"

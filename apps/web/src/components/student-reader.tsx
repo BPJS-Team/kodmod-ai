@@ -27,6 +27,7 @@ function ProgressButton({
   field: "completed" | "bookmarked";
   active: boolean;
 }) {
+  const { t } = useI18n();
   const completion = field === "completed";
   const label = completion
     ? active
@@ -38,7 +39,7 @@ function ProgressButton({
   const [state, action, pending] = useConfirmedAction(
     saveReadingProgress.bind(null, classId, materialId),
     {
-      title: `${label}?`,
+      title: `${t(label)}?`,
       text: completion
         ? "Penanda ini membantu Anda mengatur bacaan. Ini bukan nilai atau penilaian penguasaan materi."
         : active
@@ -58,7 +59,7 @@ function ProgressButton({
         disabled={pending}
       >
         <Icon size={18} aria-hidden="true" />
-        {pending ? <UiText>{"Menyimpan…"}</UiText> : label}
+        {pending ? <UiText>{"Menyimpan…"}</UiText> : <UiText>{label}</UiText>}
       </button>
       <ActionFeedback state={state} />
     </form>

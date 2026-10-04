@@ -9,8 +9,10 @@ const inFlightAudio = new Map();
 let inMemoryPreference = null;
 let cacheGeneration = 0;
 let memorySettings = null;
+let memorySettingsDirty = false;
 
 export function readVoiceSettingsSnapshot() {
+  if (memorySettingsDirty) return memorySettings;
   try { return globalThis.localStorage?.getItem(VOICE_SETTINGS_KEY) ?? memorySettings; }
   catch { return memorySettings; }
 }
@@ -31,8 +33,8 @@ export function writeVoiceSettings(value) {
   if (!parsed) return false;
   memorySettings = JSON.stringify(parsed);
   let saved = true;
-  try { globalThis.localStorage.setItem(VOICE_SETTINGS_KEY, memorySettings); }
-  catch { saved = false; }
+  try { globalThis.localStorage.setItem(VOICE_SETTINGS_KEY, memorySettings); memorySettingsDirty = false; }
+  catch { saved = false; memorySettingsDirty = true; }
   announcePreferenceChange();
   return saved;
 }

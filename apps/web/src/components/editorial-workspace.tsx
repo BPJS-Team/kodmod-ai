@@ -23,7 +23,6 @@ import { createQuizSubmissionId } from "@/lib/quiz-submission.mjs";
 import {
   eventLabel,
   quizState,
-  scheduleLabel,
   type Assignment,
   type EditableQuestion,
   type QuizDraft,
@@ -363,7 +362,7 @@ export function QuizWorkspace({
                       <button
                         type="button"
                         className="editorial-icon-button"
-                        aria-label={`Naikkan soal ${index + 1}`}
+                        aria-label={t("Naikkan soal {number}", { number: index + 1 })}
                         disabled={busy || index === 0}
                         onClick={() => move(index, -1)}
                       >
@@ -372,7 +371,7 @@ export function QuizWorkspace({
                       <button
                         type="button"
                         className="editorial-icon-button"
-                        aria-label={`Turunkan soal ${index + 1}`}
+                        aria-label={t("Turunkan soal {number}", { number: index + 1 })}
                         disabled={busy || index === items.length - 1}
                         onClick={() => move(index, 1)}
                       >
@@ -381,12 +380,12 @@ export function QuizWorkspace({
                       <button
                         type="button"
                         className="editorial-icon-button editorial-delete"
-                        aria-label={`Hapus soal ${index + 1}`}
+                        aria-label={t("Hapus soal {number}", { number: index + 1 })}
                         disabled={busy || items.length === 1}
                         onClick={async () => {
                           if (
                             await confirmAction({
-                              title: `Hapus soal ${index + 1}?`,
+                              title: t("Hapus soal {number}?", { number: index + 1 }),
                               text: "Perubahan ini diterapkan pada revisi yang sedang Anda edit.",
                               destructive: true,
                             })
@@ -431,7 +430,7 @@ export function QuizWorkspace({
                                 change(index, { correct_option_id: option.id })
                               }
                               disabled={busy}
-                              aria-label={`Kunci jawaban pilihan ${String.fromCharCode(65 + oi)} soal ${index + 1}`}
+                              aria-label={t("Kunci jawaban pilihan {letter} soal {number}", { letter: String.fromCharCode(65 + oi), number: index + 1 })}
                             />
                             <span>{String.fromCharCode(65 + oi)}</span>
                           </label>
@@ -459,7 +458,7 @@ export function QuizWorkspace({
                           <button
                             type="button"
                             className="editorial-icon-button"
-                            aria-label={`Hapus pilihan ${String.fromCharCode(65 + oi)} soal ${index + 1}`}
+                            aria-label={t("Hapus pilihan {letter} soal {number}", { letter: String.fromCharCode(65 + oi), number: index + 1 })}
                             disabled={busy || q.options.length <= 2}
                             onClick={async () => {
                               if (
@@ -735,7 +734,7 @@ export function QuizWorkspace({
                       <small><UiText>{"Revisi "}</UiText>{a.version} ·{" "}
                         {a.is_closed
                           ? <UiText>{"Ditutup"}</UiText>
-                          : "Tenggat: " + scheduleLabel(a.due_at)}
+                          : <><UiText>{"Tenggat: "}</UiText><UiDate value={a.due_at} time empty="Tanpa batas waktu" /></>}
                       </small>
                     </span>
                     <span><UiText>{"Lihat hasil"}</UiText><ArrowUpRight size={17} aria-hidden="true" />
@@ -939,7 +938,7 @@ export function QuizWorkspace({
               <ul className="editorial-timeline">
                 {draft.events.map((event, i) => (
                   <li key={i}>
-                    <strong>{eventLabel[event.kind] || event.kind}</strong>
+                    <strong>{t(eventLabel[event.kind] || event.kind)}</strong>
                     <small>{<UiDate value={event.created_at} time empty="Tanpa batas waktu" />}</small>
                     {event.note && <p>{event.note}</p>}
                   </li>

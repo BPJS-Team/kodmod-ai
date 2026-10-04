@@ -85,8 +85,8 @@ export function ClassAction({
     restore: "Aktifkan kembali",
   };
   const explanations = {
-    "add-member": `Siswa @${username} akan mendapat akses ke seluruh materi yang diterbitkan di kelas ini.`,
-    "remove-member": `${name || "Siswa"} akan kehilangan akses ke kelas dan seluruh materinya.`,
+    "add-member": t("Siswa @{username} akan mendapat akses ke seluruh materi yang diterbitkan di kelas ini.", { username }),
+    "remove-member": t("{name} akan kehilangan akses ke kelas dan seluruh materinya.", { name: name || t("Siswa") }),
     archive:
       "Kelas disimpan sebagai arsip dan tidak dapat diakses siswa. Anda bisa mengaktifkannya kembali.",
     restore:
@@ -95,7 +95,7 @@ export function ClassAction({
   const [state, action, pending] = useConfirmedAction(
     changeClass.bind(null, classId),
     {
-      title: `${labels[mode]}?`,
+      title: `${t(labels[mode])}?`,
       text: explanations[mode],
       destructive: mode === "remove-member" || mode === "archive",
     },
@@ -124,9 +124,9 @@ export function ClassAction({
       <button
         disabled={pending}
         className={`button ${mode === "add-member" || mode === "restore" ? "primary" : "secondary"}`}
-        aria-label={mode === "remove-member" ? `Keluarkan ${name}` : undefined}
+        aria-label={mode === "remove-member" ? t("Keluarkan {name}", { name: name || t("Siswa") }) : undefined}
       >
-        {pending ? <UiText>{"Memproses…"}</UiText> : labels[mode]}
+        {pending ? <UiText>{"Memproses…"}</UiText> : t(labels[mode])}
       </button>
       <ActionFeedback state={state} />
     </form>
@@ -187,7 +187,7 @@ export function MaterialForm({
       if (!title.trim()) setTitle(typeof result.title === "string" ? result.title.slice(0, 200) : file.name.replace(/\.[^.]+$/, ""));
       setSourceFilename(typeof result.filename === "string" ? result.filename : file.name);
       const warnings = Array.isArray(result.warnings) ? result.warnings.filter((item: unknown) => typeof item === "string").join(" ") : "";
-      setImportNotice(`Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.${warnings ? ` ${warnings}` : ""}`);
+      setImportNotice(`${t("Dokumen berhasil dibaca. Tinjau isi dan urutan bacaan sebelum menyimpan.")}${warnings ? ` ${warnings}` : ""}`);
       await notifyResult("Dokumen siap ditinjau di editor.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dokumen belum dapat dibaca.";
@@ -219,12 +219,12 @@ export function MaterialForm({
       {material && tutorStatus && (
         <section className={`material-ai-status ${material.rag_status === "failed" ? "failed" : ""}`} aria-label={t("Kesiapan materi untuk Tutor")}>
           <div>
-            <strong>{tutorStatus.heading}</strong>
-            <p>{tutorStatus.description}</p>
+            <strong>{t(tutorStatus.heading)}</strong>
+            <p>{t(tutorStatus.description)}</p>
           </div>
           <div className="material-status-actions">
             <button type="button" className="button secondary" onClick={() => router.refresh()} disabled={pending || importing || indexing}><RefreshCw size={16} aria-hidden="true" /><UiText>{" Perbarui status"}</UiText></button>
-            {tutorStatus.actionLabel && <button type="button" className="button primary" onClick={() => void retryIndex()} disabled={pending || importing || indexing}>{indexing ? <UiText>{"Menyiapkan…"}</UiText> : tutorStatus.actionLabel}</button>}
+            {tutorStatus.actionLabel && <button type="button" className="button primary" onClick={() => void retryIndex()} disabled={pending || importing || indexing}>{indexing ? <UiText>{"Menyiapkan…"}</UiText> : t(tutorStatus.actionLabel)}</button>}
           </div>
         </section>
       )}
@@ -257,7 +257,7 @@ export function MaterialForm({
         {importing && <p className="material-import-progress" role="status"><LoaderCircle className="spin" size={18} aria-hidden="true" /><UiText>{" Membaca dokumen, mohon tunggu…"}</UiText></p>}
         {sourceFilename && <p className="material-source-file"><FileText size={17} aria-hidden="true" /><span>{sourceFilename}</span></p>}
         {importNotice && <p className="material-import-notice" role="status">{importNotice}</p>}
-        {importError && <p className="alert error-message" role="alert">{importError}</p>}
+        {importError && <p className="alert error-message" role="alert">{t(importError)}</p>}
       </section>
       <label className="field"><UiText>{"Isi materi"}</UiText><textarea
           className="material-editor"

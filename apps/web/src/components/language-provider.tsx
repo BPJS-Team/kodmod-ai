@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { useRouter } from "next/navigation";
 import { translate, localeFor, type Language } from "@/lib/i18n.mjs";
 
-type I18n = { language: Language; t: (text: string) => string; locale: string;
+type I18n = { language: Language; t: (text: string, values?: Record<string, string | number>) => string; locale: string;
   changeLanguage: (language: Language) => Promise<void> };
 const LanguageContext = createContext<I18n | null>(null);
 
@@ -21,7 +21,7 @@ export function LanguageProvider({ initialLanguage, children }: { initialLanguag
     window.dispatchEvent(new Event("kodmod:language-change"));
     router.refresh();
   }, [language, initialLanguage, router]);
-  const value = useMemo(() => ({ language, t: (text: string) => translate(text, language),
+  const value = useMemo(() => ({ language, t: (text: string, values?: Record<string, string | number>) => translate(text, language, values),
     locale: localeFor(language), changeLanguage }), [language, changeLanguage]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

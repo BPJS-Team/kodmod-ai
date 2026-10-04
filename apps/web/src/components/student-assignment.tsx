@@ -181,7 +181,7 @@ export function StudentAssignment({
       setIndex(nextIndex);
       setSelected(next.answers[next.questions[nextIndex].id] ?? "");
       setMessage(
-        `Jawaban soal ${question.order_index} tersimpan. ${Object.keys(next.answers).length} dari ${next.questions.length} soal sudah dijawab.`,
+        t("Jawaban soal {number} tersimpan. {count} dari {total} soal sudah dijawab.", { number: question.order_index, count: Object.keys(next.answers).length, total: next.questions.length }),
       );
       requestAnimationFrame(() => heading.current?.focus());
     } catch (caught) {
@@ -310,7 +310,7 @@ export function StudentAssignment({
                 </p>
                 <VoiceControls
                   key={r.question_id}
-                  text={`${r.prompt}. Jawaban benar: ${r.options.find((o) => o.id === r.correct_option_id)?.label}. ${r.explanation}`}
+                  text={`${r.prompt}. ${t("Jawaban benar:")} ${r.options.find((o) => o.id === r.correct_option_id)?.label}. ${r.explanation}`}
                 />
               </article>
             ))}
@@ -342,7 +342,7 @@ export function StudentAssignment({
       </div>
       {error && (
         <p role="alert" className="editorial-error">
-          {error}{" "}
+          {t(error)}{" "}
           <button
             type="button"
             className="button secondary small"
@@ -352,7 +352,7 @@ export function StudentAssignment({
         </p>
       )}
       <p className="editorial-live" role="status" aria-live="polite">
-        {message}
+        {t(message)}
       </p>
       {!attempt ? (
         <section className="panel editorial-start">
@@ -392,7 +392,7 @@ export function StudentAssignment({
               <progress
                 value={answeredCount}
                 max={attempt.questions.length}
-                aria-label={`${answeredCount} dari ${attempt.questions.length} jawaban tersimpan`}
+                aria-label={t("{count} dari {total} jawaban tersimpan", { count: answeredCount, total: attempt.questions.length })}
               />
               <nav
                 className="editorial-question-nav"
@@ -406,7 +406,7 @@ export function StudentAssignment({
                     disabled={busy || !!pending}
                     aria-current={index === i ? "step" : undefined}
                     className={attempt.answers[q.id] ? "answered" : ""}
-                    aria-label={`Soal ${q.order_index}${attempt.answers[q.id] ? ", jawaban tersimpan" : ", belum dijawab"}`}
+                    aria-label={t("Soal {number}", { number: q.order_index }) + t(attempt.answers[q.id] ? ", jawaban tersimpan" : ", belum dijawab")}
                   >
                     {q.order_index}
                   </button>
@@ -477,7 +477,7 @@ export function StudentAssignment({
               </section>
               <VoiceControls
                 key={question.id}
-                text={`Soal ${question.order_index}. ${question.narration || question.prompt}. ${question.options.map((o, i) => `Pilihan ${String.fromCharCode(65 + i)}: ${o.label}`).join(". ")}`}
+                text={`${t("Soal {number}", { number: question.order_index })}. ${question.narration || question.prompt}. ${question.options.map((o, i) => `${t("Pilihan {letter}", { letter: String.fromCharCode(65 + i) })}: ${o.label}`).join(". ")}`}
               />
               <section className="panel editorial-section editorial-final-submit">
                 <div>

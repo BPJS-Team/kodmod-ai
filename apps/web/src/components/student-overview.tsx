@@ -4,7 +4,9 @@ import Link from "next/link";
 import { ArrowUpRight, BookOpen, ListChecks, MessageCircle } from "lucide-react";
 import { classroomData } from "@/lib/classrooms";
 import type { StudentMaterial } from "@/lib/class-types";
+import { getServerI18n } from "@/lib/server-language";
 export async function StudentOverview() {
+  const { t } = await getServerI18n();
   const materials = await classroomData<StudentMaterial[]>(
     "student",
     "/student/materials",
@@ -12,7 +14,7 @@ export async function StudentOverview() {
   const done = materials.filter((m) => m.progress.completed).length;
   const next = materials.find((m) => !m.progress.completed);
   return (
-    <section className="panel student-overview" aria-label="Ringkasan bacaan">
+    <section className="panel student-overview" aria-label={t("Ringkasan bacaan")}>
       <div>
         <span className="student-overview-label">
           <BookOpen size={18} aria-hidden="true" /><UiText>{"Perjalanan bacaanmu"}</UiText></span>
@@ -21,7 +23,7 @@ export async function StudentOverview() {
         <progress
           value={done}
           max={materials.length || 1}
-          aria-label={`${done} dari ${materials.length} materi ditandai selesai`}
+          aria-label={t("{count} dari {total} materi ditandai selesai", { count: done, total: materials.length })}
         />
         <p><UiText>{"Penanda pribadi untuk mengatur belajar, bukan nilai penguasaan materi."}</UiText></p>
       </div>

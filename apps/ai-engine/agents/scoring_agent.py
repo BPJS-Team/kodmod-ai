@@ -77,7 +77,8 @@ async def scoring_node(state: KODMODState) -> dict[str, Any]:
     # ---- Path 1: MCQ → exact letter match, else rubric grading -----------
     if qtype == "mcq":
         options = question.get("options", [])
-        score, feedback = _score_mcq(student_answer, expected, options)
+        score, feedback = _score_mcq(student_answer, expected, options,
+                                     state.get("learning_profile", {}).get("language"))
         if score is not None:
             attempt = _build_attempt(question, student_answer, score, feedback)
             return await _emit(state, attempt)
@@ -99,16 +100,19 @@ async def scoring_node(state: KODMODState) -> dict[str, Any]:
 _MCQ_LEADING_LETTER = re.compile(r"^\s*([a-dA-D])\b")
 
 
-def _score_mcq(student_answer: str, expected: str, options: list[str]) -> tuple[float | None, str]:
+def _score_mcq(student_answer: str, expected: str, options: list[str],
+               language: str | None = None) -> tuple[float | None, str]:
     """Grade an MCQ answer. Returns ``(None, "")`` when the answer's shape is
     genuinely ambiguous, so the caller can fall back to LLM rubric grading
     instead of defaulting to wrong.
     """
     s = student_answer.strip()
     e = expected.strip().rstrip(".!?")
+    right = "Correct." if language == "en" else "Benar."
+    wrong = "Not quite." if language == "en" else "Belum tepat."
     if not e:
         # No canonical answer to match against - never award credit blindly.
-        return 0.0, "Belum tepat."
+        return 0.0, wrong
 
     # Confident case: the answer leads with an option letter. Any punctuation
     # or restated text may follow - "B", "B.", "B, dua per empat" all count,
@@ -116,17 +120,17 @@ def _score_mcq(student_answer: str, expected: str, options: list[str]) -> tuple[
     m = _MCQ_LEADING_LETTER.match(s)
     if m:
         correct = m.group(1).lower() == e[:1].lower()
-        return (1.0, "Benar.") if correct else (0.0, "Belum tepat.")
+        return (1.0, right) if correct else (0.0, wrong)
 
     # No leading letter - maybe they restated the option text verbatim, in
     # the same language the options were generated in.
     s_lower = s.lower().rstrip(".!?")
     e_lower = e.lower()
     if s_lower == e_lower:
-        return 1.0, "Benar."
+        return 1.0, right
     for opt in options:
         if opt.lower().startswith(e_lower[:1] + ".") and opt.lower() in s_lower:
-            return 1.0, "Benar."
+            return 1.0, right
 
     # Inconclusive from string shape alone.
     return None, ""
@@ -177,7 +181,9 @@ async def _score_with_rubric(
             "score": 0.0,
             "is_correct": False,
             "confidence": 0.3,
-            "feedback": "Maaf, sistem belum bisa menilai jawaban itu.",
+            "feedback": ("Sorry, your answer could not be assessed yet."
+                         if state.get("learning_profile", {}).get("language") == "en"
+                         else "Maaf, sistem belum bisa menilai jawaban itu."),
             "missed_keywords": [],
         }
 
@@ -244,7 +250,10 @@ async def _emit(state: KODMODState, attempt: QuizAttempt) -> dict[str, Any]:
         attempt["score"] < settings.QUIZ_PASS_THRESHOLD
         and question_attempts >= settings.QUIZ_MAX_ATTEMPTS_PER_QUESTION
     ):
-        attempt = {**attempt, "feedback": "Tidak apa-apa, kita lanjut ke soal berikutnya."}
+        feedback = ("That's okay, let's move on to the next question."
+                    if state.get("learning_profile", {}).get("language") == "en"
+                    else "Tidak apa-apa, kita lanjut ke soal berikutnya.")
+        attempt = {**attempt, "feedback": feedback}
 
     attempts = [*state.get("quiz_attempts", []), attempt]
     cumulative = sum(a["score"] for a in attempts) / max(len(attempts), 1)

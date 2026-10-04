@@ -16,6 +16,9 @@ test("interface language keeps content and word boundaries intact", () => {
   const lesson = "Materi bu Rani: 1/2 + 1/4 = 3/4";
   assert.equal(translate(lesson, "en"), lesson);
   assert.equal(translate("Materi, anggota, dan ruang belajar Anda dalam satu tempat.", "en"), "Your lessons, students, and classes in one place.");
+  assert.equal(translate("Soal {number}", "en", { number: 2 }), "Question 2");
+  assert.equal(translate("Soal {number}", "id", { number: 2 }), "Soal 2");
+  assert.equal(translate("Keluarkan {name}", "en", { name: "Siswa Uji" }), "Remove Siswa Uji");
 });
 
 test("registration, onboarding, narration and confirmation have English copy", () => {

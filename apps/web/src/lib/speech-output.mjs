@@ -2,6 +2,7 @@ const initialState = Object.freeze({ owner: null, status: "idle", fallback: fals
 
 export function createSpeechCoordinator({ loadAudio, makeAudio, speakDevice }) {
   let generation = 0, controller = null, output = null, state = initialState;
+  let menuTimer;
   const listeners = new Set();
   function publish(next) {
     state = { ...state, ...next };
@@ -13,6 +14,7 @@ export function createSpeechCoordinator({ loadAudio, makeAudio, speakDevice }) {
     output = null;
   }
   function stop(owner) {
+    if (!owner || owner === "menu") cancelQueuedMenu();
     if (owner && state.owner !== owner) return;
     generation++;
     controller?.abort();
@@ -21,7 +23,17 @@ export function createSpeechCoordinator({ loadAudio, makeAudio, speakDevice }) {
     state = initialState;
     for (const listener of listeners) listener();
   }
+  function cancelQueuedMenu() { clearTimeout(menuTimer); menuTimer = undefined; }
+  function queueMenu(request, canPlay = () => true, delay = 150) {
+    cancelQueuedMenu();
+    menuTimer = setTimeout(() => {
+      menuTimer = undefined;
+      if (canPlay()) void play({ ...request, owner: "menu" });
+    }, delay);
+  }
   async function play(request) {
+    if (request.owner === "menu" && state.owner && state.owner !== "menu"
+      && ["loading", "playing", "paused"].includes(state.status)) return;
     stop();
     const ticket = generation;
     controller = new AbortController();
@@ -82,6 +94,6 @@ export function createSpeechCoordinator({ loadAudio, makeAudio, speakDevice }) {
       }
     }
   }
-  return { play, stop, togglePause, getState: () => state,
+  return { play, stop, queueMenu, cancelQueuedMenu, togglePause, getState: () => state,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); } };
 }

@@ -5,6 +5,16 @@ import { translate, type Language } from "@/lib/i18n.mjs";
 
 const t = (text: string) => translate(text, document.documentElement.lang as Language);
 
+async function waitForNativeDialog() {
+  if (!document.querySelector("dialog[open]")) return;
+  await new Promise<void>(resolve => {
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector("dialog[open]")) { observer.disconnect(); resolve(); }
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["open"], childList: true, subtree: true });
+  });
+}
+
 const dialog = () =>
   Swal.mixin({
     customClass: {
@@ -31,6 +41,7 @@ export type Confirmation = {
   destructive?: boolean;
 };
 export async function confirmAction(options: Confirmation) {
+  await waitForNativeDialog();
   if (Swal.isVisible()) return false;
   const result = await dialog().fire({
     titleText: t(options.title),
@@ -46,6 +57,7 @@ export async function confirmAction(options: Confirmation) {
 }
 
 export async function notifyResult(message: string, error = false) {
+  await waitForNativeDialog();
   await dialog().fire({
     titleText: t(error ? "Belum berhasil" : "Berhasil"),
     text: t(message),
