@@ -229,7 +229,7 @@ def _unauth_routes() -> set[tuple[str, str]]:
     return out
 
 
-def test_km_sec_013a_no_unexpected_unauth_endpoints() -> None:
+async def test_km_sec_013a_no_unexpected_unauth_endpoints() -> None:
     extra = _unauth_routes() - _ALLOWLIST - _KNOWN_GAPS
     assert not extra, f"new unauthenticated endpoints: {sorted(extra)}"
 
@@ -238,7 +238,7 @@ def test_km_sec_013a_no_unexpected_unauth_endpoints() -> None:
     "#14 - /metrics is reachable with no auth; acceptable only because deployment is "
     "expected to restrict it at the network layer"
 )
-def test_km_sec_013b_known_gaps_closed() -> None:
+async def test_km_sec_013b_known_gaps_closed() -> None:
     still_open = _unauth_routes() & _KNOWN_GAPS
     assert not still_open, f"still unauthenticated: {sorted(still_open)}"
 
@@ -250,7 +250,7 @@ def test_km_sec_013b_known_gaps_closed() -> None:
     "#15 - config/settings.py defaults JWT_SECRET to 'change-me-in-production'; the running api "
     "must be started with a real secret from env/secret store, never the default"
 )
-def test_km_sec_014_jwt_secret_not_default() -> None:
+async def test_km_sec_014_jwt_secret_not_default() -> None:
     from config.settings import settings
 
     assert settings.JWT_SECRET != "change-me-in-production"

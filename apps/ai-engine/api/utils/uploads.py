@@ -78,7 +78,7 @@ async def save_upload(upload_file, dest_dir: Path | None = None, *, allowed_suff
                 total += len(chunk)
                 if total > limit:
                     raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                         detail=f"File is larger than {settings.MAX_UPLOAD_MB} MB.",
                     )
                 f.write(chunk)

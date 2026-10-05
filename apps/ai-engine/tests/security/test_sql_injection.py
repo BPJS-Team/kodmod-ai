@@ -146,7 +146,7 @@ class _SqlInterpolationVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def test_km_sec_025_no_sql_string_interpolation() -> None:
+async def test_km_sec_025_no_sql_string_interpolation() -> None:
     findings: dict[str, list[str]] = {}
     for rel in _AUDIT_FILES:
         path = _REPO / rel

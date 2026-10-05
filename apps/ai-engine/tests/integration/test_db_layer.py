@@ -241,7 +241,7 @@ async def test_km_int_010_close_db_resets_globals(db_engine, monkeypatch) -> Non
 # --------------------------------------------------------------------------- #
 # KM-INT-011 - no compose file bootstraps a hand-written SQL schema
 # --------------------------------------------------------------------------- #
-def test_km_int_011_no_sql_schema_bootstrap() -> None:
+async def test_km_int_011_no_sql_schema_bootstrap() -> None:
     """`database/models.py` is the only schema. Nothing may deploy SQL beside it.
 
     A second, drifting source of truth is exactly the failure this codebase

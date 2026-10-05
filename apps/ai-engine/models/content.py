@@ -50,17 +50,18 @@ class DocumentOut(BaseModel):
 
 
 class ConceptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     name: str
     slug: str
     description: str | None = None
     difficulty_level: str = "medium"
 
-    class Config:
-        from_attributes = True
-
 
 class LessonOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     concept_id: uuid.UUID
     title: str
@@ -68,20 +69,16 @@ class LessonOut(BaseModel):
     audio_friendly_summary: str | None = None
     estimated_minutes: int = 10
 
-    class Config:
-        from_attributes = True
-
 
 class ExerciseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     concept_id: uuid.UUID
     question: str
     question_type: str
     options: list[str] = Field(default_factory=list)
     difficulty: str
-
-    class Config:
-        from_attributes = True
 
 
 class ContentRetrieveRequest(BaseModel):

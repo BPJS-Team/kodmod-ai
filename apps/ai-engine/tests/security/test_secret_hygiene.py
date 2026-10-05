@@ -66,7 +66,7 @@ async def test_km_sec_071_no_secret_in_responses(client) -> None:  # type: ignor
     now = int(time.time())
     bad = pyjwt.encode(
         {"sub": str(uuid.uuid4()), "role": "student", "iat": now, "exp": now + 60},
-        "wrong-secret-value-00000000",
+        "test-only-wrong-signing-key-0123456789abcdef",
         algorithm="HS256",
     )
     bodies.append(
@@ -89,7 +89,7 @@ async def test_km_sec_071_no_secret_in_responses(client) -> None:  # type: ignor
 # --------------------------------------------------------------------------- #
 # KM-SEC-072 - .env is not baked into the built image / not on the run path
 # --------------------------------------------------------------------------- #
-def test_km_sec_072_env_not_in_image_context() -> None:
+async def test_km_sec_072_env_not_in_image_context() -> None:
     dockerignore = _REPO / ".dockerignore"
     assert dockerignore.exists(), ".dockerignore missing"
     patterns = {

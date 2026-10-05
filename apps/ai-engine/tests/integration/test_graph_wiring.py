@@ -21,7 +21,7 @@ async def test_graph_compiles() -> None:
     assert hasattr(graph, "astream_events")
 
 
-def test_state_initial_factory() -> None:
+async def test_state_initial_factory() -> None:
     from graphs.state import initial_state
 
     s = initial_state(session_id="s-1", student_id="00000000-0000-0000-0000-000000000001")
@@ -31,7 +31,7 @@ def test_state_initial_factory() -> None:
     assert isinstance(s["messages"], list)
 
 
-def test_routers_return_known_node_names() -> None:
+async def test_routers_return_known_node_names() -> None:
     from graphs.main_graph import route_after_intent, route_after_scoring
     from graphs.state import initial_state
 

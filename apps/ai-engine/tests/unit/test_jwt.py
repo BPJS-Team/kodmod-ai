@@ -42,7 +42,9 @@ def test_expired_token_raises_401() -> None:  # KM-UNIT-141
 
 
 def test_wrong_secret_raises_401() -> None:  # KM-UNIT-142
-    token = _encode({"sub": "x", "role": "student"}, secret="a-totally-different-secret")
+    token = _encode(
+        {"sub": "x", "role": "student"}, secret="test-only-wrong-signing-key-0123456789"
+    )
     with pytest.raises(HTTPException) as exc:
         _decode_jwt(token)
     assert exc.value.status_code == 401

@@ -81,6 +81,8 @@ class QuizRecoveryResponse(BaseModel):
 
 
 class QuizSessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     student_id: uuid.UUID
     started_at: datetime
@@ -89,6 +91,3 @@ class QuizSessionOut(BaseModel):
     correct_count: int
     final_score: float | None
     status: str
-
-    class Config:
-        from_attributes = True
