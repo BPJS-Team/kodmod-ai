@@ -31,13 +31,15 @@ import logging
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from config.settings import settings
-from graphs.state import KODMODState
 from voice import elevenlabs
 from voice.audio_cache import cached_audio
+
+if TYPE_CHECKING:
+    from graphs.state import KODMODState
 
 log = logging.getLogger(__name__)
 

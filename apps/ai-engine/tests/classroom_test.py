@@ -206,6 +206,48 @@ class ClassroomRoutesTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()["id"]
 
+    async def test_member_candidate_search_does_not_expand_wildcard_only_queries(self):
+        cid = await self.create_class()
+
+        for query in ("%%", "__"):
+            response = await self.client.get(
+                f"/classes/{cid}/member-candidates", params={"q": query}
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), [])
+
+    async def test_member_candidates_and_batch_enrollment_are_class_scoped(self):
+        cid = await self.create_class()
+        candidates = await self.client.get(
+            f"/classes/{cid}/member-candidates", params={"q": "Siswa"}
+        )
+        self.assertEqual(candidates.status_code, 200, candidates.text)
+        self.assertEqual(
+            {row["id"] for row in candidates.json()},
+            {str(self.student.id), str(self.outsider.id)},
+        )
+
+        added = await self.client.post(
+            f"/classes/{cid}/members/batch",
+            json={"student_ids": [str(self.student.id), str(self.outsider.id)]},
+        )
+        self.assertEqual(added.status_code, 201, added.text)
+        self.assertEqual(added.json(), {"added": 2})
+
+        duplicate = await self.client.post(
+            f"/classes/{cid}/members/batch",
+            json={"student_ids": [str(self.student.id)]},
+        )
+        self.assertEqual(duplicate.status_code, 409)
+
+        self.actor = self.other_teacher
+        self.assertEqual(
+            (
+                await self.client.get(f"/classes/{cid}/member-candidates", params={"q": "Siswa"})
+            ).status_code,
+            404,
+        )
+
     async def test_learning_material_only_visible_to_enrolled_student(self):
         cid = await self.create_class()
         added = await self.client.post(f"/classes/{cid}/members", json={"username": "student"})

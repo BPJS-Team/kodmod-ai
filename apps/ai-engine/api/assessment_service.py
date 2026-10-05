@@ -421,14 +421,28 @@ async def submit_assessment(
         raise ValueError("Graph returned an invalid mastery cursor")
     complete = new_index == len(questions)
     cumulative = sum(bounded_score(a["score"]) for a in attempts) / len(attempts)
-    feedback = (
-        final.get("accessible_response")
-        or final.get("generated_response")
-        or attempt.get("feedback", "")
-    )
+    is_correct = bool(attempt.get("is_correct"))
+    english = canonical.get("learning_profile", {}).get("language") == "en"
+    if complete:
+        feedback = (
+            final.get("accessible_response")
+            or final.get("generated_response")
+            or attempt.get("feedback", "")
+        )
+    elif is_correct:
+        base_feedback = attempt.get("feedback", "").strip()
+        next_prompt = (
+            "Please select continue to go to the next question."
+            if english
+            else "Silakan tekan lanjut ke soal berikutnya."
+        )
+        feedback = f"{base_feedback} {next_prompt}".strip() if base_feedback else next_prompt
+    else:
+        feedback = attempt.get("feedback", "") or final.get("generated_response", "")
+
     response = QuizSubmitResponse(
         score=score,
-        is_correct=bool(attempt.get("is_correct")),
+        is_correct=is_correct,
         feedback=feedback,
         next_question=None if complete else question_out(questions[new_index], new_index),
         quiz_complete=complete,

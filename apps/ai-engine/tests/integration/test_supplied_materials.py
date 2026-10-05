@@ -16,17 +16,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.schema import CreateSchema, DropSchema
 
-from api import material_service
+from api import durable_jobs, material_service, material_worker
 from api.dependencies import current_user, db_session
 from api.routes import classrooms
-from database.models import Base, CurriculumChunk, User
+from config.settings import settings
+from database.models import BackgroundJob, Base, CurriculumChunk, User
 from rag import ingestion
 from rag.stores import pgvector_store
 
 pytestmark = [pytest.mark.integration, pytest.mark.db, pytest.mark.asyncio(loop_scope="function")]
 
 
-async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypatch):
+async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypatch, tmp_path):
     directory = os.getenv("KODMOD_MATERIAL_TEST_DIR")
     if not directory:
         pytest.skip("set KODMOD_MATERIAL_TEST_DIR to validate the four supplied PDFs")
@@ -51,6 +52,10 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
 
     monkeypatch.setattr(ingestion, "_embed_batch", embed)
     monkeypatch.setattr(material_service, "async_session", factory)
+    monkeypatch.setattr(durable_jobs, "async_session", factory)
+    monkeypatch.setattr(material_worker, "async_session", factory)
+    monkeypatch.setattr(material_worker, "HEARTBEAT_PATH", tmp_path / "worker-heartbeat")
+    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path / "uploads")
     monkeypatch.setattr(pgvector_store, "async_session", factory)
     from database import session as database_session
 
@@ -73,6 +78,27 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
 
     app.dependency_overrides[current_user] = user
     app.dependency_overrides[db_session] = transaction
+
+    async def process_queued_job(kind, target_id):
+        job = await durable_jobs.claim()
+        assert job is not None
+        assert job.kind == kind and str(job.target_id) == target_id
+        await material_worker.run_job(job)
+        async with factory() as session:
+            stored = await session.get(BackgroundJob, job.id)
+            assert stored.state == "complete", stored.error_message
+
+    async def completed_preview(client, class_id, response):
+        assert response.status_code == 202, response.text
+        pending = response.json()
+        assert pending["state"] == "pending" and pending["preview"] is None
+        await process_queued_job("material_import", pending["import_id"])
+        read = await client.get(f"/classes/{class_id}/imports/{pending['import_id']}")
+        assert read.status_code == 200, read.text
+        completed = read.json()
+        assert completed["state"] == "complete" and completed["preview"] is not None
+        return completed
+
     created = False
     try:
         async with admin_engine.begin() as connection:
@@ -116,8 +142,8 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
                 response = await client.post(
                     endpoint, files={"file": (path.name, raw, "application/pdf")}
                 )
-                assert response.status_code == 200, response.text
-                preview = response.json()
+                imported = await completed_preview(client, cid, response)
+                preview = imported["preview"]
                 chapters = preview["sections"]
                 selection = preview["page_range"]
                 if preview["preview_type"] == "book":
@@ -125,15 +151,11 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
                     first = chapters[0]["first"]
                     selection = {"first": first, "last": min(chapters[0]["last"], first + 19)}
                     response = await client.post(
-                        endpoint,
-                        files={"file": (path.name, raw, "application/pdf")},
-                        data={
-                            "first_page": str(selection["first"]),
-                            "last_page": str(selection["last"]),
-                        },
+                        f"/classes/{cid}/imports/{imported['import_id']}/pages",
+                        json={"first_page": selection["first"], "last_page": selection["last"]},
                     )
-                    assert response.status_code == 200, response.text
-                    preview = response.json()
+                    imported = await completed_preview(client, cid, response)
+                    preview = imported["preview"]
                 assert 1 <= len(preview["content"]) <= 100000
                 assert not (await client.get(f"/classes/{cid}")).json()["materials"], (
                     "preview must not save or publish"
@@ -143,6 +165,7 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
                     "content": preview["content"],
                     "published": False,
                     "source_filename": f"{path.name} · Halaman {selection['first']}–{selection['last']}",
+                    "source_import_id": imported["import_id"],
                 }
                 response = await client.post(f"/classes/{cid}/materials", json=payload)
                 assert response.status_code == 201, response.text
@@ -161,6 +184,8 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
                     f"/classes/{cid}/materials/{mid}", json=payload | {"published": True}
                 )
                 assert response.status_code == 200, response.text
+                assert response.json()["rag_status"] == "pending"
+                await process_queued_job("material_index", mid)
                 actor["name"] = "student"
                 response = await client.get(f"/classes/{cid}/materials/{mid}")
                 assert response.status_code == 200, response.text
@@ -206,7 +231,7 @@ async def test_supplied_pdfs_preview_publish_read_and_scoped_retrieval(monkeypat
                         "characters": len(payload["content"]),
                         "chunks": material["n_chunks"],
                         "rag_status": material["rag_status"],
-                        "flow": "preview-draft-publish-index-read-retrieve",
+                        "flow": "queued-import-worker-preview-draft-publish-worker-index-read-retrieve",
                         "provider": "simulated",
                     }
                 )

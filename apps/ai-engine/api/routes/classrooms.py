@@ -31,6 +31,7 @@ from database.models import (
     Enrollment,
     MaterialImport,
     MaterialProgress,
+    Subject,
     User,
 )
 
@@ -40,7 +41,7 @@ router = APIRouter(tags=["classes"])
 class ClassWrite(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     name: str = Field(min_length=1, max_length=120)
-    subject: str = Field(min_length=1, max_length=120)
+    subject: str = Field(default="", max_length=120)
     subject_id: uuid.UUID | None = None
     description: str = Field(default="", max_length=2000)
 
@@ -56,6 +57,11 @@ class ClassUpdate(BaseModel):
 class MemberWrite(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     username: str = Field(min_length=3, max_length=64)
+
+
+class MemberBatchWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    student_ids: list[uuid.UUID] = Field(min_length=1, max_length=50)
 
 
 class MaterialWrite(BaseModel):
@@ -174,11 +180,20 @@ async def create_class(
     user: User = Depends(require_teacher),
     session: AsyncSession = Depends(db_session),
 ):
-    """Create a teacher-owned classroom with its subject label."""
+    """Create a teacher-owned classroom linked to a catalog subject."""
     subject = await select_subject(session, body.subject_id)
+    if subject is None and body.subject:
+        subject = await session.scalar(
+            select(Subject).where(func.lower(Subject.name) == body.subject.lower())
+        )
+        if subject is None:
+            subject = Subject(name=body.subject, created_by=user.id)
+            session.add(subject)
+            await session.flush()
+    if subject is None:
+        raise HTTPException(422, "Pilih mata pelajaran kelas.")
     values = body.model_dump()
-    if subject:
-        values["subject"] = subject.name
+    values["subject"], values["subject_id"] = subject.name, subject.id
     row = Classroom(teacher_id=user.id, **values)
     session.add(row)
     await session.flush()
@@ -370,6 +385,75 @@ async def review_mapping(
         await enqueue_material(session, material)
     await session.commit()
     return result
+
+
+@router.get("/{class_id}/member-candidates")
+async def member_candidates(
+    class_id: uuid.UUID,
+    q: str = "",
+    user: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Search active students who are not yet enrolled in the teacher's classroom."""
+    await accessible(session, class_id, user)
+    term = q.strip()[:64].replace("%", "").replace("_", "").strip()
+    if len(term) < 2:
+        return []
+    pattern = f"%{term}%"
+    enrolled = select(Enrollment.student_id).where(Enrollment.class_id == class_id)
+    rows = (
+        await session.scalars(
+            select(User)
+            .where(
+                User.role == "student",
+                User.is_active.is_(True),
+                User.id.not_in(enrolled),
+                User.full_name.ilike(pattern) | User.username.ilike(pattern),
+            )
+            .order_by(User.full_name)
+            .limit(20)
+        )
+    ).all()
+    return [{"id": str(m.id), "full_name": m.full_name, "username": m.username} for m in rows]
+
+
+@router.post("/{class_id}/members/batch", status_code=201)
+async def add_members(
+    class_id: uuid.UUID,
+    body: MemberBatchWrite,
+    user: User = Depends(require_teacher),
+    session: AsyncSession = Depends(db_session),
+):
+    """Enroll several active students chosen from the candidate search."""
+    row = await accessible(session, class_id, user, write=True)
+    ids = list(dict.fromkeys(body.student_ids))
+    students = (
+        await session.scalars(
+            select(User).where(User.id.in_(ids), User.role == "student", User.is_active.is_(True))
+        )
+    ).all()
+    enrolled = set(
+        (
+            await session.scalars(
+                select(Enrollment.student_id).where(
+                    Enrollment.class_id == class_id, Enrollment.student_id.in_(ids)
+                )
+            )
+        ).all()
+    )
+    added = [student for student in students if student.id not in enrolled]
+    if not added:
+        raise HTTPException(409, "Siswa yang dipilih sudah menjadi anggota kelas.")
+    for student in added:
+        session.add(Enrollment(class_id=class_id, student_id=student.id))
+    try:
+        await session.flush()
+    except IntegrityError as error:
+        await session.rollback()
+        raise HTTPException(409, "Keanggotaan sudah berubah. Muat ulang kelas.") from error
+    for student in added:
+        record(session, row, user, "member.added", student.id)
+    return {"added": len(added)}
 
 
 @router.post("/{class_id}/members", status_code=201)

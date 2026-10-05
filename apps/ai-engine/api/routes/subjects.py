@@ -45,6 +45,16 @@ async def _subject_or_404(session: AsyncSession, subject_id: uuid.UUID) -> Subje
     return subject
 
 
+async def _editable_subject(session: AsyncSession, subject_id: uuid.UUID, actor: User) -> Subject:
+    """Only the creating teacher or an administrator can change catalog content."""
+    subject = await _subject_or_404(session, subject_id)
+    if actor.role != "admin" and subject.created_by != actor.id:
+        raise HTTPException(
+            403, "Hanya pembuat mata pelajaran atau admin yang bisa mengubah isinya."
+        )
+    return subject
+
+
 async def _decorate(session: AsyncSession, subjects: list[Subject]) -> list[SubjectOut]:
     """Attach concept and document counts in two queries rather than 2N."""
     if not subjects:
@@ -133,18 +143,20 @@ async def create_subject(
             status.HTTP_409_CONFLICT, "A subject with that name already exists."
         ) from e
     await session.refresh(subject)
-    return (await _decorate(session, [subject]))[0]
+    result = (await _decorate(session, [subject]))[0]
+    await session.commit()
+    return result
 
 
 @router.patch("/{subject_id}", response_model=SubjectOut)
 async def update_subject(
     subject_id: uuid.UUID,
     body: SubjectWrite,
-    _: User = Depends(require_teacher),
+    actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ) -> SubjectOut:
     """Rename a subject or change its description."""
-    subject = await _subject_or_404(session, subject_id)
+    subject = await _editable_subject(session, subject_id, actor)
     subject.name = body.name
     subject.description = body.description
     session.add(subject)
@@ -155,17 +167,19 @@ async def update_subject(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "A subject with that name already exists."
         ) from e
-    return (await _decorate(session, [subject]))[0]
+    result = (await _decorate(session, [subject]))[0]
+    await session.commit()
+    return result
 
 
 @router.delete("/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_subject(
     subject_id: uuid.UUID,
-    _: User = Depends(require_teacher),
+    actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ) -> None:
     """Removes the subject with its concepts, documents, and indexed chunks."""
-    subject = await _subject_or_404(session, subject_id)
+    subject = await _editable_subject(session, subject_id, actor)
     stored = list(
         (
             await session.execute(
@@ -183,6 +197,7 @@ async def delete_subject(
         raise HTTPException(
             409, "Mata pelajaran sudah dipakai oleh kelas atau kuis. Riwayat tetap disimpan."
         ) from None
+    await session.commit()
     for path in stored:
         delete_upload(path)
 
@@ -191,11 +206,11 @@ async def delete_subject(
 async def create_concept(
     subject_id: uuid.UUID,
     body: ConceptWrite,
-    _: User = Depends(require_teacher),
+    actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ) -> Concept:
     """Add a concept to a subject."""
-    await _subject_or_404(session, subject_id)
+    await _editable_subject(session, subject_id, actor)
     concept = Concept(
         subject_id=subject_id,
         name=body.name,
@@ -222,11 +237,7 @@ async def retire_concept(
     session: AsyncSession = Depends(db_session),
 ):
     """Retire future attribution while preserving reviewed historical evidence."""
-    subject = await _subject_or_404(session, subject_id)
-    if actor.role != "admin" and subject.created_by != actor.id:
-        raise HTTPException(
-            403, "Hanya pembuat mata pelajaran atau admin yang bisa menonaktifkan konsep."
-        )
+    await _editable_subject(session, subject_id, actor)
     concept = await session.scalar(
         select(Concept)
         .where(Concept.id == concept_id, Concept.subject_id == subject_id)
@@ -318,11 +329,11 @@ async def upload_document(
     subject_id: uuid.UUID,
     background: BackgroundTasks,
     file: UploadFile,
-    teacher: User = Depends(require_teacher),
+    teacher: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ) -> Document:
     """Accept a PDF, Markdown, or text file and index it for this subject."""
-    await _subject_or_404(session, subject_id)
+    await _editable_subject(session, subject_id, teacher)
     validate_suffix(file.filename)
     stored = await save_upload(file)
 
@@ -347,7 +358,7 @@ async def upload_document(
 @documents_router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: uuid.UUID,
-    _: User = Depends(require_teacher),
+    actor: User = Depends(require_staff),
     session: AsyncSession = Depends(db_session),
 ) -> None:
     """Remove a document, its indexed chunks, and the stored file."""
@@ -356,8 +367,10 @@ async def delete_document(
     doc = await session.get(Document, document_id)
     if doc is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such document.")
+    await _editable_subject(session, doc.subject_id, actor)
     stored_path = doc.stored_path
     await delete_by_document(document_id)
     await session.delete(doc)
     await session.flush()
+    await session.commit()
     delete_upload(stored_path)

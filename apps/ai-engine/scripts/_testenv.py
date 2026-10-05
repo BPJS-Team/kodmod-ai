@@ -46,6 +46,7 @@ TEST_ENV: dict[str, str] = {
     # concurrency (KM-PERF-003); the pool is pre-warmed at startup in session.py.
     "DB_POOL_SIZE": "40",
     "UPLOAD_DIR": str(ROOT / ".runtime" / "uploads"),
+    "AUDIO_DIR": str(ROOT / ".runtime" / "test-audio"),
     "JWT_SECRET": "test-secret-not-for-prod-0123456789abcdef",
     # High host port avoids Windows Hyper-V reservations around 8000.
     "OPENAI_BASE_URL": "http://127.0.0.1:18199/v1",

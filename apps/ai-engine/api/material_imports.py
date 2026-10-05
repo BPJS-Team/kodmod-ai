@@ -1,6 +1,7 @@
 """Bounded document extraction for teacher review before material publication."""
 
 import io
+import re
 import zipfile
 from pathlib import PurePosixPath
 from typing import Any
@@ -23,6 +24,37 @@ WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 def safe_filename(filename: str | None) -> str:
     return PurePosixPath((filename or "materi.txt").replace("\\", "/")).name[:300]
+
+
+LIST_START = re.compile(r"^([-*•▪●○]|\d{1,2}[.)]|[a-zA-Z][.)])\s")
+SPACES = re.compile(r"[ \t\u00a0]{2,}")
+
+
+def _continues(previous: str, line: str) -> bool:
+    """Whether a PDF line break split one sentence across two visual lines."""
+    if len(previous) < 15 or not line or previous[-1] in ".!?:;" or "=" in line[:2]:
+        return False
+    if LIST_START.match(line):
+        return False
+    return line[0].islower() or previous[-1] in ",-("
+
+
+def tidy_pdf_text(text: str) -> str:
+    """Rejoin wrapped sentences and collapse spacing without touching formulas or lists."""
+    lines: list[str] = []
+    for raw in text.replace("\r", "").split("\n"):
+        line = SPACES.sub(" ", raw).rstrip()
+        stripped = line.strip()
+        if lines and lines[-1] and stripped and _continues(lines[-1].strip(), stripped):
+            previous = lines[-1].strip()
+            before_hyphen = previous[:-1] if previous.endswith("-") else ""
+            word_fragment = re.search(r"([^\W\d_]+)$", before_hyphen, re.UNICODE)
+            is_wrapped_word = bool(word_fragment and len(word_fragment.group(1)) >= 3)
+            joiner = "" if is_wrapped_word and stripped[0].islower() else " "
+            lines[-1] = (lines[-1][:-1] if joiner == "" else lines[-1]) + joiner + stripped
+        elif stripped or (lines and lines[-1]):
+            lines.append(line if stripped else "")
+    return "\n".join(lines).strip()
 
 
 def extract_document(
@@ -95,6 +127,7 @@ def extract_document(
                         recognized = recognize_page(data, index)
                         text = recognized["text"]
                         provenance.update(method="ocr", confidence=recognized["confidence"])
+                    text = tidy_pdf_text(text)
                     characters += len(text) + (2 if pages else 0)
                     if characters > MAX_CONTENT:
                         if selected:

@@ -18,6 +18,18 @@ pytestmark = pytest.mark.unit
 
 
 class MaterialImportTest(classroom_test.ClassroomRoutesTest):
+    def test_pdf_cleanup_preserves_subtraction_sign_and_dehyphenates_wrapped_words(self):
+        from api.material_imports import tidy_pdf_text
+
+        self.assertEqual(
+            tidy_pdf_text("Kurangkan nilai x -\ny dari kedua sisi persamaan."),
+            "Kurangkan nilai x - y dari kedua sisi persamaan.",
+        )
+        self.assertEqual(
+            tidy_pdf_text("Gunakan istilah inter-\nnasional dalam contoh ini."),
+            "Gunakan istilah internasional dalam contoh ini.",
+        )
+
     async def completed_preview(self, cid, response):
         from api import durable_jobs, material_worker
 

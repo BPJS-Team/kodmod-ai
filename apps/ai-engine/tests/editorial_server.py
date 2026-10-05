@@ -8,6 +8,7 @@ The disposable schema is removed on graceful shutdown. No provider calls.
 from __future__ import annotations
 
 import os
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -37,7 +38,8 @@ from api.routes import auth, classrooms, editorial_quizzes, subjects
 from api.security import hash_password
 from database.models import Base, Classroom, Enrollment, Subject, User
 
-SCHEMA = "editorial_ui_fixture"
+# Each run owns its schema, including after an interrupted earlier fixture.
+SCHEMA = f"editorial_ui_fixture_{uuid.uuid4().hex}"
 PASSWORD = "editorial-test-password-123"
 URL = "postgresql+asyncpg://kodmod:kodmod@127.0.0.1:5434/kodmod_editorial_migration_test"
 engine = create_async_engine(
@@ -49,8 +51,7 @@ factory = async_sessionmaker(engine, expire_on_commit=False)
 fixture: dict[str, Any] = {}
 
 
-@asynccontextmanager
-async def lifespan(_):
+async def seed_fixture():
     async with engine.begin() as connection:
         await connection.execute(text(f'CREATE SCHEMA "{SCHEMA}"'))
         await connection.run_sync(Base.metadata.create_all)
@@ -96,10 +97,19 @@ async def lifespan(_):
             class_id=str(classroom.id),
             users={name: str(user.id) for name, user in users.items()},
         )
-    yield
-    async with engine.begin() as connection:
-        await connection.execute(text(f'DROP SCHEMA "{SCHEMA}" CASCADE'))
-    await engine.dispose()
+
+
+@asynccontextmanager
+async def lifespan(_):
+    try:
+        await seed_fixture()
+        yield
+    finally:
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(text(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE'))
+        finally:
+            await engine.dispose()
 
 
 app = FastAPI(lifespan=lifespan)
