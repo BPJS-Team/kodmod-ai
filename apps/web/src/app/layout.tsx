@@ -15,6 +15,7 @@ import { LanguageProvider } from "@/components/language-provider";
 import { getServerI18n } from "@/lib/server-language";
 import { serverDisplaySettings } from "@/lib/server-display";
 import "../styles/accessibility.css";
+import "../styles/loading.css";
 
 export const metadata: Metadata = {
   title: "KODMOD - Asisten Belajar",

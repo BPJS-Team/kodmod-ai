@@ -1,4 +1,6 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
+import { Skeleton } from "./ui/skeleton";
 import { UiText, UiDate } from "@/components/language-provider";
 
 
@@ -52,6 +54,7 @@ export function TeacherStudentDetailView({
   const [error, setError] = useState("");
 
   async function refresh(next = window) {
+    if (loading || loadingTranscript) return;
     setLoading(true);
     setError("");
     try {
@@ -73,6 +76,7 @@ export function TeacherStudentDetailView({
   }
 
   async function toggleTranscript(id: string) {
+    if (loading || loadingTranscript) return;
     if (openSessionId === id) {
       setOpenSessionId(null);
       return;
@@ -94,6 +98,8 @@ export function TeacherStudentDetailView({
   const analytics = data.analytics;
   return (
     <section className="teacher-detail-workspace" aria-label={`Detail siswa ${data.account.full_name}`}>
+      <LoadingStatus active={loading} label="Memuat progres siswa…" />
+      <LoadingStatus active={loadingTranscript} label="Membuka riwayat sesi…" />
       <Link className="back-link" href="/guru/analitik"><ArrowLeft size={16} aria-hidden="true" /><UiText>{" Kembali ke analitik"}</UiText></Link>
       <div className="teacher-detail-heading">
         <div className="teacher-profile-heading">
@@ -156,13 +162,13 @@ export function TeacherStudentDetailView({
             <div className="teacher-session-list">
               {sessions.map((session) => (
                 <div className="teacher-session-item" key={session.id}>
-                  <button type="button" className="teacher-session-toggle" onClick={() => void toggleTranscript(session.id)} aria-expanded={openSessionId === session.id}>
+                  <button type="button" className="teacher-session-toggle" disabled={loading || loadingTranscript} onClick={() => void toggleTranscript(session.id)} aria-expanded={openSessionId === session.id}>
                     <span><strong>{session.title}</strong><small>{session.subject_name || <UiText>{"Umum"}</UiText>} · {<UiDate value={session.started_at} />}</small></span>
                     {openSessionId === session.id ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
                   </button>
                   {openSessionId === session.id && (
                     <div className="teacher-transcript">
-                      {loadingTranscript ? <p className="analytics-empty"><UiText>{"Membuka transcript…"}</UiText></p> : transcript?.turns.map((turn, index) => (
+                      {loadingTranscript ? <div aria-hidden="true"><Skeleton className="page-loading-field" /><Skeleton className="page-loading-field" /></div> : transcript?.turns.map((turn, index) => (
                         <div className={`teacher-turn ${turn.role === "student" ? "student" : "assistant"}`} key={`${turn.timestamp || "turn"}-${index}`}>
                           <span>{turn.role === "student" ? <UiText>{"Siswa"}</UiText> : <UiText>{"Tutor"}</UiText>}</span>
                           <p>{turn.text}</p>

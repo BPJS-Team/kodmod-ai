@@ -29,6 +29,8 @@ test("speech engine preference defaults to unset and persists either choice", ()
   assert.equal(readSpeechEnginePreference(storage), "device");
   writeSpeechEnginePreference(storage, "app");
   assert.equal(readSpeechEnginePreference(storage), "app");
+  writeSpeechEnginePreference(storage, "off");
+  assert.equal(readSpeechEnginePreference(storage), "off");
 });
 
 test("a quota failure keeps the latest voice choice for this page instead of rereading stale storage", async (t) => {

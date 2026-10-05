@@ -1,4 +1,6 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
+import { Spinner } from "./ui/spinner";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 
 import { UiText, UiDate } from "@/components/language-provider";
@@ -16,6 +18,7 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const locked = useRef(false);
+  const [closing, setClosing] = useState(false);
   async function refresh(close = false) {
     if (locked.current) return;
     locked.current = true;
@@ -31,6 +34,7 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
       )
         return;
       setBusy(true);
+      setClosing(close);
       setError("");
       if (close)
         await editorialRequest(
@@ -55,6 +59,7 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
   }
   return (
     <>
+      <LoadingStatus active={busy} label={closing ? "Menutup penugasan…" : "Memuat hasil siswa…"} />
       <div className="editorial-status-bar">
         <Badge active={!data.assignment.is_closed}>
           {data.assignment.is_closed ? <UiText>{"Penugasan ditutup"}</UiText> : <UiText>{"Penugasan aktif"}</UiText>}
@@ -104,14 +109,14 @@ export function AssignmentResults({ initial }: { initial: TeacherResults }) {
               disabled={busy}
               onClick={() => void refresh()}
             >
-              <RefreshCw size={16} aria-hidden="true" /><UiText>{"Perbarui"}</UiText></button>
+              {busy && !closing ? <Spinner /> : <RefreshCw size={16} aria-hidden="true" />}<UiText>{"Perbarui"}</UiText></button>
             <button
               type="button"
               className="button secondary small"
               disabled={busy || data.assignment.is_closed}
               onClick={() => void refresh(true)}
             >
-              <LockKeyhole size={16} aria-hidden="true" /><UiText>{"Tutup penugasan"}</UiText></button>
+              {busy && closing ? <Spinner /> : <LockKeyhole size={16} aria-hidden="true" />}<UiText>{"Tutup penugasan"}</UiText></button>
           </div>
         </div>
         {data.results.length ? (

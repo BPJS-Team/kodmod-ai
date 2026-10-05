@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { JSDOM } from "jsdom";
 import { attachMenuNarration, announceLanguageChange } from "../src/lib/menu-narration.mjs";
 import { createSpeechCoordinator } from "../src/lib/speech-output.mjs";
 
@@ -102,4 +103,23 @@ test("language confirmation cancels old queued hover before the new-language aud
   assert.equal(requests.length, 1);
   assert.equal(requests[0].language, "en");
   speech.stop();
+});
+
+test("dialog announcement dispatched on window reaches menu narration", () => {
+  const dom = new JSDOM("<!doctype html><html><body></body></html>");
+  const played = [];
+  const speech = {
+    getState: () => ({ owner: null, status: "idle" }),
+    queueMenu() {},
+    cancelQueuedMenu() {},
+    stop() {},
+    play(request) { played.push(request); },
+  };
+  const detach = attachMenuNarration({ document: dom.window.document, speech, language: "id", engine: "app", pathname: "/" });
+  dom.window.dispatchEvent(new dom.window.CustomEvent("kodmod:dialog-announce", {
+    detail: { text: "Yakin ingin keluar?" },
+  }));
+  assert.deepEqual(played.map(request => request.text), ["Yakin ingin keluar?"]);
+  detach();
+  dom.window.close();
 });

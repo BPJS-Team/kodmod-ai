@@ -1,4 +1,4 @@
-export type SpeechEngine = "app" | "device";
+export type SpeechEngine = "app" | "device" | "off";
 export type VoiceSettings = { engine: SpeechEngine; menuEnabled: boolean; tutorEnabled: boolean;
   lowVision: boolean; guidedNavigation: boolean; fontScale: "default" | "large" | "extra-large";
   highContrast: boolean; spacious: boolean; reducedMotion: boolean };

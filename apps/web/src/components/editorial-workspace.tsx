@@ -36,6 +36,9 @@ import {
 } from "@/lib/editorial-types";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
 import { Badge } from "./ui";
+import { LoadingStatus } from "./loading-feedback";
+import { Spinner } from "./ui/spinner";
+import { RefreshButton } from "./refresh-button";
 import "@/styles/editorial.css";
 
 const blankQuestion = (order_index: number): EditableQuestion => ({
@@ -62,6 +65,12 @@ const editable = (draft: QuizDraft): EditableQuestion[] =>
     difficulty: q.difficulty,
     concept_id: q.concept_id,
   }));
+
+const operationLabels: Record<string, string> = {
+  propose: "Menyusun usulan soal…", save: "Menyimpan revisi kuis…", subject: "Menyimpan mata pelajaran…",
+  publish: "Menerbitkan kuis…", assign: "Menyiapkan penugasan…", reviewer: "Memperbarui reviewer…",
+  "submit-review": "Mengajukan kuis untuk review…", approve: "Menyimpan hasil review…", reject: "Menyimpan hasil review…",
+};
 
 export function QuizWorkspace({
   initial = null,
@@ -109,6 +118,8 @@ export function QuizWorkspace({
   const [proposalMaterial, setProposalMaterial] = useState("");
   const [proposalCount, setProposalCount] = useState("5");
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState("");
+  const [busyAction, setBusyAction] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const inFlight = useRef(false);
@@ -134,6 +145,7 @@ export function QuizWorkspace({
     text: string,
     work: () => Promise<void>,
     success: string,
+    operation = "update",
   ) {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -147,6 +159,8 @@ export function QuizWorkspace({
       )
         return;
       setBusy(true);
+      setBusyAction(operation);
+      setBusyLabel(operationLabels[operation] ?? "Memperbarui kuis…");
       setError("");
       await work();
       setMessage(success);
@@ -203,6 +217,7 @@ export function QuizWorkspace({
         if (!draft) router.replace(`/guru/kuis/${next.id}`);
       },
       "Revisi disimpan. Pilih reviewer, lalu ajukan untuk review.",
+      "save",
     );
   }
   async function transition(
@@ -224,11 +239,13 @@ export function QuizWorkspace({
         );
       },
       "Status kuis berhasil diperbarui.",
+      name,
     );
   }
 
   return (
     <>
+      <LoadingStatus active={busy} label={busyLabel} />
       <div className="editorial-status-bar">
         <Badge active={state !== "rejected"}>{<UiText>{quizState[state]}</UiText>}</Badge>
         <span><UiText>{"Revisi "}</UiText>{draft?.current_version ?? 1} · {items.length}<UiText>{" soal"}</UiText></span>
@@ -239,11 +256,7 @@ export function QuizWorkspace({
       {error && (
         <p className="editorial-error" role="alert">
           {error}{" "}
-          <button
-            type="button"
-            className="button secondary small"
-            onClick={() => router.refresh()}
-          ><UiText>{"Muat ulang halaman"}</UiText></button>
+          <RefreshButton label="Muat ulang halaman" size="sm" disabled={busy} />
         </p>
       )}
       <p className="editorial-live" role="status" aria-live="polite">
@@ -271,8 +284,8 @@ export function QuizWorkspace({
                     void run("Ganti soal dengan usulan dari materi?", "Soal di editor akan diganti. Tinjau semua pertanyaan, pilihan, dan pembahasannya sebelum menyimpan.", async () => {
                       const proposed = await editorialRequest<{ questions: EditableQuestion[] }>("/teacher/quizzes/propose", "POST", { class_id: source.class_id, material_id: source.id, n_questions: Number(proposalCount), language });
                       setItems(proposed.questions); if (!title.trim()) setTitle(source.title); setDirty(true);
-                    }, "Usulan soal siap ditinjau. Belum diterbitkan ke siswa.");
-                  }}><Sparkles size={17} aria-hidden="true" /><UiText>{"Buat usulan soal"}</UiText></button>
+                    }, "Usulan soal siap ditinjau. Belum diterbitkan ke siswa.", "propose");
+                  }}>{busy && busyAction === "propose" ? <Spinner /> : <Sparkles size={17} aria-hidden="true" />}<UiText>{"Buat usulan soal"}</UiText></button>
                 </section>
                 <label className="field"><UiText>{"Judul kuis"}</UiText><Input
                     value={title}
@@ -364,9 +377,10 @@ export function QuizWorkspace({
                           setDirty(true);
                         },
                         "Mata pelajaran ditambahkan.",
+                        "subject",
                       )
                     }
-                  ><UiText>{"Tambah mata pelajaran"}</UiText></button>
+                  >{busy && busyAction === "subject" && <Spinner />}<UiText>{"Tambah mata pelajaran"}</UiText></button>
                 </details>
               </section>
               <section className="panel editorial-section">
@@ -593,8 +607,8 @@ export function QuizWorkspace({
                   className="button primary"
                   disabled={busy || !subjectId || !dirty}
                 >
-                  <Save size={17} aria-hidden="true" />{" "}
-                  {busy
+                  {busy && busyAction === "save" ? <Spinner /> : <Save size={17} aria-hidden="true" />}{" "}
+                  {busy && busyAction === "save"
                     ? <UiText>{"Menyimpan…"}</UiText>
                     : draft
                       ? <UiText>{"Simpan revisi baru"}</UiText>
@@ -692,6 +706,7 @@ export function QuizWorkspace({
                         );
                       },
                       "Kuis berhasil ditugaskan ke kelas.",
+                      "assign",
                     );
                   }}
                   className="editorial-assignment-form"
@@ -734,7 +749,7 @@ export function QuizWorkspace({
                     className="button primary"
                     disabled={busy || dirty || !classId}
                   >
-                    <Send size={16} aria-hidden="true" /><UiText>{"Bagikan ke kelas"}</UiText></button>
+                    {busy && busyAction === "assign" ? <Spinner /> : <Send size={16} aria-hidden="true" />}<UiText>{"Bagikan ke kelas"}</UiText></button>
                   {!classes.some((c) => !c.is_archived) && (
                     <Link className="learning-back" href="/guru/kelas/baru"><UiText>{"Buat kelas aktif terlebih dahulu"}</UiText>{" "}
                       <ArrowUpRight size={16} aria-hidden="true" />
@@ -832,7 +847,7 @@ export function QuizWorkspace({
                           { reviewer_id: reviewer || null },
                         )
                       }
-                    ><UiText>{"Simpan reviewer"}</UiText></button>
+                    >{busy && busyAction === "reviewer" && <Spinner />}<UiText>{"Simpan reviewer"}</UiText></button>
                     <button
                       className="button primary"
                       type="button"
@@ -849,7 +864,7 @@ export function QuizWorkspace({
                         )
                       }
                     >
-                      <Send size={16} aria-hidden="true" /><UiText>{"Ajukan review"}</UiText></button>
+                      {busy && busyAction === "submit-review" ? <Spinner /> : <Send size={16} aria-hidden="true" />}<UiText>{"Ajukan review"}</UiText></button>
                   </>
                 )}
                 {draft && state === "approved" && (
@@ -865,7 +880,7 @@ export function QuizWorkspace({
                       )
                     }
                   >
-                    <CheckCircle2 size={17} aria-hidden="true" /><UiText>{"Terbitkan kuis"}</UiText></button>
+                    {busy && busyAction === "publish" ? <Spinner /> : <CheckCircle2 size={17} aria-hidden="true" />}<UiText>{"Terbitkan kuis"}</UiText></button>
                 )}
                 {!draft && (
                   <p className="editorial-help"><UiText>{"Simpan draft pertama untuk mulai review."}</UiText></p>
@@ -902,7 +917,7 @@ export function QuizWorkspace({
                     )
                   }
                 >
-                  <CheckCircle2 size={16} aria-hidden="true" /><UiText>{"Setujui revisi"}</UiText></button>
+                  {busy && busyAction === "approve" ? <Spinner /> : <CheckCircle2 size={16} aria-hidden="true" />}<UiText>{"Setujui revisi"}</UiText></button>
                 <button
                   type="button"
                   className="button secondary"
@@ -915,7 +930,7 @@ export function QuizWorkspace({
                       { note },
                     )
                   }
-                ><UiText>{"Minta perbaikan"}</UiText></button>
+                >{busy && busyAction === "reject" && <Spinner />}<UiText>{"Minta perbaikan"}</UiText></button>
                 {admin && state === "in_review" && (
                   <details className="editorial-details">
                     <summary><UiText>{"Ganti reviewer"}</UiText></summary>
@@ -948,7 +963,7 @@ export function QuizWorkspace({
                           { reviewer_id: reviewer || null },
                         )
                       }
-                    ><UiText>{"Ganti reviewer"}</UiText></button>
+                    >{busy && busyAction === "reviewer" && <Spinner />}<UiText>{"Ganti reviewer"}</UiText></button>
                   </details>
                 )}
               </div>

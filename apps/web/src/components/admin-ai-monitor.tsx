@@ -1,4 +1,5 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -67,6 +68,7 @@ export function AdminAiMonitor({
 
   return (
     <div className="admin-ai-monitor-layout">
+      <LoadingStatus active={loading} label="Memuat penggunaan layanan AI…" />
       {/* Top Header Controls */}
       <div className="admin-ai-topbar">
         <div>

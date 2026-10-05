@@ -21,7 +21,7 @@ import type {
   StudentMaterial,
 } from "@/lib/class-types";
 import { Badge, Empty, Heading } from "./ui";
-import { ClassAction, MaterialForm } from "./class-forms";
+import { ClassAction, MaterialForm, MemberPicker } from "./class-forms";
 import { StudentReader } from "./student-reader";
 import { StudentOverview } from "./student-overview";
 import { readingSettings } from "@/lib/reading-settings";
@@ -221,7 +221,16 @@ export async function ClassRoom({
       {row.is_archived && (
         <p className="info-note"><UiText>{"Kelas ini diarsipkan. Aktifkan kembali untuk mengelola anggota dan materi."}</UiText></p>
       )}
-      {teacher && !row.is_archived && <ClassSubjectForm key={row.subject_id} classId={id} subjectId={row.subject_id} subjects={subjects} />}
+      {teacher && !row.is_archived && (
+        <details className="panel" style={{ marginBlock: "1rem" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+            <UiText>{"Pengaturan mata pelajaran kelas"}</UiText>
+          </summary>
+          <div style={{ marginTop: "1rem" }}>
+            <ClassSubjectForm key={row.subject_id} classId={id} subjectId={row.subject_id} subjects={subjects} />
+          </div>
+        </details>
+      )}
       <div className={`class-detail-grid ${teacher ? "" : "student-detail"}`}>
         <section className="panel learning-section">
           <div className="learning-section-heading">
@@ -240,7 +249,7 @@ export async function ClassRoom({
                 <Link
                   key={material.id}
                   className="material-row"
-                  href={`${baseFor(role)}/kelas/${id}/materi/${material.id}`}
+                  href={teacher ? `/guru/kelas/${id}/materi/${material.id}` : `/siswa/tutor?class_id=${id}&material_id=${material.id}`}
                 >
                   <span className="material-number">
                     {String(index + 1).padStart(2, "0")}
@@ -271,7 +280,7 @@ export async function ClassRoom({
             <h2><UiText>{"Anggota kelas"}</UiText>{" "}
               <span className="muted">({row.members.length})</span>
             </h2>
-            {!row.is_archived && <ClassAction classId={id} mode="add-member" />}
+            {!row.is_archived && <MemberPicker classId={id} />}
             <div className="member-list">
               {row.members.map((member) => (
                 <div className="member-row" key={member.id}>
@@ -320,11 +329,10 @@ export async function MaterialPage({
     role === "student" ? readingSettings() : Promise.resolve(readingDefaults),
   ]);
   const { token } = await requireSession(role);
-  const [subjects, mapping, concepts]: [CurriculumSubject[], MaterialMapping | null, CurriculumConcept[]] = role === "teacher" && !row.is_archived ? await Promise.all([
-    backend<CurriculumSubject[]>("/subjects", token),
+  const [mapping, concepts]: [MaterialMapping | null, CurriculumConcept[]] = role === "teacher" && !row.is_archived ? await Promise.all([
     backend<MaterialMapping>(`/classes/${id}/materials/${materialId}/concepts`, token),
     row.subject_id ? backend<CurriculumConcept[]>(`/subjects/${row.subject_id}/concepts`, token) : Promise.resolve([]),
-  ]) : [[], null, []];
+  ]) : [null, []];
   return (
     <>
       <Link className="learning-back" href={`${baseFor(role)}/kelas/${id}`}>
@@ -338,8 +346,14 @@ export async function MaterialPage({
       {role === "teacher" && !row.is_archived ? (
         <>
           <MaterialForm classId={id} material={material} />
-          <ClassSubjectForm key={row.subject_id} classId={id} subjectId={row.subject_id} subjects={subjects} />
-          {mapping && <MaterialConceptsForm key={`${mapping.content_version}:${mapping.mapping_version}:${mapping.subject_id}`} classId={id} mapping={mapping} concepts={concepts} />}
+          {mapping && (
+            <details className="panel" style={{ marginTop: "1.5rem" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                <UiText>{"Pengaturan lanjutan (Konsep pembelajaran)"}</UiText>
+              </summary>
+              <MaterialConceptsForm key={`${mapping.content_version}:${mapping.mapping_version}:${mapping.subject_id}`} classId={id} mapping={mapping} concepts={concepts} />
+            </details>
+          )}
         </>
       ) : role === "student" ? (
         <StudentReader

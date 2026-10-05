@@ -13,6 +13,7 @@ import type { StudentMaterial } from "@/lib/class-types";
 import { useQuizExitGuard } from "./use-quiz-exit-guard";
 import { prepareQuizSubmission, quizProgress, readQuizSubmissionResponse, submissionFailureAction } from "@/lib/quiz-submission.mjs";
 import { VoiceControls } from "./voice-controls";
+import { LoadingStatus } from "./loading-feedback";
 
 type Phase = "idle" | "starting" | "active" | "submitting" | "review" | "complete";
 
@@ -203,6 +204,7 @@ export function StudentQuiz({ materials = [], initialSession = null, embedded = 
 
   return (
     <div className="quiz-shell">
+      <LoadingStatus active={phase === "starting" || phase === "submitting"} label={phase === "starting" ? "Menyiapkan soal dari materi…" : "Memeriksa jawabanmu…"} />
       {(phase === "idle" || phase === "starting") && (
         <section className="panel quiz-start-card">
           <div className="quiz-start-icon" aria-hidden="true">

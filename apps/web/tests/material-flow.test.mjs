@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as materialFlow from "../src/lib/material-flow.mjs";
 import { chatMessagePayload, materialTutorStatus, validateMaterialFile, parseMaterialPageRange } from "../src/lib/material-flow.mjs";
 
 const classId = "10000000-0000-4000-8000-000000000001";
@@ -32,4 +33,11 @@ test("book selections forward a bounded integer range and reject partial or malf
   for (const [first, last] of [[null, "23"], ["1", null], ["0", "3"], ["3", "1"],
     ["1", "151"], ["500", "501"], ["1e2", "120"], [new Blob(["2"]), "3"]])
     assert.throws(() => parseMaterialPageRange(first, last));
+});
+
+test("an imported source keeps its target class fixed until the import is discarded", () => {
+  assert.equal(materialFlow.canChangeMaterialTarget?.({ importing: false, hasBook: false, sourceImportId: "import-1" }), false);
+  assert.equal(materialFlow.canChangeMaterialTarget?.({ importing: false, hasBook: true, sourceImportId: "" }), false);
+  assert.equal(materialFlow.canChangeMaterialTarget?.({ importing: true, hasBook: false, sourceImportId: "" }), false);
+  assert.equal(materialFlow.canChangeMaterialTarget?.({ importing: false, hasBook: false, sourceImportId: "" }), true);
 });

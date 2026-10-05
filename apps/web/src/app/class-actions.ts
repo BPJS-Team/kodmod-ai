@@ -39,8 +39,8 @@ export async function createClass(
       method: "POST",
       body: JSON.stringify({
         name: value(data, "name"),
-        subject: value(data, "subject"),
-        subject_id: value(data, "subject_id") || null,
+        subject: value(data, "subject_id") === "__new__" ? value(data, "new_subject") : "",
+        subject_id: uuid(value(data, "subject_id")) ? value(data, "subject_id") : null,
         description: value(data, "description"),
       }),
     });
@@ -93,6 +93,27 @@ export async function changeClass(
   };
 }
 
+export async function addMembers(
+  classId: string,
+  _: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const { token } = await requireSession("teacher");
+  const ids = data.getAll("student_ids").map(String).filter(uuid);
+  if (!uuid(classId) || !ids.length) return { error: "Pilih minimal satu siswa." };
+  let added = 0;
+  try {
+    ({ added } = await backend<{ added: number }>(`/classes/${classId}/members/batch`, token, {
+      method: "POST",
+      body: JSON.stringify({ student_ids: ids.slice(0, 50) }),
+    }));
+  } catch (error) {
+    return failure(error);
+  }
+  refresh();
+  return { success: `${added} siswa berhasil ditambahkan.` };
+}
+
 export async function saveMaterial(
   classId: string,
   materialId: string | null,
@@ -100,12 +121,13 @@ export async function saveMaterial(
   data: FormData,
 ): Promise<ActionState> {
   const { token } = await requireSession("teacher");
-  if (!uuid(classId) || (materialId && !uuid(materialId)))
-    return { error: "Materi tidak valid." };
+  const effectiveClassId = classId || value(data, "class_id");
+  if (!uuid(effectiveClassId) || (materialId && !uuid(materialId)))
+    return { error: "Kelas atau materi tidak valid." };
   let row: Material;
   try {
     row = await backend<Material>(
-      `/classes/${classId}/materials${materialId ? `/${materialId}` : ""}`,
+      `/classes/${effectiveClassId}/materials${materialId ? `/${materialId}` : ""}`,
       token,
       {
         method: materialId ? "PUT" : "POST",
@@ -123,6 +145,6 @@ export async function saveMaterial(
   }
   refresh();
   if (!materialId)
-    redirect(`/guru/kelas/${classId}/materi/${row.id}?success=material-saved`);
+    redirect(`/guru/kelas/${effectiveClassId}/materi/${row.id}?success=material-saved`);
   return { success: "Materi disimpan sesuai status publikasinya." };
 }

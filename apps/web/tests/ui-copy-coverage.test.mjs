@@ -17,6 +17,12 @@ test("explicit translated interface labels have English copy across current page
     const walk = node => {
       if (ts.isCallExpression(node) && /(?:^|\.)t$/.test(node.expression.getText(source))) literal(node.arguments[0]);
       if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === "UiText") for (const child of node.children) { if (ts.isJsxText(child)) check(child.text); else if (ts.isJsxExpression(child)) literal(child.expression); }
+      if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && ["LoadingStatus", "PageLoading", "ActionFeedback", "Feedback", "RefreshButton"].includes(node.tagName.getText(source))) {
+        for (const attr of node.attributes.properties) if (ts.isJsxAttribute(attr) && ["label", "description", "pendingLabel"].includes(attr.name.getText(source))) {
+          literal(attr.initializer && ts.isJsxExpression(attr.initializer) ? attr.initializer.expression : attr.initializer);
+        }
+      }
+      if (ts.isCallExpression(node) && ["setBusyLabel", "setImportStage"].includes(node.expression.getText(source))) literal(node.arguments[0]);
       ts.forEachChild(node, walk);
     };
     walk(source);

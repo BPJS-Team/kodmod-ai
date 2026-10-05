@@ -109,7 +109,7 @@ export function StudentLibrary({
           {filtered.slice(0, limit).map((m) => (
             <Link
               className="panel student-material-card"
-              href={`/siswa/kelas/${m.class_id}/materi/${m.id}`}
+              href={`/siswa/tutor?class_id=${m.class_id}&material_id=${m.id}`}
               key={m.id}
             >
               <div className="student-material-top">
@@ -129,7 +129,7 @@ export function StudentLibrary({
                     <>
                       <CheckCircle2 size={16} aria-hidden="true" /><UiText>{"Sudah dipelajari"}</UiText></>
                   ) : (
-                    "Belum selesai"
+                    <UiText>{"Belajar dengan Tutor"}</UiText>
                   )}
                 </span>
                 <ArrowUpRight size={19} aria-hidden="true" />

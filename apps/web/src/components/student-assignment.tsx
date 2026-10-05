@@ -7,11 +7,10 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  RefreshCw,
   Save,
   Send,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { RefreshButton } from "./refresh-button";
 import { confirmAction, notifyResult } from "@/lib/dialogs";
 import { EditorialError, editorialRequest } from "@/lib/editorial-client";
 import {
@@ -30,6 +29,8 @@ import {
 import { VoiceControls } from "./voice-controls";
 import { useQuizExitGuard } from "./use-quiz-exit-guard";
 import { Badge } from "./ui";
+import { LoadingStatus } from "./loading-feedback";
+import { Spinner } from "./ui/spinner";
 import "@/styles/editorial.css";
 
 const pendingMemory = new Map<string, string | null>();
@@ -90,7 +91,6 @@ export function StudentAssignment({
   initialResult: AssignmentResult | null;
 }) {
   const { t } = useI18n();
-  const router = useRouter();
   const [attempt, setAttempt] = useState(initialAttempt);
   const [result, setResult] = useState(initialResult);
   const [index, setIndex] = useState(0);
@@ -100,6 +100,7 @@ export function StudentAssignment({
       : "",
   );
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const inFlight = useRef(false);
@@ -134,6 +135,7 @@ export function StudentAssignment({
       )
         return;
       setBusy(true);
+      setBusyLabel("Menyiapkan tugas…");
       setError("");
       const next = await editorialRequest<AssignmentAttempt>(
         base + "/start",
@@ -172,6 +174,7 @@ export function StudentAssignment({
       )
         return;
       setBusy(true);
+      setBusyLabel("Menyimpan jawaban…");
       setError("");
       const next = await editorialRequest<AssignmentAttempt>(
         `${base}/answers/${question.id}`,
@@ -232,6 +235,7 @@ export function StudentAssignment({
       );
       writePending(attempt.id, intent);
       setBusy(true);
+      setBusyLabel("Menilai hasil tugas…");
       setError("");
       const next = await editorialRequest<AssignmentResult>(
         base + "/submit",
@@ -323,12 +327,7 @@ export function StudentAssignment({
             <p><UiText>{"Guru akan membuka pembahasan setelah batas pengumpulan:"}</UiText>{" "}
               {<UiDate value={assignment.due_at} time empty="Tanpa batas waktu" />}.
             </p>
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => router.refresh()}
-            >
-              <RefreshCw size={16} aria-hidden="true" /><UiText>{"Periksa pembahasan"}</UiText></button>
+            <RefreshButton label="Periksa pembahasan" />
           </section>
         )}
       </div>
@@ -336,6 +335,7 @@ export function StudentAssignment({
 
   return (
     <>
+      <LoadingStatus active={busy} label={busyLabel} />
       <div className="editorial-status-bar">
         <Badge active={availability === "open"}>
           {<UiText>{availabilityLabel[availability]}</UiText>}
@@ -345,12 +345,7 @@ export function StudentAssignment({
       {error && (
         <p role="alert" className="editorial-error">
           {t(error)}{" "}
-          <button
-            type="button"
-            className="button secondary small"
-            onClick={() => router.refresh()}
-            disabled={busy}
-          ><UiText>{"Muat ulang progres"}</UiText></button>
+          <RefreshButton label="Muat ulang progres" size="sm" disabled={busy} />
         </p>
       )}
       <p className="editorial-live" role="status" aria-live="polite">
@@ -379,7 +374,7 @@ export function StudentAssignment({
             disabled={busy || availability !== "open"}
           >
             {busy ? <UiText>{"Menyiapkan…"}</UiText> : <UiText>{"Mulai tugas"}</UiText>}
-            <ArrowRight size={17} aria-hidden="true" />
+            {busy ? <Spinner /> : <ArrowRight size={17} aria-hidden="true" />}
           </button>
         </section>
       ) : (
@@ -474,7 +469,7 @@ export function StudentAssignment({
                     }
                     onClick={() => void save()}
                   >
-                    <Save size={16} aria-hidden="true" /><UiText>{"Simpan & lanjut"}</UiText></button>
+                    {busy && busyLabel === "Menyimpan jawaban…" ? <Spinner /> : <Save size={16} aria-hidden="true" />}<UiText>{"Simpan & lanjut"}</UiText></button>
                 </div>
               </section>
               <VoiceControls
@@ -503,8 +498,8 @@ export function StudentAssignment({
                   }
                   onClick={() => void submit()}
                 >
-                  <Send size={17} aria-hidden="true" />{" "}
-                  {busy
+                  {busy && busyLabel === "Menilai hasil tugas…" ? <Spinner /> : <Send size={17} aria-hidden="true" />}{" "}
+                  {busy && busyLabel === "Menilai hasil tugas…"
                     ? <UiText>{"Mengirim…"}</UiText>
                     : pending
                       ? <UiText>{"Coba kirim kembali"}</UiText>

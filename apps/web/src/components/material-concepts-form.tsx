@@ -20,7 +20,7 @@ export function CreateSubjectForm() {
     <summary><UiText>{"Mata pelajaran belum ada?"}</UiText></summary>
     <form action={action} className="form-stack" onReset={event => event.preventDefault()}>
       <label className="field"><UiText>{"Nama mata pelajaran"}</UiText><Input name="name" required maxLength={120} disabled={pending} /></label>
-      <ActionFeedback state={state} /><Button disabled={pending}><Plus size={16} aria-hidden="true" /><UiText>{"Tambahkan mata pelajaran"}</UiText></Button>
+      <ActionFeedback state={state} pending={pending} /><Button loading={pending} loadingText={<UiText>{"Menyimpan…"}</UiText>} disabled={pending}><Plus size={16} aria-hidden="true" /><UiText>{"Tambahkan mata pelajaran"}</UiText></Button>
     </form>
   </details>;
 }
@@ -34,7 +34,7 @@ export function ClassSubjectForm({ classId, subjectId, subjects }: { classId: st
       <label className="field"><UiText>{"Mata pelajaran"}</UiText><NativeSelect name="subject_id" defaultValue={subjectId || ""} disabled={pending}>
         <option value=""><UiText>{"Belum dipilih"}</UiText></option>{subjects.map(subject => <option value={subject.id} key={subject.id}>{subject.name}</option>)}
       </NativeSelect></label>
-      <ActionFeedback state={state} /><Button disabled={pending || !subjects.length}><UiText>{"Simpan mata pelajaran"}</UiText></Button>
+      <ActionFeedback state={state} pending={pending} /><Button loading={pending} loadingText={<UiText>{"Menyimpan…"}</UiText>} disabled={pending || !subjects.length}><UiText>{"Simpan mata pelajaran"}</UiText></Button>
     </form>
     <CreateSubjectForm />
   </CardContent></Card>;
@@ -61,7 +61,7 @@ export function MaterialConceptsForm({ classId, mapping, concepts }: { classId: 
         <label className="field"><UiText>{"Konsep utama (opsional)"}</UiText><NativeSelect name="primary_concept_id" value={primary} onChange={event => setPrimary(event.target.value)} disabled={pending}>
           <option value=""><UiText>{"Tanpa konsep utama"}</UiText></option>{concepts.filter(concept => selected.includes(concept.id)).map(concept => <option key={concept.id} value={concept.id}>{concept.name}</option>)}
         </NativeSelect></label>
-        <ActionFeedback state={state} /><Button disabled={pending}><CheckCircle2 size={16} aria-hidden="true" /><UiText>{"Setujui konsep"}</UiText></Button>
+        <ActionFeedback state={state} pending={pending} /><Button loading={pending} loadingText={<UiText>{"Menyimpan…"}</UiText>} disabled={pending}><CheckCircle2 size={16} aria-hidden="true" /><UiText>{"Setujui konsep"}</UiText></Button>
       </form>
       <CreateConceptForm subjectId={mapping.subject_id} />
     </>}
@@ -76,7 +76,7 @@ function CreateConceptForm({ subjectId }: { subjectId: string }) {
     <form action={action} className="form-stack" onReset={event => event.preventDefault()}>
       <label className="field"><UiText>{"Nama konsep"}</UiText><Input name="name" required maxLength={200} disabled={pending} /></label>
       <label className="field"><UiText>{"Kode konsep"}</UiText><Input name="slug" required maxLength={200} pattern="[a-z0-9][a-z0-9-]*" autoCapitalize="none" disabled={pending} /><small><UiText>{"Gunakan huruf kecil, angka, dan tanda hubung. Contoh: pecahan-senilai."}</UiText></small></label>
-      <ActionFeedback state={state} /><Button disabled={pending}><Plus size={16} aria-hidden="true" /><UiText>{"Tambahkan konsep"}</UiText></Button>
+      <ActionFeedback state={state} pending={pending} /><Button loading={pending} loadingText={<UiText>{"Menyimpan…"}</UiText>} disabled={pending}><Plus size={16} aria-hidden="true" /><UiText>{"Tambahkan konsep"}</UiText></Button>
     </form>
   </details>;
 }

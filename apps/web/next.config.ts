@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   allowedDevOrigins: ["127.0.0.1"],
+  // Keep native Windows builds usable alongside Docker and the development tools.
+  experimental: process.platform === "win32" ? { cpus: 2 } : undefined,
   async rewrites() {
     return {
       fallback: [{ source: "/api/:path*", destination: `${apiOrigin}/:path*` }],

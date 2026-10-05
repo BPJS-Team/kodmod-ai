@@ -1,4 +1,5 @@
 "use client";
+import { Spinner } from "./ui/spinner";
 import { NativeSelect } from "@/components/ui/native-select";
 
 import { UiText, useI18n } from "@/components/language-provider";
@@ -60,10 +61,10 @@ function ProgressButton({
         className={`button ${completion ? "primary" : "secondary"}`}
         disabled={pending}
       >
-        <Icon size={18} aria-hidden="true" />
+        {pending ? <Spinner /> : <Icon size={18} aria-hidden="true" />}
         {pending ? <UiText>{"Menyimpan…"}</UiText> : <UiText>{label}</UiText>}
       </button>
-      <ActionFeedback state={state} />
+      <ActionFeedback state={state} pending={pending} />
     </form>
   );
 }
@@ -134,6 +135,7 @@ export function StudentReader({
           /><UiText>{"Kontras tinggi"}</UiText></label>
         <div className="reader-settings-actions">
           <button className="button primary" disabled={saving}>
+            {saving && <Spinner />}
             {saving ? <UiText>{"Menyimpan…"}</UiText> : <UiText>{"Simpan tampilan"}</UiText>}
           </button>
           <button
@@ -146,7 +148,7 @@ export function StudentReader({
               setContrast(readingDefaults.contrast);
             }}
           ><UiText>{"Pratinjau bawaan"}</UiText></button>
-          <ActionFeedback state={settingsState} />
+          <ActionFeedback state={settingsState} pending={saving} />
         </div>
       </form>
       <div className="reader-status" role="status">

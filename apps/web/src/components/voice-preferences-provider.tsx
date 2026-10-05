@@ -5,16 +5,18 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   useSyncExternalStore, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Headphones, Smartphone, Volume2, X, Play, Square, ChevronDown } from "lucide-react";
+import { Headphones, Smartphone, Volume2, VolumeX, X, Play, Square, ChevronDown } from "lucide-react";
 import { DEFAULT_VOICE_SETTINGS, parseVoiceSettings, readVoiceSettingsSnapshot, writeVoiceSettings,
   parseDisplaySettings, type DisplaySettings, type VoiceSettings, type SpeechEngine } from "@/lib/speech-preferences.mjs";
-import { clearSpeechAudioCache, pruneExpiredSpeechAudioCache } from "@/lib/speech-audio-cache";
+import { pruneExpiredSpeechAudioCache } from "@/lib/speech-audio-cache";
 import { speechOutput } from "@/lib/browser-speech";
 import { attachMenuNarration, announceLanguageChange } from "@/lib/menu-narration.mjs";
 import type { Language } from "@/lib/i18n.mjs";
 import { useI18n } from "./language-provider";
 import { Switch } from "./ui/switch";
 import { Dialog } from "./ui/dialog";
+import { LoadingStatus } from "./loading-feedback";
+import { Spinner } from "./ui/spinner";
 
 type Preferences = VoiceSettings & { openVoicePreferences: () => void; toggleMenu: () => void };
 const VoicePreferencesContext = createContext<Preferences | null>(null);
@@ -32,9 +34,13 @@ const guide = {
   id: "Selamat datang di KODMOD. Pilih suara KODMOD atau suara perangkat. Tekan contoh suara untuk mendengarkan. Pembaca menu dapat dimatikan. Suara Tutor tetap aktif saat belajar.",
   en: "Welcome to KODMOD. Choose the KODMOD voice or your device voice. Press preview to listen. You can turn menu reading off. Your Tutor still speaks while you learn.",
 };
-const sample = {
+const sampleApp = {
   id: "Halo, ini suara KODMOD. Saya akan menemanimu belajar, satu langkah demi satu langkah.",
   en: "Hello, this is the KODMOD voice. I will help you learn, one step at a time.",
+};
+const sampleDevice = {
+  id: "Ini adalah suara perangkat Anda.",
+  en: "This is your device voice.",
 };
 
 export function useVoicePreferences() {
@@ -53,8 +59,6 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<VoiceSettings>({ ...DEFAULT_VOICE_SETTINGS, ...initialDisplay });
   const [warning, setWarning] = useState("");
-  const [clearing, setClearing] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
   const [languagePending, setLanguagePending] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -67,7 +71,7 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
 
   const openVoicePreferences = useCallback(() => {
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setDraft(preferences); setWarning(""); setConfirmClear(false); setSettingsOpen(true);
+    setDraft(preferences); setWarning(""); setSettingsOpen(true);
   }, [preferences]);
   const toggleMenu = useCallback(() => {
     const value = { ...preferences, menuEnabled: !preferences.menuEnabled };
@@ -78,9 +82,34 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
     [preferences, openVoicePreferences, toggleMenu]);
 
   const preview = useCallback((engine: SpeechEngine, welcome = false) => {
-    return speechOutput.play({ owner: "voice-setup", text: welcome ? guide[language] : sample[language],
-      engine, language, menuKey: welcome ? "welcome" : "preview" });
+    if (engine === "off") return Promise.resolve();
+    const text = welcome ? guide[language] : (engine === "device" ? sampleDevice[language] : sampleApp[language]);
+    return speechOutput.play({
+      owner: "voice-setup",
+      text,
+      engine: engine === "device" ? "device" : "app",
+      language,
+      menuKey: welcome ? "welcome" : (engine === "app" ? "preview" : undefined),
+    });
   }, [language]);
+
+  // Automatically play welcome guide on the user's first interaction anywhere on the page
+  useEffect(() => {
+    if (!ready || saved || initialGuidePlayed.current) return;
+    const playGuideOnFirstInteraction = () => {
+      if (initialGuidePlayed.current) return;
+      initialGuidePlayed.current = true;
+      if (preferences.engine !== "off" && preferences.menuEnabled) {
+        void preview(preferences.engine, true);
+      }
+    };
+    window.addEventListener("pointerdown", playGuideOnFirstInteraction, { once: true });
+    window.addEventListener("keydown", playGuideOnFirstInteraction, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", playGuideOnFirstInteraction);
+      window.removeEventListener("keydown", playGuideOnFirstInteraction);
+    };
+  }, [ready, saved, preferences.engine, preferences.menuEnabled, preview]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -89,16 +118,12 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
       if (!returnFocus.current) returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       element.showModal(); wasOpen.current = true;
       element.querySelector<HTMLButtonElement>("[data-guide-button]")?.focus();
-      if (!saved && !initialGuidePlayed.current) {
-        initialGuidePlayed.current = true;
-        void preview("app", true);
-      }
     } else if (!opened && element.open) {
       element.close(); speechOutput.stop("voice-setup");
       if (wasOpen.current) returnFocus.current?.focus();
       returnFocus.current = null; wasOpen.current = false;
     }
-  }, [opened, saved, preview]);
+  }, [opened]);
 
   useEffect(() => {
     void pruneExpiredSpeechAudioCache().catch(() => {});
@@ -136,9 +161,9 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
   }, [language, opened, draft.engine, draft.menuEnabled, preferences.engine, preferences.menuEnabled]);
 
   useEffect(() => {
-    if (!ready || opened || !saved || !preferences.menuEnabled) return;
+    if (!ready || opened || !preferences.menuEnabled || preferences.engine === "off") return;
     return attachMenuNarration({ document, speech: speechOutput, language, engine: preferences.engine, pathname });
-  }, [ready, opened, saved, preferences.menuEnabled, preferences.engine, pathname, language]);
+  }, [ready, opened, preferences.menuEnabled, preferences.engine, pathname, language]);
 
   useEffect(() => {
     if (!preferences.guidedNavigation) return;
@@ -150,9 +175,9 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
       const dx = event.changedTouches[0].clientX - start.x;
       const dy = event.changedTouches[0].clientY - start.y; start = null;
       if (Math.abs(dx) < 70 || Math.abs(dy) > 40) return;
-      if ((event.target as HTMLElement).closest("input,textarea,select,[role=slider]")) return;
+      if (event.target instanceof Element && event.target.closest("input,textarea,select,[role=slider],[role=combobox],[role=listbox],[contenteditable=true]")) return;
       const scope = dialog.current?.open ? dialog.current : document;
-      const targets = [...scope.querySelectorAll<HTMLElement>("a,button,input,select,textarea,summary,[tabindex='0']")]
+      const targets = [...scope.querySelectorAll<HTMLElement>("a[href],button,input,select,textarea,summary,[tabindex='0']")]
         .filter(element => !element.hasAttribute("disabled") && element.getClientRects().length > 0 && element.tabIndex >= 0);
       if (!targets.length) return;
       const index = targets.indexOf(document.activeElement as HTMLElement);
@@ -174,13 +199,6 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
     setSettingsOpen(false);
   }
 
-  async function clearAudio() {
-    setClearing(true); speechOutput.stop();
-    try { await clearSpeechAudioCache(); setWarning("Suara tersimpan sudah dihapus."); }
-    catch { setWarning("Audio belum dapat dibuat. Coba lagi."); }
-    finally { setClearing(false); setConfirmClear(false); }
-  }
-
   return <VoicePreferencesContext.Provider value={value}>
     {children}
     {warning && !opened && <div className="global-voice-notice" role="status">{t(warning)}</div>}
@@ -199,17 +217,21 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
         </button>
         <fieldset className="voice-preferences-options">
           <legend className="sr-only">{t("Pilih suara untuk belajar")}</legend>
-          {(["app", "device"] as SpeechEngine[]).map(engine => <div key={engine} className={`voice-choice-row ${draft.engine === engine ? "is-selected" : ""}`}>
+          {([
+            { id: "app" as const, title: "Suara KODMOD", desc: "Suara yang jernih untuk menemani belajar.", icon: Headphones },
+            { id: "device" as const, title: "Suara perangkat", desc: "Gunakan suara yang tersedia di HP atau komputermu.", icon: Smartphone },
+            { id: "off" as const, title: "Suara mati", desc: "Matikan suara pembaca menu. Suara Tutor dan latihan soal tetap aktif.", icon: VolumeX },
+          ]).map(({ id: engine, title, desc, icon: Icon }) => <div key={engine} className={`voice-choice-row ${draft.engine === engine ? "is-selected" : ""}`}>
             <label className="voice-preference-option">
               <input type="radio" name="speech-engine" value={engine} checked={draft.engine === engine}
-                onChange={() => { setDraft({ ...draft, engine }); void preview(engine); }} />
-              <span className="voice-preference-icon" aria-hidden="true">{engine === "app" ? <Headphones size={21} /> : <Smartphone size={21} />}</span>
-              <span className="voice-preference-copy"><strong>{t(engine === "app" ? "Suara KODMOD" : "Suara perangkat")}</strong>
-                <small>{t(engine === "app" ? "Suara yang jernih untuk menemani belajar." : "Gunakan suara yang tersedia di HP atau komputermu.")}</small></span>
+                onChange={() => { setDraft({ ...draft, engine }); if (engine !== "off") void preview(engine); }} />
+              <span className="voice-preference-icon" aria-hidden="true"><Icon size={21} /></span>
+              <span className="voice-preference-copy"><strong>{t(title)}</strong>
+                <small>{t(desc)}</small></span>
               <span className="voice-preference-choice" aria-hidden="true" />
             </label>
-            <button type="button" className="voice-preview-button" aria-label={`${t("Dengarkan contoh suara")} ${t(engine === "app" ? "Suara KODMOD" : "Suara perangkat")}`}
-              onClick={() => void preview(engine)}><Play size={16} aria-hidden="true" />{t("Dengarkan")}</button>
+            {engine !== "off" && <button type="button" className="voice-preview-button" aria-label={`${t("Dengarkan contoh suara")} ${t(title)}`}
+              onClick={() => void preview(engine)}><Play size={16} aria-hidden="true" />{t("Dengarkan")}</button>}
           </div>)}
         </fieldset>
         <div className="voice-options-settings">
@@ -233,19 +255,12 @@ export function VoicePreferencesProvider({ children, initialDisplay = parseDispl
           <div className="voice-setting-row"><label htmlFor="voice-contrast"><strong>{t("Kontras tinggi")}</strong></label><Switch id="voice-contrast" checked={draft.highContrast} onCheckedChange={highContrast => setDraft({ ...draft, highContrast })} /></div>
           <div className="voice-setting-row"><label htmlFor="voice-spacing"><strong>{t("Jarak bacaan lebih lega")}</strong></label><Switch id="voice-spacing" checked={draft.spacious} onCheckedChange={spacious => setDraft({ ...draft, spacious })} /></div>
           <div className="voice-setting-row"><label htmlFor="voice-motion"><strong>{t("Kurangi animasi")}</strong></label><Switch id="voice-motion" checked={draft.reducedMotion} onCheckedChange={reducedMotion => setDraft({ ...draft, reducedMotion })} /></div>
-          <div className="voice-setting-row"><label htmlFor="voice-guided"><strong>{t("Geser untuk berpindah menu")}</strong>
-            <small>{t("Geser kiri atau kanan untuk memindahkan fokus.")}</small></label>
-            <Switch id="voice-guided" checked={draft.guidedNavigation} onCheckedChange={guidedNavigation => setDraft({ ...draft, guidedNavigation })} /></div>
+          <div className="voice-setting-row"><label htmlFor="voice-guided"><strong>{t("Navigasi dengan geser")}</strong><small>{t("Geser kanan atau kiri untuk pindah menu. Matikan saat memakai pembaca layar perangkat.")}</small></label><Switch id="voice-guided" checked={draft.guidedNavigation} onCheckedChange={guidedNavigation => setDraft({ ...draft, guidedNavigation })} /></div>
         </details>
-        {(previewActive && output.status !== "idle") && <div className="voice-preview-status" role="status">
-          <span>{t(output.message || (output.status === "loading" ? "Menyiapkan…" : output.status === "playing" ? "Sedang membacakan." : "Pembacaan dijeda."))}</span>
+        <LoadingStatus active={languagePending} label="Mengganti bahasa…" compact />
+        {(previewActive && output.status !== "idle") && <div className="voice-preview-status" role="status" aria-live="polite">
+          <span>{output.status === "loading" && <Spinner className="loading-inline-icon" />}{t(output.status === "loading" ? "Menyiapkan suara…" : output.message || (output.status === "playing" ? "Sedang membacakan." : "Pembacaan dijeda."))}</span>
           <button type="button" className="icon-button" aria-label={t("Hentikan suara")} onClick={() => speechOutput.stop("voice-setup")}><Square size={15} aria-hidden="true" /></button>
-        </div>}
-        {saved && <div className="voice-cache-actions">
-          {!confirmClear ? <button type="button" className="text-link" onClick={() => setConfirmClear(true)}>{t("Hapus suara tersimpan")}</button>
-            : <div className="voice-cache-confirm"><p>{t("Hapus suara tersimpan?")}</p><p>{t("Audio akan tersedia kembali saat kamu mendengarkan.")}</p>
-              <button type="button" className="button secondary" onClick={() => setConfirmClear(false)}>{t("Batal")}</button>
-              <button type="button" className="button danger" disabled={clearing} onClick={() => void clearAudio()}>{t("Ya, hapus")}</button></div>}
         </div>}
         {warning && <p className="voice-preferences-warning" role="status">{t(warning)}</p>}
       </div>

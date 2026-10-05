@@ -5,9 +5,11 @@
 .experience-button[aria-pressed=false] { color: #52677f; background: #fff; }
 .sound-toggle span { font-size: .66rem; font-weight: 800; }
 .sound-toggle { padding-inline: 9px; }
-.toolbar-language { appearance: none; min-height: 42px; width: 45px; text-align: center; border: 1px solid #d7e4f6; border-radius: 12px; background: #f5f9ff; font: inherit; font-size: .8rem; font-weight: 700; color: #24548e; cursor: pointer; }
+.toolbar-language, .kodmod-select.toolbar-language { appearance: none; flex: 0 0 auto; min-height: 42px; width: 45px; min-width: 45px; padding: 0; text-align: center; border: 1px solid #d7e4f6; border-radius: 12px; background: #f5f9ff; font: inherit; font-size: .8rem; font-weight: 700; color: #24548e; cursor: pointer; }
 .toolbar-error { position: absolute; top: calc(100% + 8px); right: 0; padding: 10px 14px; background: #fff; color: #9a3030; box-shadow: 0 4px 30px #0d203d25; min-width: 240px; border-radius: 12px; z-index: 60; }
 .lp-header-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+.lp-mobile-nav summary { list-style: none; }
+.lp-mobile-nav summary::marker { content: ""; }
 .lp-header .experience-button, .lp-header .toolbar-language { background: #102442; border-color: #ffffff26; color: #c8ddfc; }
 .lp-header .experience-button:hover { background: #183762; }
 .lp-header .experience-button[aria-pressed=false] { background: #0b1b33; color: #9aacc4; }
@@ -87,3 +89,172 @@ html[data-low-vision=true] .muted,html[data-low-vision=true] .field small,html[d
 .book-import-picker .material-status-actions { flex-wrap: wrap; }
 @media (max-width: 420px) { .book-import-range { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 480px) { .book-import-picker .material-status-actions .button { width: 100%; justify-content: center; } }
+
+/* Toolbar button stability */
+.experience-button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.lp-header .experience-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Desktop typography & navigation refinements for Siswa, Guru, and Admin */
+@media (min-width: 769px) {
+  .admin-shell .admin-nav a {
+    font-size: 0.95rem;
+    font-weight: 550;
+    padding: 0.78rem 1rem;
+    border-radius: 12px;
+    gap: 0.85rem;
+  }
+  .admin-shell .sidebar-label {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+  .workspace-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #162f55;
+  }
+
+  .admin-insights-heading p {
+    font-size: 0.9375rem;
+    color: #586c87;
+  }
+  .admin-insight-card > span:not(.admin-insight-icon) {
+    font-size: 0.8125rem;
+    color: #5f7390;
+    font-weight: 500;
+  }
+  .admin-insight-card strong {
+    font-size: 1.5rem;
+  }
+  .admin-insight-card small {
+    font-size: 0.8125rem;
+    color: #6e819b;
+  }
+  .admin-activity-item strong {
+    font-size: 0.9375rem;
+    color: #1c365d;
+    font-weight: 600;
+  }
+  .admin-activity-item p,
+  .admin-activity-item small {
+    font-size: 0.8125rem;
+    color: #5c718e;
+  }
+  .admin-insight-empty p {
+    font-size: 0.875rem;
+  }
+
+  .student-overview-label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .student-overview p,
+  .reader-controls p,
+  .reader-finish p {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #4b6282;
+  }
+  .class-card-bottom {
+    font-size: 0.875rem;
+    color: #3b5a82;
+  }
+  .learning-back {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .material-info small,
+  .member-row small {
+    font-size: 0.8125rem;
+    color: #5a7294;
+  }
+  .member-row .button {
+    font-size: 0.875rem;
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+
+  .tutor-prompt {
+    font-size: 0.875rem;
+    padding: 10px 16px;
+    font-weight: 500;
+  }
+  .tutor-sidebar-empty p {
+    font-size: 0.875rem;
+  }
+  .tutor-sources {
+    font-size: 0.875rem;
+  }
+  .tutor-sources strong {
+    font-size: 0.875rem;
+  }
+  .tutor-message-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 0.875rem;
+    border-radius: 12px;
+  }
+
+  .quiz-score-label {
+    font-size: 0.875rem;
+  }
+  .quiz-question-meta {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .quiz-question-meta span:last-child {
+    font-size: 0.8125rem;
+    padding: 6px 12px;
+  }
+  .quiz-option {
+    font-size: 1rem;
+    padding: 15px 18px;
+    border-radius: 14px;
+  }
+  .quiz-option-key {
+    width: 32px;
+    height: 32px;
+    font-size: 0.875rem;
+    border-radius: 10px;
+  }
+  .quiz-answer-footer > span {
+    font-size: 0.8125rem;
+  }
+
+  .analytics-toolbar p {
+    font-size: 0.9375rem;
+  }
+  .analytics-kicker {
+    font-size: 0.75rem;
+  }
+  .analytics-window-tabs button {
+    font-size: 0.875rem;
+    padding: 9px 15px;
+  }
+  .analytics-hero p {
+    font-size: 0.9375rem;
+  }
+  .analytics-progress-meta span {
+    font-size: 0.8125rem;
+  }
+  .analytics-stat-label {
+    font-size: 0.8125rem;
+    color: #5c708c;
+  }
+  .analytics-stat-card small {
+    font-size: 0.8125rem;
+  }
+  .analytics-hero-mark span {
+    font-size: 0.875rem;
+  }
+}

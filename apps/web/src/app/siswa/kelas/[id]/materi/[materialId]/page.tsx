@@ -1,9 +1,9 @@
-import { MaterialPage } from "@/components/class-pages";
+import { redirect } from "next/navigation";
 export default async function Page({
   params,
 }: {
   params: Promise<{ id: string; materialId: string }>;
 }) {
   const { id, materialId } = await params;
-  return <MaterialPage role="student" id={id} materialId={materialId} />;
+  redirect(`/siswa/tutor?class_id=${encodeURIComponent(id)}&material_id=${encodeURIComponent(materialId)}`);
 }

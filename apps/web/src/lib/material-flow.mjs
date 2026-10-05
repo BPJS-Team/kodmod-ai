@@ -1,6 +1,10 @@
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MATERIAL_UPLOAD_LIMIT = 25 * 1024 * 1024;
 
+export function canChangeMaterialTarget({ importing, hasBook, sourceImportId, pending = false }) {
+  return !importing && !hasBook && !sourceImportId && !pending;
+}
+
 export function materialTutorStatus(material) {
   if (!material.published) return { heading: "Materi masih berupa draft", description: "Terbitkan materi setelah meninjau isinya. Setelah itu, materi akan disiapkan untuk Tutor.", actionLabel: null };
   const current = material.indexed_version === material.content_version && (material.indexed_mapping_version ?? 0) === (material.mapping_version ?? 0) && material.n_chunks > 0;

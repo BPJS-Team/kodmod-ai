@@ -28,8 +28,8 @@ export function UserProfileDropdown({ user, roleLabel, role = "student" }: {
   const destination = role === "admin" ? "/admin" : role === "teacher" ? "/guru" : "/siswa/progres";
   const label = role === "admin" ? "Ruang administrasi" : role === "teacher" ? "Ruang mengajar" : "Progres saya";
   return <div className="profile-dropdown-container"><DropdownMenu open={open} onOpenChange={setOpen}>
-    <DropdownMenuTrigger asChild><button ref={trigger} type="button" className={`profile-dropdown-trigger ${open ? "open" : ""}`} aria-label={t("Menu profil pengguna")}>
-      <span className="avatar" aria-hidden="true">{initial}</span>
+    <DropdownMenuTrigger asChild><button ref={trigger} type="button" className={`profile-dropdown-trigger ${open ? "open" : ""}`} aria-label={t(pending ? "Keluar…" : "Menu profil pengguna")} aria-busy={pending} disabled={pending}>
+      <span className="avatar" aria-hidden="true">{pending ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : initial}</span>
       <span className="profile-dropdown-text"><strong>{user.full_name}</strong><small>{t(roleLabel)}</small></span>
       <ChevronDown size={15} className={`profile-dropdown-chevron ${open ? "rotate" : ""}`} aria-hidden="true" />
     </button></DropdownMenuTrigger>

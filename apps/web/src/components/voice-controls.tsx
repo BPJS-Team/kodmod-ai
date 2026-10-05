@@ -1,6 +1,8 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
+import { Spinner } from "./ui/spinner";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { Headphones, Mic, Pause, Play, Settings2, Square, LoaderCircle } from "lucide-react";
+import { Headphones, Mic, Pause, Play, Settings2, Square } from "lucide-react";
 import { speechOutput } from "@/lib/browser-speech";
 import { useVoicePreferences } from "./voice-preferences-provider";
 import { useI18n } from "./language-provider";
@@ -27,7 +29,7 @@ export function VoiceControls({ text, onTranscript, autoPlayKey, language: conte
     stream.current?.getTracks().forEach(track => track.stop()); stream.current = null;
     setCapture("idle");
   }, []);
-  const play = useCallback(() => speechOutput.play({ owner, text, engine, language }), [owner, text, engine, language]);
+  const play = useCallback(() => speechOutput.play({ owner, text, engine: engine === "off" ? "app" : engine, language }), [owner, text, engine, language]);
   useEffect(() => () => { speechOutput.stop(owner); cancelCapture(); }, [owner, text, engine, language, cancelCapture]);
   useEffect(() => {
     if (!autoPlayKey || autoPlayed.current === autoPlayKey) return;
@@ -89,29 +91,31 @@ export function VoiceControls({ text, onTranscript, autoPlayKey, language: conte
     }
   }
   const busy = capture === "permission" || capture === "transcribing";
+  const busyLabel = capture === "permission" ? "Menunggu izin mikrofon…" : capture === "transcribing" ? "Mengubah suara menjadi teks…" : "Menyiapkan suara…";
   const active = ["loading", "playing", "paused"].includes(state);
   return <section className="voice-panel voice-panel-compact" aria-label={t("Bantuan suara")}
     data-voice-ignore="true" data-recording={capture === "recording"}>
     <div className="voice-panel-heading"><Headphones size={21} aria-hidden="true" />
-      <strong>{t(engine === "app" ? "Suara KODMOD" : "Suara perangkat")}</strong>
+      <strong>{t(engine === "device" ? "Suara perangkat" : "Suara KODMOD")}</strong>
       <button type="button" className="icon-button" aria-label={t("Pengaturan suara")} title={t("Pengaturan suara")} onClick={openVoicePreferences}><Settings2 size={18} aria-hidden="true" /></button>
     </div>
     <div className="voice-actions">
       <button type="button" className="button primary" onClick={() => void listen()}
-        disabled={!text.trim() || busy || capture === "recording" || state === "loading"} aria-pressed={state === "playing"}>
-        {state === "loading" ? <LoaderCircle size={17} className="spin" aria-hidden="true" /> : state === "playing" ? <Pause size={17} aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
-        {t(state === "loading" ? "Menyiapkan…" : state === "playing" ? "Jeda" : state === "paused" ? "Putar lagi" : "Dengarkan")}
+        disabled={!text.trim() || busy || capture === "recording" || state === "loading"} aria-busy={state === "loading"} aria-pressed={state === "playing"}>
+        {state === "loading" ? <Spinner /> : state === "playing" ? <Pause size={17} aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
+        {t(state === "loading" ? "Menyiapkan suara…" : state === "playing" ? "Jeda" : state === "paused" ? "Putar lagi" : "Dengarkan")}
       </button>
       {onTranscript && <button type="button" className={`button ${capture === "recording" ? "danger" : "secondary"}`}
-        onClick={() => void record()} disabled={busy || active} aria-pressed={capture === "recording"}>
-        {capture === "recording" ? <Square size={17} aria-hidden="true" /> : <Mic size={17} aria-hidden="true" />}
-        {t(capture === "recording" ? "Berhenti" : busy ? "Membaca…" : "Jawab dengan suara")}
+        onClick={() => void record()} disabled={busy || active} aria-busy={busy} aria-pressed={capture === "recording"}>
+        {busy ? <Spinner /> : capture === "recording" ? <Square size={17} aria-hidden="true" /> : <Mic size={17} aria-hidden="true" />}
+        {t(capture === "recording" ? "Berhenti" : busy ? busyLabel : "Jawab dengan suara")}
       </button>}
-      {(active || capture !== "idle") && <button type="button" className="button secondary" onClick={stop}><Square size={16} aria-hidden="true" />{t("Hentikan suara")}</button>}
-      {active && state !== "loading" && <button type="button" className="button secondary" onClick={() => void play()}>{t("Ulangi")}</button>}
+      <button type="button" className="button secondary" onClick={stop} disabled={!active && capture === "idle"}><Square size={16} aria-hidden="true" />{t("Hentikan suara")}</button>
+      <button type="button" className="button secondary" onClick={() => void play()} disabled={!text.trim() || busy || capture === "recording" || state === "loading"}>{t("Ulangi")}</button>
     </div>
+    <LoadingStatus active={busy || state === "loading"} label={busyLabel} compact />
     <p className={`voice-status ${state === "error" || state === "blocked" ? "voice-status-error" : ""}`} role="status">
-      {t(output.owner === owner && output.message ? output.message : message || (state === "loading" ? "Menyiapkan…" : state === "playing" ? "Sedang membacakan." : state === "paused" ? "Pembacaan dijeda." : ""))}
+      {!busy && state !== "loading" && t(output.owner === owner && output.message ? output.message : message || (state === "playing" ? "Sedang membacakan." : state === "paused" ? "Pembacaan dijeda." : ""))}
     </p>
     {transcript && <div className="voice-transcript"><strong>{t("Hasil rekaman")}</strong><p>{transcript}</p><small>{t("Periksa kembali hasil ini sebelum digunakan sebagai jawaban.")}</small></div>}
   </section>;

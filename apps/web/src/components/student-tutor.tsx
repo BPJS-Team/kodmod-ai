@@ -1,4 +1,5 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -273,6 +274,7 @@ export function StudentTutor({
   }
 
   return (
+    <><LoadingStatus active={busy} label={pending ? "Tutor sedang menyiapkan jawaban…" : loadingSession ? "Membuka sesi belajar…" : deletingId ? "Menghapus percakapan…" : "Menyimpan progres belajar…"} />
     <section className="tutor-workspace" aria-label={t("Tutor AI siswa")}>
       <aside className="panel tutor-sidebar" aria-label={t("Riwayat percakapan")}>
         <div className="tutor-sidebar-heading">
@@ -376,7 +378,6 @@ export function StudentTutor({
               {materials.map((item) => <option key={item.id} value={item.id}>{item.subject} · {item.title}</option>)}
             </NativeSelect>
           </label>
-          {selectedMaterial && <Link className="tutor-material-link" href={`/siswa/kelas/${selectedMaterial.class_id}/materi/${selectedMaterial.id}`}><UiText>{"Buka materi"}</UiText></Link>}
           {materialUnavailable && <p className="tutor-context-warning" role="alert"><UiText>{"Akses materi ini sudah tidak tersedia. Pilih materi lain untuk memulai sesi baru."}</UiText></p>}
           {materialNotReady && <p className="tutor-context-warning" role="status"><UiText>{"Materi belum siap digunakan Tutor. Coba perbarui halaman setelah guru selesai menyiapkannya."}</UiText></p>}
         </section>
@@ -464,6 +465,6 @@ export function StudentTutor({
         {error && <p className="alert error-message tutor-feedback" role="alert">{t(error)}</p>}
         {notice && !error && <p className="tutor-feedback" role="status">{t(notice)}</p>}
       </section>
-    </section>
+    </section></>
   );
 }

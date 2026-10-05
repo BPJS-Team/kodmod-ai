@@ -160,7 +160,7 @@ export function AdminUserDetail({
                 </button>
               </form>
             )}
-            <ActionFeedback state={toggleState} />
+            <ActionFeedback state={toggleState} pending={togglePending} pendingLabel="Memperbarui akses akun…" />
           </div>
 
           {/* Card Zona Bahaya (Hapus Akun) */}
@@ -193,7 +193,7 @@ export function AdminUserDetail({
                 </button>
               </form>
             )}
-            <ActionFeedback state={deleteState} />
+            <ActionFeedback state={deleteState} pending={deletePending} pendingLabel="Menghapus akun…" />
           </div>
         </aside>
 
@@ -298,7 +298,7 @@ export function AdminUserDetail({
               </div>
             </div>
 
-            <ActionFeedback state={saveState} />
+            <ActionFeedback state={saveState} pending={savePending} pendingLabel="Menyimpan akun…" />
 
             <div className="form-footer-actions">
               <Link href="/admin/pengguna" className="button secondary">

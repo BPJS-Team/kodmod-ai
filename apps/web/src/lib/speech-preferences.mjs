@@ -29,9 +29,9 @@ export function readVoiceSettingsSnapshot() {
 export function parseVoiceSettings(snapshot) {
   try {
     const value = JSON.parse(snapshot);
-    if (!value || !["app", "device"].includes(value.engine)) return null;
+    if (!value || !["app", "device", "off"].includes(value.engine)) return null;
     return { engine: value.engine,
-      menuEnabled: typeof value.menuEnabled === "boolean" ? value.menuEnabled : true,
+      menuEnabled: typeof value.menuEnabled === "boolean" ? value.menuEnabled : (value.engine !== "off"),
       tutorEnabled: typeof value.tutorEnabled === "boolean" ? value.tutorEnabled : true,
       ...parseDisplaySettings(value), guidedNavigation: value.guidedNavigation === true };
   } catch { return null; }
@@ -61,7 +61,7 @@ export function readSpeechEnginePreference(storage) {
   try {
     const destination = storage ?? globalThis.localStorage;
     const value = destination?.getItem(SPEECH_ENGINE_PREFERENCE_KEY);
-    if (value === "app" || value === "device") return value;
+    if (value === "app" || value === "device" || value === "off") return value;
   } catch {
     return inMemoryPreference;
   }
@@ -69,7 +69,7 @@ export function readSpeechEnginePreference(storage) {
 }
 
 export function writeSpeechEnginePreference(storage, engine) {
-  if (engine !== "app" && engine !== "device") return false;
+  if (engine !== "app" && engine !== "device" && engine !== "off") return false;
   try {
     const destination = storage ?? globalThis.localStorage;
     if (!destination) throw new Error("Penyimpanan peramban tidak tersedia.");

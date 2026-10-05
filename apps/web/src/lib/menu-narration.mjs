@@ -1,16 +1,27 @@
-const targets = "[data-voice-menu],a,button,summary,input,select,textarea";
+const targets = "[data-voice-menu],a,button,summary,input,select,textarea,[role=option],[role=button],[role=menuitem],[role=combobox],.lp-capability,.lp-access-chips > span,.lp-floating,details,.kodmod-dialog-title,.kodmod-dialog-body,.swal2-title,.swal2-html-container";
 const fieldKeys = { username: "username", password: "password", full_name: "full-name", role: "role" };
 
 export function attachMenuNarration({ document, speech, language, engine, pathname }) {
+  if (engine === "off") return () => {};
+  const dialogTarget = document.defaultView ?? document;
   let last = null, lastAt = 0;
-  const closestMenu = node => node?.closest?.(targets) ?? node?.parentElement?.closest?.(targets);
-  const canPlay = () => !document.querySelector(".voice-panel[data-recording=true],dialog[open],.swal2-container");
+  const closestMenu = node => {
+    const voiced = node?.closest?.("[data-voice-menu]");
+    if (voiced) return voiced;
+    return node?.closest?.(targets) ?? node?.parentElement?.closest?.(targets);
+  };
+  const canPlay = () => !document.querySelector(".voice-panel[data-recording=true]");
   function narrate(event, hover = false) {
     if (hover && event.pointerType === "touch") return;
     const element = closestMenu(event.target);
     if (hover && element?.contains(event.relatedTarget)) return;
-    if (!element || element.closest("[data-voice-ignore],.swal2-container,[aria-hidden=true]")
-      || element.matches(":disabled,[aria-disabled=true]") || !canPlay()) {
+    const activeModal = document.querySelector(".swal2-container.swal2-shown, dialog[open]");
+    const insideModal = Boolean(activeModal && element?.closest?.(".swal2-container, dialog[open]"));
+    if (activeModal && !insideModal) {
+      speech.cancelQueuedMenu(); return;
+    }
+    if (!element || element.closest("[data-voice-ignore],[aria-hidden=true]")
+      || element.matches?.(":disabled,[aria-disabled=true]") || !canPlay()) {
       speech.cancelQueuedMenu(); return;
     }
     const current = speech.getState();
@@ -18,12 +29,12 @@ export function attachMenuNarration({ document, speech, language, engine, pathna
       speech.cancelQueuedMenu(); return;
     }
     const now = Date.now();
-    if (last === element && now - lastAt < 800) return;
-    const menuKey = element.dataset.voiceMenu ?? fieldKeys[element.getAttribute("name") ?? ""];
+    if (last === element && now - lastAt < 600) return;
+    const menuKey = element.dataset?.voiceMenu ?? fieldKeys[element.getAttribute?.("name") ?? ""];
     // Only labels are narrated. User-entered values never become speech requests.
-    const label = element.getAttribute("aria-label") ?? element.labels?.[0]?.textContent ?? element.textContent;
-    const text = label?.trim().slice(0, 300);
-    if (!text || (!menuKey && !/^\/(siswa|guru|admin)(\/|$)/.test(pathname))) {
+    const label = element.getAttribute?.("aria-label") ?? element.labels?.[0]?.textContent ?? element.innerText ?? element.textContent;
+    const text = label?.trim().replace(/\s+/g, " ").slice(0, 300);
+    if (!text || (!menuKey && !insideModal && !/^\/(siswa|guru|admin)(\/|$)/.test(pathname))) {
       speech.cancelQueuedMenu(); return;
     }
     last = element; lastAt = now;
@@ -36,11 +47,18 @@ export function attachMenuNarration({ document, speech, language, engine, pathna
     if (!element || element.contains(event.relatedTarget)) return;
     if (last === element) { speech.cancelQueuedMenu(); last = null; }
   };
+  const onDialogAnnounce = event => {
+    const text = event?.detail?.text?.trim();
+    if (!text || !canPlay()) return;
+    speech.play({ owner: "menu", text, engine, language });
+  };
+  dialogTarget.addEventListener("kodmod:dialog-announce", onDialogAnnounce);
   document.addEventListener("focusin", focus);
   document.addEventListener("click", focus);
   document.addEventListener("pointerover", hover);
   document.addEventListener("pointerout", leave);
   return () => {
+    dialogTarget.removeEventListener("kodmod:dialog-announce", onDialogAnnounce);
     document.removeEventListener("focusin", focus);
     document.removeEventListener("click", focus);
     document.removeEventListener("pointerover", hover);

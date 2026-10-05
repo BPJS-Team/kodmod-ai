@@ -1,4 +1,5 @@
 export const MATERIAL_UPLOAD_LIMIT: number;
+export function canChangeMaterialTarget(options: { importing: boolean; hasBook: boolean; sourceImportId?: string | null; pending?: boolean }): boolean;
 export type MaterialSection = { title: string; first: number; last: number; kind: "chapter" | "range" };
 export function parseMaterialPageRange(first: unknown, last: unknown): { first: number; last: number } | null;
 export function materialTutorStatus(material: { published: boolean; rag_status?: string; indexed_version?: number; content_version?: number; n_chunks?: number }): { heading: string; description: string; actionLabel: string | null };

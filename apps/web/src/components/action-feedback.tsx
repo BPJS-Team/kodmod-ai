@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { confirmAction, notifyResult, type Confirmation } from "@/lib/dialogs";
 import type { ActionState } from "@/lib/types";
 import { useI18n } from "@/components/language-provider";
+import { LoadingStatus } from "./loading-feedback";
 
 export function useConfirmedAction(
   action: (state: ActionState, data: FormData) => Promise<ActionState>,
@@ -25,7 +26,7 @@ export function useConfirmedAction(
   }, {});
 }
 
-export function ActionFeedback({ state }: { state: ActionState }) {
+export function ActionFeedback({ state, pending = false, pendingLabel = "Menyimpan…" }: { state: ActionState; pending?: boolean; pendingLabel?: string }) {
   const { t } = useI18n();
   const shown = useRef<ActionState | null>(null);
   useEffect(() => {
@@ -34,14 +35,15 @@ export function ActionFeedback({ state }: { state: ActionState }) {
     if (state.error || state.success)
       void notifyResult(state.error || state.success || "", !!state.error);
   }, [state]);
-  return (
+  return (<>
+    <LoadingStatus active={pending} label={pendingLabel} compact />
     <div aria-live="polite" aria-atomic="true">
       {state.error && <p className="alert error-message">{t(state.error)}</p>}
       {state.success && (
         <p className="alert success-message">{t(state.success)}</p>
       )}
     </div>
-  );
+  </>);
 }
 
 const messages: Record<string, string> = {

@@ -8,6 +8,7 @@ import { register } from "@/app/actions";
 import { Password } from "./forms";
 import { ActionFeedback, useConfirmedAction } from "./action-feedback";
 import { useI18n } from "./language-provider";
+import { Button } from "./ui/button";
 export function RegisterForm() {
   const { t } = useI18n();
   const [state, action, pending] = useConfirmedAction(register, {
@@ -70,10 +71,8 @@ export function RegisterForm() {
       <p className="form-help">
         {t("Minimal 8 karakter.")}
       </p>
-      <ActionFeedback state={state} />
-      <button type="submit" className="button primary" disabled={pending}>
-        {t(pending ? "Membuat akun…" : "Buat akun")}
-      </button>
+      <ActionFeedback state={state} pending={pending} pendingLabel="Membuat akun…" />
+      <Button type="submit" loading={pending} loadingText={t("Membuat akun…")}>{t("Buat akun")}</Button>
       <p className="form-help">
         {t("Sudah punya akun?")}{" "}
         <Link className="text-link" href="/masuk">

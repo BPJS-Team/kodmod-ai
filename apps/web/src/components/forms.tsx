@@ -7,7 +7,8 @@ import { UiText } from "@/components/language-provider";
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Button } from "./ui/button";
 import {
   login,
   saveUser,
@@ -29,12 +30,7 @@ function Submit({
 }) {
   const { t } = useI18n();
   return (
-    <button className="button primary" type="submit" disabled={pending}>
-      {pending && (
-        <LoaderCircle className="spin" size={18} aria-hidden="true" />
-      )}
-      {pending ? t("Memproses…") : children}
-    </button>
+    <Button type="submit" loading={pending} loadingText={t("Memproses…")}>{children}</Button>
   );
 }
 export function Password({
@@ -107,7 +103,7 @@ export function LoginForm() {
         />
       </div>
       <Password label="Kata sandi" autoComplete="current-password" />
-      <Feedback state={state} />
+      <Feedback state={state} pending={pending} pendingLabel="Masuk ke akun…" />
       <Submit pending={pending}>
         {t("Masuk")} <ArrowRight size={18} aria-hidden="true" />
       </Submit>
@@ -206,7 +202,7 @@ export function UserForm({
           />
         )}
       </div>
-      <Feedback state={state} />
+      <Feedback state={state} pending={pending} />
       <div className="form-footer">
         <Link className="button secondary" href="/admin/pengguna"><UiText>{"Batal"}</UiText></Link>
         <Submit pending={pending}>
@@ -242,7 +238,7 @@ export function StatusForm({ user, self }: { user: User; self: boolean }) {
           </Submit>
         </form>
       )}
-      <Feedback state={state} />
+      <Feedback state={state} pending={pending} />
     </section>
   );
 }

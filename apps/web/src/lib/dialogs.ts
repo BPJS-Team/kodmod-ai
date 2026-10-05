@@ -5,6 +5,15 @@ import { translate, type Language } from "@/lib/i18n.mjs";
 
 const t = (text: string) => translate(text, document.documentElement.lang as Language);
 
+function announceDialog(text: string) {
+  if (typeof window === "undefined" || typeof CustomEvent === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent("kodmod:dialog-announce", { detail: { text } }));
+  } catch {
+    // Ignore if window is not available
+  }
+}
+
 async function waitForNativeDialog() {
   if (!document.querySelector("dialog[open]")) return;
   await new Promise<void>(resolve => {
@@ -43,6 +52,7 @@ export type Confirmation = {
 export async function confirmAction(options: Confirmation) {
   await waitForNativeDialog();
   if (Swal.isVisible()) return false;
+  announceDialog(`${t(options.title)}. ${t(options.text)}`);
   const result = await dialog().fire({
     titleText: t(options.title),
     text: t(options.text),
@@ -58,8 +68,10 @@ export async function confirmAction(options: Confirmation) {
 
 export async function notifyResult(message: string, error = false) {
   await waitForNativeDialog();
+  const title = t(error ? "Belum berhasil" : "Berhasil");
+  announceDialog(`${title}. ${t(message)}`);
   await dialog().fire({
-    titleText: t(error ? "Belum berhasil" : "Berhasil"),
+    titleText: title,
     text: t(message),
     icon: error ? "error" : "success",
     iconColor: error ? "#c44343" : "#23856d",

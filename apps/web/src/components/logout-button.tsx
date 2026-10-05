@@ -31,7 +31,8 @@ export function LogoutButton({
     <button
       type="button"
       className={buttonClass}
-      aria-label={t("Keluar dari akun")}
+      aria-label={t(pending ? "Keluar…" : "Keluar dari akun")}
+      aria-busy={pending}
       data-voice-menu="logout"
       disabled={pending}
       onClick={async () => {

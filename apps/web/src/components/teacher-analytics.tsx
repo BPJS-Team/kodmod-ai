@@ -1,4 +1,5 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
 import { UiText, useI18n } from "@/components/language-provider";
 
 
@@ -59,6 +60,7 @@ export function TeacherAnalytics({ initial }: { initial: TeacherCohort }) {
 
   return (
     <section className="teacher-analytics-workspace" aria-label={t("Analitik siswa")}>
+      <LoadingStatus active={loading} label="Memuat analitik kelas…" />
       <div className="analytics-toolbar">
         <div>
           <span className="analytics-kicker"><BarChart3 size={14} aria-hidden="true" /><UiText>{" RUANG GURU"}</UiText></span>

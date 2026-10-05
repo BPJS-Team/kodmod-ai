@@ -1,4 +1,5 @@
 "use client";
+import { LoadingStatus } from "./loading-feedback";
 import { UiText, useI18n, UiDate } from "@/components/language-provider";
 
 
@@ -101,6 +102,7 @@ export function AdminInsights({
   const provider = overview.providers.elevenlabs;
   return (
     <section className="admin-insights" aria-label={t("Insight operasional admin")}>
+      <LoadingStatus active={loading} label="Memuat analitik dan aktivitas…" />
       <div className="admin-insights-heading">
         <div>
           <span className="analytics-kicker"><Activity size={14} aria-hidden="true" /><UiText>{" OPERASIONAL"}</UiText></span>
