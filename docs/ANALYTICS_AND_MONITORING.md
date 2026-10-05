@@ -51,3 +51,7 @@ Grafana lokal tersedia di `http://localhost:3001`. Kredensial administrator disi
 Di Windows, tiga panel host Linux dicatat sebagai `SKIP` karena profil `monitoring-linux` belum aktif. Ketika deploy di VPS Linux, jalankan node-exporter seperti konfigurasi produksi; panel CPU host, memori host, dan disk root harus menghasilkan data juga. Verifikasi lokal belum membuktikan deployment VPS.
 
 Nama Compose project default adalah `kodmod-centre` pada Windows dan `kodmod` pada Linux. Gunakan `KODMOD_COMPOSE_PROJECT` ketika nama project berbeda; `GRAFANA_BASE_URL` tersedia untuk mengubah alamat pemeriksaan Grafana.
+
+Checker memilih container layanan Compose yang aktif. Container ad hoc untuk pengujian dan perintah Compose satu kali tidak ikut dipilih sebagai layanan utama. Jika satu layanan mempunyai beberapa replica, checker meminta pemeriksaan replica tersebut.
+
+Hasil audit penguasaan konsep, bukti pengujian, dan temuan yang masih perlu dikerjakan tersedia di [Validasi Student Model](STUDENT_MODEL_VALIDATION.md).

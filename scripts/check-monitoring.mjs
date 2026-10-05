@@ -18,7 +18,11 @@ const run = args => {
     throw new Error(`Docker check failed (${args[0]}); inspect the service logs.`);
   }
 };
-const find = name => run(["ps", "--filter", `label=com.docker.compose.project=${project}`, "--filter", `label=com.docker.compose.service=${name}`, "--format", "{{.ID}}"]);
+const find = name => {
+  const ids = run(["ps", "--filter", `label=com.docker.compose.project=${project}`, "--filter", `label=com.docker.compose.service=${name}`, "--filter", "label=com.docker.compose.oneoff=False", "--format", "{{.ID}}"]);
+  if (ids.includes("\n")) throw new Error(`Multiple Compose containers found for ${name}; inspect the service replicas.`);
+  return ids;
+};
 const api = find("ai-engine");
 const grafana = find("grafana");
 const prometheus = find("prometheus");
