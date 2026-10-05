@@ -61,6 +61,21 @@ LEARNING_RATE = 0.25
 # Decay applied per day of inactivity (forgetting curve, very mild)
 DAILY_DECAY = 0.005
 
+
+def mastery_at(
+    score: float, last_practiced: datetime | None, *, now: datetime | None = None
+) -> float:
+    """Project stored evidence to the current time without changing it."""
+    if last_practiced is None:
+        return max(0.0, min(1.0, score))
+    last = last_practiced.replace(tzinfo=UTC) if last_practiced.tzinfo is None else last_practiced
+    current = now if now is not None else datetime.now(UTC)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=UTC)
+    days = max(0, (current - last).days)
+    return max(0.0, min(1.0, score - DAILY_DECAY * days))
+
+
 # Tunables for predict_correct_probability(), ported from HELP-DKT Eq. (8).
 # ALPHA controls how sharply probability swings around the threshold (paper
 # default: sigmoid(alpha*(1-0.5)) ~ 0.99, i.e. a confident "yes" once clearly
@@ -83,6 +98,10 @@ class StudentModel:
     _confidence: dict[str, float] = field(default_factory=dict)
     _attempts: dict[str, int] = field(default_factory=dict)
     _last_practiced: dict[str, datetime] = field(default_factory=dict)
+    _dirty_concepts: set[str] = field(default_factory=set, init=False, repr=False)
+    _decay_bases: dict[str, tuple[datetime, float]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     # ------------------------------------------------------------------
     # Loading & saving
@@ -114,8 +133,13 @@ class StudentModel:
         return m
 
     async def persist(self) -> None:
+        changed = tuple(self._dirty_concepts)
+        if not changed:
+            return
         async with async_session() as s:
-            for cid, score in self._scores.items():
+            for cid in changed:
+                base = self._decay_bases.get(cid)
+                score = base[1] if base is not None else self._scores[cid]
                 await s.execute(
                     text(
                         """
@@ -141,6 +165,7 @@ class StudentModel:
                     },
                 )
             await s.commit()
+        self._dirty_concepts.difference_update(changed)
 
     # ------------------------------------------------------------------
     # Updates
@@ -157,6 +182,8 @@ class StudentModel:
         self._confidence[concept_id] = new_conf
         self._attempts[concept_id] = self._attempts.get(concept_id, 0) + 1
         self._last_practiced[concept_id] = datetime.now(UTC)
+        self._decay_bases.pop(concept_id, None)
+        self._dirty_concepts.add(concept_id)
 
         log.info(
             "Mastery update: student=%s concept=%s %.3f → %.3f (conf=%.2f)",
@@ -168,13 +195,14 @@ class StudentModel:
         )
 
     def apply_decay(self) -> None:
-        """Mild forgetting curve - call before reading scores for analytics."""
+        """Read current mastery from its evidence base; repeated reads are stable."""
         now = datetime.now(UTC)
         for cid, last in self._last_practiced.items():
-            days = max(0, (now - last).days)
-            if days == 0:
-                continue
-            self._scores[cid] = max(0.0, self._scores[cid] - DAILY_DECAY * days)
+            base = self._decay_bases.get(cid)
+            if base is None or base[0] != last:
+                base = (last, self._scores[cid])
+                self._decay_bases[cid] = base
+            self._scores[cid] = mastery_at(base[1], last, now=now)
 
     # ------------------------------------------------------------------
     # Queries

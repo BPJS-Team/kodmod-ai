@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import desc, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from analytics.student_model import mastery_at
 from database.models import (
     InteractionLog,
     LearningSession,
@@ -52,7 +54,11 @@ async def load_profile(student_id: uuid.UUID) -> dict:
             .scalars()
             .all()
         )
-        mastery = {str(m.concept_id): float(m.mastery) for m in mastery_rows}
+        now = datetime.now(UTC)
+        mastery = {
+            str(m.concept_id): mastery_at(float(m.mastery), m.last_seen, now=now)
+            for m in mastery_rows
+        }
 
         # Streak: consecutive days with at least one session.
         streak_days = await _compute_streak(session, student_id)
@@ -136,16 +142,21 @@ async def fetch_weak_concepts(student_id: uuid.UUID, n: int = 5) -> list[dict]:
         rows = (
             (
                 await session.execute(
-                    select(MasteryScore)
-                    .where(MasteryScore.student_id == student_id)
-                    .order_by(MasteryScore.mastery.asc())
-                    .limit(n)
+                    select(MasteryScore).where(MasteryScore.student_id == student_id)
                 )
             )
             .scalars()
             .all()
         )
-        return [{"concept_id": str(r.concept_id), "mastery": float(r.mastery)} for r in rows]
+        now = datetime.now(UTC)
+        current: list[dict[str, Any]] = [
+            {
+                "concept_id": str(r.concept_id),
+                "mastery": mastery_at(float(r.mastery), r.last_seen, now=now),
+            }
+            for r in rows
+        ]
+        return sorted(current, key=lambda item: item["mastery"])[: max(0, n)]
 
 
 # ------------------------------------------------------- misconceptions --

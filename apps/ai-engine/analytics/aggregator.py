@@ -30,6 +30,7 @@ from typing import Any, Literal, cast
 
 from sqlalchemy import func, select
 
+from analytics.student_model import mastery_at
 from api.teacher_access import teacher_roster_query
 from database.models import (
     AssignmentAttempt,
@@ -169,11 +170,12 @@ class StudentAggregator:
         )
         accuracy = (n_correct / n_attempts) if n_attempts else 0.0
 
+        mastery_now = datetime.now(UTC)
         mastery: list[dict[str, Any]] = [
             {
                 "concept_id": str(m.concept_id),
                 "concept_name": c.name,
-                "mastery": float(m.mastery),
+                "mastery": mastery_at(float(m.mastery), m.last_seen, now=mastery_now),
                 "n_attempts": int(m.n_attempts),
             }
             for m, c in mastery_rows
