@@ -94,8 +94,18 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     # from the student's previous topic, global mastery or similar names.
     approved = state.get("approved_material_concepts", []) if classroom_scope else []
     allowed_concepts = {item["id"] for item in approved}
+    mastery = state.get("mastery_scores", {})
     concept_id = ""
-    if not classroom_scope:
+    if classroom_scope and approved:
+        requested_concept = state.get("current_concept_id") or ""
+        if requested_concept in allowed_concepts:
+            concept_id = requested_concept
+        else:
+            candidates = [item for item in approved if item.get("primary")] or approved
+            concept_id = min(
+                candidates, key=lambda item: (mastery.get(item["id"], 0.5), item["id"])
+            )["id"]
+    elif not classroom_scope:
         concept_id = state.get("current_concept_id") or ""
         if not concept_id and requested_topic:
             concept_id = await _resolve_concept_id(requested_topic, subject_id) or ""
@@ -105,7 +115,6 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     # which tells the model nothing - prefer an explicit topic label.
     topic = requested_topic or ("materi kelas" if classroom_scope else concept_id)
     difficulty: DifficultyLevel = state.get("current_difficulty", "medium")
-    mastery = state.get("mastery_scores", {})
     mastery_confidence = state.get("mastery_confidence", {})
     requested_n = int(state.get("quiz_n_questions") or 0)
     n_questions = requested_n if requested_n >= 1 else _decide_n_questions(state)
@@ -127,7 +136,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
     # Scope by subject_id even when concept_id can't be resolved, so retrieval
     # never falls back to an unfiltered search over the whole curriculum table.
     filters: dict[str, Any] = {}
-    if concept_id:
+    if concept_id and not classroom_scope:
         filters["concept_id"] = concept_id
     if subject_id:
         filters["subject_id"] = subject_id
@@ -162,6 +171,7 @@ async def problem_generator_node(state: KODMODState) -> dict[str, Any]:
         f"<mastery>{json.dumps(mastery)}</mastery>\n"
         f"<concept_id>{concept_id}</concept_id>\n"
         f"<approved_material_concepts>{json.dumps(approved)}</approved_material_concepts>\n"
+        "For classroom questions, <concept_id> is the reviewed target used to adapt difficulty, not a label to copy onto every question.\n"
         "For classroom questions, concept_id must identify the specific tested concept from that approved list, or be empty if none is tested. Never invent a concept or assign all questions the same concept.\n"
         f"<n_questions>{n_questions}</n_questions>\n"
         f"All {n_questions} questions must be about the topic above.\n"
