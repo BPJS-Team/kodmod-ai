@@ -54,7 +54,9 @@ async def student_detail(
     return {
         "account": UserOut.model_validate(student).model_dump(mode="json"),
         "analytics": analytics,
-        "teacher_summary": generate_teacher_summary(analytics)["headline"],
+        "teacher_summary": generate_teacher_summary(analytics, language=teacher.preferred_language)[
+            "headline"
+        ],
     }
 
 

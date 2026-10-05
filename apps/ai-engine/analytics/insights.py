@@ -4,7 +4,7 @@ KODMOD AI - Insight Generation
 
 Converts raw analytics rollups into:
 
-1. A short, spoken-friendly summary in Bahasa Indonesia for the student.
+1. A short, spoken-friendly summary in the selected language for the student.
 2. Actionable insights for the teacher dashboard.
 3. Suggestions consumed by the Recommendation Agent.
 
@@ -26,26 +26,55 @@ logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------- helpers --
-def _pct(x: float) -> str:
-    return f"{round(x * 100)} persen"
+def _pct(x: float, language: str = "id") -> str:
+    return f"{round(x * 100)} {'percent' if language == 'en' else 'persen'}"
 
 
-def _format_concept_list(items: list[dict], key: str = "concept_name", n: int = 3) -> str:
+def _format_concept_list(
+    items: list[dict], key: str = "concept_name", n: int = 3, *, language: str = "id"
+) -> str:
     if not items:
-        return "belum ada"
-    names = [i.get(key) or "konsep tanpa nama" for i in items[:n]]
+        return "none yet" if language == "en" else "belum ada"
+    names = [
+        i.get(key) or ("unnamed concept" if language == "en" else "konsep tanpa nama")
+        for i in items[:n]
+    ]
     if len(names) == 1:
         return names[0]
-    return ", ".join(names[:-1]) + f", dan {names[-1]}"
+    return ", ".join(names[:-1]) + f", {'and' if language == 'en' else 'dan'} {names[-1]}"
+
+
+def _period(analytics: dict, language: str) -> str:
+    periods = (
+        {
+            "today": "Today",
+            "week": "In the past 7 days",
+            "month": "In the past 30 days",
+            "all": "So far",
+        }
+        if language == "en"
+        else {
+            "today": "Hari ini",
+            "week": "Dalam 7 hari terakhir",
+            "month": "Dalam 30 hari terakhir",
+            "all": "Sejauh ini",
+        }
+    )
+    return periods.get(analytics.get("window", "week"), periods["week"])
 
 
 # ------------------------------------------------- student-facing summary --
-def generate_student_spoken_summary(analytics: dict) -> str:
-    """Produces the audio-friendly Bahasa Indonesia summary."""
+def generate_student_spoken_summary(analytics: dict, *, language: str = "id") -> str:
+    """Produces a deterministic audio-friendly summary in Indonesian or English."""
+    english = language == "en"
     if analytics.get("error"):
-        return "Maaf, data analitik belum tersedia."
+        return (
+            "Your progress data is not available yet."
+            if english
+            else "Maaf, data analitik belum tersedia."
+        )
 
-    name = analytics.get("student_name", "kamu").split()[0]
+    name = (analytics.get("student_name") or ("there" if english else "kamu")).split()[0]
     n_sessions = analytics.get("n_sessions", 0)
     accuracy = analytics.get("quiz_accuracy", 0.0)
     overall = analytics.get("overall_mastery", 0.0)
@@ -53,43 +82,68 @@ def generate_student_spoken_summary(analytics: dict) -> str:
     strong = analytics.get("strong_concepts", [])
 
     parts: list[str] = []
-    parts.append(f"Halo {name}.")
+    parts.append(f"Hello {name}." if english else f"Halo {name}.")
+    period = _period(analytics, language)
 
-    if n_sessions == 0:
-        parts.append("Minggu ini kamu belum belajar sama sekali. Mari mulai sekarang!")
+    if n_sessions == 0 and not analytics.get("n_quiz_attempts", 0):
+        parts.append(
+            f"{period}, you have no learning activity yet. Let's get started!"
+            if english
+            else f"{period} kamu belum belajar sama sekali. Mari mulai sekarang!"
+        )
         return " ".join(parts)
 
     parts.append(
-        f"Minggu ini kamu sudah belajar {n_sessions} sesi "
-        f"dengan tingkat penguasaan rata-rata {_pct(overall)}."
+        f"{period}, you completed {n_sessions} learning sessions with average mastery of {_pct(overall, language)}."
+        if english
+        else f"{period} kamu sudah belajar {n_sessions} sesi dengan tingkat penguasaan rata-rata {_pct(overall)}."
     )
 
     if accuracy >= 0.8:
-        parts.append(f"Akurasi kuis kamu sangat baik di {_pct(accuracy)}. Pertahankan!")
+        parts.append(
+            f"Your quiz and assignment accuracy is excellent at {_pct(accuracy, language)}. Keep it up!"
+            if english
+            else f"Akurasi kuis dan tugas kamu sangat baik di {_pct(accuracy)}. Pertahankan!"
+        )
     elif accuracy >= 0.6:
-        parts.append(f"Akurasi kuis kamu {_pct(accuracy)}. Teruskan latihan.")
+        parts.append(
+            f"Your quiz and assignment accuracy is {_pct(accuracy, language)}. Keep practising."
+            if english
+            else f"Akurasi kuis dan tugas kamu {_pct(accuracy)}. Teruskan latihan."
+        )
     elif accuracy > 0:
         parts.append(
-            f"Akurasi kuis kamu masih {_pct(accuracy)}. "
-            "Jangan khawatir, kita akan kerjakan bersama."
+            f"Your quiz and assignment accuracy is {_pct(accuracy, language)}. We will work on this together."
+            if english
+            else f"Akurasi kuis dan tugas kamu masih {_pct(accuracy)}. Jangan khawatir, kita akan kerjakan bersama."
         )
 
     if strong:
-        parts.append(f"Kamu sudah kuat di {_format_concept_list(strong)}.")
+        names = _format_concept_list(strong, language=language)
+        parts.append(f"Your strengths are {names}." if english else f"Kamu sudah kuat di {names}.")
     if weak:
-        parts.append(f"Yang masih perlu kita perdalam: {_format_concept_list(weak)}.")
+        names = _format_concept_list(weak, language=language)
+        parts.append(
+            f"Let's practise {names} next."
+            if english
+            else f"Yang masih perlu kita perdalam: {names}."
+        )
 
     return " ".join(parts)
 
 
 # ----------------------------------------------- teacher-facing summary --
-def generate_teacher_summary(analytics: dict) -> dict:
+def generate_teacher_summary(analytics: dict, *, language: str = "id") -> dict:
     """Produces a structured summary plus 1-3 alert lines."""
+    english = language == "en"
     if analytics.get("error"):
-        return {"alerts": [], "headline": "Data tidak tersedia."}
+        return {
+            "alerts": [],
+            "headline": "Data is unavailable." if english else "Data tidak tersedia.",
+        }
 
     alerts: list[dict] = []
-    student_name = analytics.get("student_name") or "Siswa"
+    student_name = analytics.get("student_name") or ("Student" if english else "Siswa")
 
     accuracy = analytics.get("quiz_accuracy", 0.0)
     n_attempts = analytics.get("n_quiz_attempts", 0)
@@ -100,10 +154,13 @@ def generate_teacher_summary(analytics: dict) -> dict:
         alerts.append(
             {
                 "level": "warning",
-                "title": f"{student_name}: akurasi rendah",
+                "title": f"{student_name}: low accuracy"
+                if english
+                else f"{student_name}: akurasi rendah",
                 "detail": (
-                    f"Akurasi {int(accuracy * 100)}% dari {n_attempts} kuis. "
-                    "Disarankan sesi 1:1 atau remediasi terarah."
+                    f"Accuracy is {int(accuracy * 100)}% across {n_attempts} answers. Consider individual support or targeted practice."
+                    if english
+                    else f"Akurasi {int(accuracy * 100)}% dari {n_attempts} jawaban. Disarankan sesi 1:1 atau remediasi terarah."
                 ),
             }
         )
@@ -112,8 +169,12 @@ def generate_teacher_summary(analytics: dict) -> dict:
         alerts.append(
             {
                 "level": "warning",
-                "title": f"{student_name}: keterlibatan rendah",
-                "detail": "Kurang dari satu sesi per minggu. Periksa motivasi siswa.",
+                "title": f"{student_name}: low engagement"
+                if english
+                else f"{student_name}: keterlibatan rendah",
+                "detail": "Few learning sessions recorded. Check in with this student."
+                if english
+                else "Sesi belajar masih sedikit. Periksa kebutuhan pendampingan siswa.",
             }
         )
 
@@ -121,7 +182,9 @@ def generate_teacher_summary(analytics: dict) -> dict:
         alerts.append(
             {
                 "level": "info",
-                "title": f"{student_name}: {len(miscons)} miskonsepsi terdeteksi",
+                "title": f"{student_name}: {len(miscons)} misconceptions detected"
+                if english
+                else f"{student_name}: {len(miscons)} miskonsepsi terdeteksi",
                 "detail": "; ".join(m["description"] for m in miscons[:3]),
             }
         )
@@ -130,22 +193,29 @@ def generate_teacher_summary(analytics: dict) -> dict:
         alerts.append(
             {
                 "level": "success",
-                "title": f"{student_name}: penguasaan kuat",
-                "detail": "Pertimbangkan materi tantangan tingkat lanjut.",
+                "title": f"{student_name}: strong mastery"
+                if english
+                else f"{student_name}: penguasaan kuat",
+                "detail": "Consider more challenging materials."
+                if english
+                else "Pertimbangkan materi tantangan tingkat lanjut.",
             }
         )
 
+    mastery = int(analytics.get("overall_mastery", 0) * 100)
+    period = _period(analytics, language).lower()
     headline = (
-        f"{student_name}: penguasaan {int(analytics.get('overall_mastery', 0) * 100)}%, "
-        f"akurasi kuis {int(accuracy * 100)}%, "
-        f"{analytics.get('n_sessions', 0)} sesi minggu ini."
+        f"{student_name}: mastery {mastery}%, quiz accuracy {int(accuracy * 100)}%, {analytics.get('n_sessions', 0)} sessions {period}."
+        if english
+        else f"{student_name}: penguasaan {mastery}%, akurasi kuis {int(accuracy * 100)}%, {analytics.get('n_sessions', 0)} sesi {period}."
     )
     return {"headline": headline, "alerts": alerts}
 
 
 # --------------------------------------------------- cohort-level alerts --
-def generate_cohort_alerts(cohort_summary: dict) -> list[dict]:
+def generate_cohort_alerts(cohort_summary: dict, *, language: str = "id") -> list[dict]:
     """Alerts spanning every student, shown at the top of the teacher dashboard."""
+    english = language == "en"
     if cohort_summary.get("error"):
         return []
     alerts: list[dict] = []
@@ -154,11 +224,13 @@ def generate_cohort_alerts(cohort_summary: dict) -> list[dict]:
         alerts.append(
             {
                 "level": "warning",
-                "title": f"Konsep lemah: {weak[0]['concept_name']}",
+                "title": f"Needs practice: {weak[0]['concept_name']}"
+                if english
+                else f"Konsep lemah: {weak[0]['concept_name']}",
                 "detail": (
-                    f"Rata-rata penguasaan hanya "
-                    f"{int(weak[0]['avg_mastery'] * 100)}% pada {weak[0]['n_students']} siswa. "
-                    "Pertimbangkan mengajarkan ulang materi ini."
+                    f"Average mastery is {int(weak[0]['avg_mastery'] * 100)}% across {weak[0]['n_students']} students. Consider teaching this topic again."
+                    if english
+                    else f"Rata-rata penguasaan hanya {int(weak[0]['avg_mastery'] * 100)}% pada {weak[0]['n_students']} siswa. Pertimbangkan mengajarkan ulang materi ini."
                 ),
             }
         )
@@ -166,8 +238,10 @@ def generate_cohort_alerts(cohort_summary: dict) -> list[dict]:
         alerts.append(
             {
                 "level": "info",
-                "title": "Keterlibatan rendah",
-                "detail": "Rata-rata sesi per siswa di bawah ambang sehat.",
+                "title": "Low engagement" if english else "Keterlibatan rendah",
+                "detail": "The average learning activity is low. Check which students need support."
+                if english
+                else "Rata-rata sesi per siswa di bawah ambang sehat.",
             }
         )
     return alerts
@@ -186,10 +260,10 @@ async def generate_insights(
     Returns: {"spoken": str, "structured": dict}
     """
     if audience == "teacher":
-        structured = generate_teacher_summary(analytics)
+        structured = generate_teacher_summary(analytics, language=language)
         spoken = structured["headline"]
     else:
-        structured = {"summary": generate_student_spoken_summary(analytics)}
+        structured = {"summary": generate_student_spoken_summary(analytics, language=language)}
         spoken = structured["summary"]
 
     if not use_llm:

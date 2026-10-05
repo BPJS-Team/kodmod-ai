@@ -44,7 +44,10 @@ async def my_analytics_spoken(
 ) -> dict:
     """Your own progress, plus a few sentences written to be heard."""
     summary = await StudentAggregator().summarise(student_id=student.id, window=window)
-    return {"summary": summary, "spoken": generate_student_spoken_summary(summary)}
+    return {
+        "summary": summary,
+        "spoken": generate_student_spoken_summary(summary, language=student.preferred_language),
+    }
 
 
 @router.get("/student/{student_id}")
@@ -78,4 +81,7 @@ async def cohort_alerts(
 ) -> dict:
     """Cohort-level alerts, plus the rollup they were derived from."""
     rollup = await CohortAggregator().summarise(window=window, teacher_id=teacher.id)
-    return {"alerts": generate_cohort_alerts(rollup), "summary": rollup}
+    return {
+        "alerts": generate_cohort_alerts(rollup, language=teacher.preferred_language),
+        "summary": rollup,
+    }

@@ -32,6 +32,7 @@ from sqlalchemy import func, select
 
 from api.teacher_access import teacher_roster_query
 from database.models import (
+    AssignmentAttempt,
     Concept,
     InteractionLog,
     LearningSession,
@@ -92,6 +93,27 @@ class StudentAggregator:
                 attempts_q = attempts_q.where(QuizAttempt.answered_at >= start)
             attempts = (await session.execute(attempts_q)).scalars().all()
 
+            # Frozen formal grades use a separate attempt table. Count their
+            # questions, not their percentage scores, so a one-question mini
+            # quiz and a longer assignment have equal weight per answer.
+            assignments_q = select(
+                func.count(AssignmentAttempt.id),
+                func.coalesce(func.sum(AssignmentAttempt.total_questions), 0),
+                func.coalesce(func.sum(AssignmentAttempt.correct_count), 0),
+            ).where(
+                AssignmentAttempt.student_id == student_id,
+                AssignmentAttempt.state == "submitted",
+                AssignmentAttempt.submitted_at.is_not(None),
+                AssignmentAttempt.score.is_not(None),
+                AssignmentAttempt.correct_count.is_not(None),
+                AssignmentAttempt.total_questions > 0,
+            )
+            if start:
+                assignments_q = assignments_q.where(AssignmentAttempt.submitted_at >= start)
+            assignment_count, assignment_answers, assignment_correct = (
+                await session.execute(assignments_q)
+            ).one()
+
             # ---- Mastery snapshot (full, not windowed - mastery is cumulative)
             mastery_rows = (
                 await session.execute(
@@ -138,9 +160,15 @@ class StudentAggregator:
             0.0,
         )
 
-        n_attempts = len(attempts)
-        n_correct = sum(1 for a in attempts if a.is_correct)
-        avg_score = (sum(a.score for a in attempts) / n_attempts) if n_attempts else 0.0
+        formal_answers = int(assignment_answers or 0)
+        formal_correct = int(assignment_correct or 0)
+        n_attempts = len(attempts) + formal_answers
+        n_correct = sum(1 for a in attempts if a.is_correct) + formal_correct
+        avg_score = (
+            (sum(a.score for a in attempts) + formal_correct) / n_attempts
+            if n_attempts
+            else 0.0
+        )
         accuracy = (n_correct / n_attempts) if n_attempts else 0.0
 
         mastery: list[dict[str, Any]] = [
@@ -169,6 +197,9 @@ class StudentAggregator:
             "total_minutes": round(total_minutes, 1),
             "interaction_count": int(interaction_count),
             "n_quiz_attempts": n_attempts,
+            "n_practice_answers": len(attempts),
+            "n_assignment_answers": formal_answers,
+            "n_assignment_submissions": int(assignment_count),
             "quiz_accuracy": round(accuracy, 3),
             "avg_quiz_score": round(avg_score, 3),
             "overall_mastery": round(overall_mastery, 3),
