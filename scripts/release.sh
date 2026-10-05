@@ -6,7 +6,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 action="${1:-check}"
 case "$action" in check|backup|deploy|smoke) ;; *) echo 'Use check, backup, deploy or smoke.' >&2; exit 2 ;; esac
 test -f .env && test -f apps/ai-engine/.env || { echo 'Configure root and backend .env files first.' >&2; exit 1; }
-compose=(docker compose --env-file .env -f infra/docker/docker-compose.prod.yml)
+compose=(docker compose --profile monitoring --profile monitoring-linux --env-file .env -f infra/docker/docker-compose.prod.yml)
 "${compose[@]}" config --quiet
 "${compose[@]}" config --format json | node scripts/check-compose.mjs prod
 

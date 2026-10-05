@@ -114,6 +114,129 @@ services:
     depends_on:
       web: { condition: service_healthy }
 
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-5GB}
+    volumes:
+      - type: bind
+        source: ./prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - type: bind
+        source: ./prometheus-alerts.yml
+        target: /etc/prometheus/rules.yml
+        read_only: true
+      - type: bind
+        source: ${MONITORING_DATA_ROOT:?Set MONITORING_DATA_ROOT in the root .env}/prometheus
+        target: /prometheus
+        bind: { create_host_path: true }
+    depends_on:
+      cadvisor: { condition: service_started }
+    mem_limit: 512m
+    cpus: 0.50
+    logging:
+      options: { max-size: 10m, max-file: "3" }
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in the root .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_PORT:-3001}/
+      GF_SECURITY_COOKIE_SECURE: "false"
+    ports: ["127.0.0.1:${GRAFANA_PORT:-3001}:3000"]
+    volumes:
+      - type: bind
+        source: ${MONITORING_DATA_ROOT:?Set MONITORING_DATA_ROOT in the root .env}/grafana
+        target: /var/lib/grafana
+        bind: { create_host_path: true }
+      - type: bind
+        source: ./grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+      - type: bind
+        source: ./grafana/dashboards
+        target: /var/lib/grafana/dashboards
+        read_only: true
+    depends_on:
+      prometheus: { condition: service_started }
+    mem_limit: 512m
+    cpus: 0.25
+    logging:
+      options: { max-size: 10m, max-file: "3" }
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    privileged: true
+    read_only: true
+    tmpfs: [/tmp]
+    volumes:
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+      - type: bind
+        source: /var/run
+        target: /var/run
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /sys
+        read_only: true
+      - type: bind
+        source: /var/lib/docker
+        target: /var/lib/docker
+        read_only: true
+      - type: bind
+        source: /dev/disk
+        target: /dev/disk
+        read_only: true
+    mem_limit: 512m
+    cpus: 0.25
+    logging:
+      options: { max-size: 10m, max-file: "3" }
+
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.12.1
+    profiles: ["monitoring-linux"]
+    restart: unless-stopped
+    pid: host
+    read_only: true
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+    volumes:
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /host/sys
+        read_only: true
+      - type: bind
+        source: /
+        target: /host
+        read_only: true
+    mem_limit: 128m
+    cpus: 0.10
+    logging:
+      options: { max-size: 10m, max-file: "3" }
+
 volumes:
   kodmod-pgdata:
   kodmod-redisdata:

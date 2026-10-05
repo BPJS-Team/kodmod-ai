@@ -1,0 +1,47 @@
+groups:
+  - name: kodmod-monitoring
+    rules:
+      - alert: MonitoringTargetDown
+        expr: up{job=~"prometheus|cadvisor|node-exporter|kodmod-api"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is unavailable"
+          description: "Target {{ $labels.instance }} has been unavailable for more than two minutes."
+
+      - alert: HostCpuHigh
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU usage is above 85%"
+          description: "Host CPU usage has stayed high for ten minutes."
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 10% host memory is available"
+          description: "Host memory has remained below 10% available for five minutes."
+
+      - alert: HostRootDiskLow
+        expr: node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 10% host root disk is available"
+          description: "Root filesystem capacity has remained below 10% available for five minutes."
+
+      - alert: KodmodContainerMemoryHigh
+        expr: container_memory_working_set_bytes{name=~".*kodmod.*"} > 6 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "KODMOD container {{ $labels.name }} uses over 6 GiB"
+          description: "The container working set has stayed above 6 GiB for five minutes."

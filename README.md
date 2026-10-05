@@ -27,7 +27,7 @@ kodmod-ai/
 │   ├── ai-engine/      Backend agentic (Python, FastAPI, LangGraph)
 │   └── web/            Antarmuka (Next.js App Router, React 19, Tailwind v4)
 ├── docs/               Arsitektur, API, aksesibilitas, deployment
-├── infra/docker/       Compose produksi, Caddy, Prometheus
+├── infra/docker/       Compose produksi, Caddy, Prometheus, Grafana dashboard
 ├── assets/logo/        Aset merek
 ├── docker-compose.yml  Runtime Docker lokal (web, API, database, Redis)
 └── Makefile            Kumpulan perintah sehari-hari
@@ -68,16 +68,24 @@ pwsh -NoProfile -File .\scripts\docker.ps1 status
 
 Alias: `npm run docker:up`, `npm run docker:status`, dan `npm run docker:down`.
 
-Buka `http://localhost:3100`. Web, AI engine, PostgreSQL/pgvector dan Redis
-berjalan dalam container; migrasi Alembic dijalankan otomatis sebelum API.
-Data Docker Centre tetap di `F:\Docker_Centre\kodmod\data`. Provider key
-dibaca dari `apps/ai-engine/.env`, hanya pada backend. OpenAI dan ElevenLabs
-adalah layanan eksternal. Build lokal memakai image hasil kompilasi; jalankan
-`up` kembali setelah perubahan source.
+Buka `http://localhost:3100`. Web, AI engine, worker, PostgreSQL/pgvector,
+Redis, Prometheus, cAdvisor dan Grafana berjalan dalam Docker; migrasi Alembic
+dijalankan sebelum API. Dashboard resource tersedia di `http://localhost:3001`
+dan hanya terikat ke loopback. Data Docker Centre, termasuk histori metrik,
+tetap di `F:\Docker_Centre\kodmod\data`. Provider key dibaca dari
+`apps/ai-engine/.env`, hanya pada backend. OpenAI dan ElevenLabs adalah layanan
+eksternal. Build lokal memakai image hasil kompilasi; jalankan `up` kembali
+setelah perubahan source.
 
-Tanpa Docker Centre: `docker compose up -d --build --wait` dari root setelah
-mengisi `.env` backend. Panduan akun admin, data persisten, backup, dan **VPS
-dengan Caddy/HTTPS**: [Deployment](docs/DEPLOYMENT.md).
+Perintah monitoring terpisah: `npm run docker:monitoring`,
+`npm run docker:monitoring:status`, `npm run docker:monitoring:logs`, dan
+`npm run docker:monitoring:down`. Credential Grafana Docker Centre disimpan
+di `F:\Docker_Centre\kodmod\.env`; layanan metrik tidak dibuka lewat tunnel
+ngrok. Panduan setup dan VPS: [Deployment](docs/DEPLOYMENT.md).
+
+Tanpa Docker Centre: `docker compose --profile monitoring up -d --build --wait`
+dari root setelah mengisi `.env` backend. Panduan akun admin, data persisten,
+backup, dan **VPS dengan Caddy/HTTPS**: [Deployment](docs/DEPLOYMENT.md).
 Status fitur beserta batas validasi: [Scope Oktober 2026](docs/SCOPE-STATUS-2026-10-04.md).
 
 **Pengembangan native dengan hot reload (opsional):**

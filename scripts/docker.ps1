@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('up', 'build', 'backup', 'migrate', 'api', 'infra', 'qdrant', 'down', 'status', 'logs', 'admin', 'demo-users')]
+    [ValidateSet('up', 'build', 'backup', 'migrate', 'api', 'infra', 'qdrant', 'down', 'status', 'logs', 'admin', 'demo-users', 'monitoring-up', 'monitoring-down', 'monitoring-status', 'monitoring-logs')]
     [string]$Action = 'up',
     [string]$CentreRoot = 'F:\Docker_Centre\kodmod'
 )
@@ -21,6 +21,7 @@ if (-not (Test-Path -LiteralPath $dockerExe)) {
 $composeArgs = @('compose', '--project-directory', $sourceRoot)
 $centreEnv = [System.IO.Path]::Combine($CentreRoot, '.env')
 $centreOverride = [System.IO.Path]::Combine($CentreRoot, 'compose.override.yaml')
+$usesCentre = $false
 if ((Test-Path -LiteralPath $centreEnv) -and (Test-Path -LiteralPath $centreOverride)) {
     $entry = Get-Content -LiteralPath $centreEnv |
         Where-Object { $_ -match '^KODMOD_SOURCE_ROOT=' } | Select-Object -First 1
@@ -32,8 +33,61 @@ if ((Test-Path -LiteralPath $centreEnv) -and (Test-Path -LiteralPath $centreOver
     }
     $composeArgs += @('--project-name', 'kodmod-centre', '--env-file', $centreEnv,
         '--file', (Join-Path $sourceRoot 'docker-compose.yml'), '--file', $centreOverride)
+    $usesCentre = $true
 } else {
     $composeArgs += @('--file', (Join-Path $sourceRoot 'docker-compose.yml'))
+}
+
+$monitoringProfileActions = @('up', 'api', 'down', 'status', 'logs', 'monitoring-up', 'monitoring-down', 'monitoring-status', 'monitoring-logs')
+if ($Action -in $monitoringProfileActions) {
+    $composeArgs += @('--profile', 'monitoring')
+    if ($IsLinux) { $composeArgs += @('--profile', 'monitoring-linux') }
+}
+
+if ($usesCentre -and $Action -in @('up', 'monitoring-up')) {
+    $lines = @(Get-Content -LiteralPath $centreEnv)
+    $dataRoot = [System.IO.Path]::GetFullPath((Join-Path $CentreRoot 'data\monitoring')).Replace('\', '/')
+    $hasDataRoot = $false
+    $hasPassword = $false
+    $passwordReady = $false
+    $generatedNewPassword = $false
+    $updated = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in $lines) {
+        if ($line -match '^MONITORING_DATA_ROOT=(.*)$') {
+            $hasDataRoot = $true
+            if ([string]::IsNullOrWhiteSpace($matches[1])) { $updated.Add("MONITORING_DATA_ROOT=$dataRoot") }
+            else { $updated.Add($line) }
+        } elseif ($line -match '^GRAFANA_ADMIN_PASSWORD=(.*)$') {
+            $hasPassword = $true
+            if ([string]::IsNullOrWhiteSpace($matches[1])) { $updated.Add('GRAFANA_ADMIN_PASSWORD=') }
+            else { $updated.Add($line); $passwordReady = $true }
+        } else {
+            $updated.Add($line)
+        }
+    }
+    if (-not $hasDataRoot) { $updated.Add("MONITORING_DATA_ROOT=$dataRoot") }
+    if (-not $hasPassword -or -not $passwordReady) {
+        $secretBytes = [byte[]]::new(32)
+        [System.Security.Cryptography.RandomNumberGenerator]::Fill($secretBytes)
+        $generatedPassword = [Convert]::ToHexString($secretBytes).ToLowerInvariant()
+        $generatedNewPassword = $true
+        if ($hasPassword) {
+            for ($index = $updated.Count - 1; $index -ge 0; $index--) {
+                if ($updated[$index] -match '^GRAFANA_ADMIN_PASSWORD=') {
+                    $updated[$index] = "GRAFANA_ADMIN_PASSWORD=$generatedPassword"
+                    break
+                }
+            }
+        } else {
+            $updated.Add("GRAFANA_ADMIN_PASSWORD=$generatedPassword")
+        }
+        $passwordReady = $true
+    }
+    [System.IO.File]::WriteAllText($centreEnv, (($updated -join "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
+    New-Item -ItemType Directory -Force -Path (Join-Path $CentreRoot 'data\monitoring\prometheus') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $CentreRoot 'data\monitoring\grafana') | Out-Null
+    Write-Host "Monitoring data directory: $(Join-Path $CentreRoot 'data\monitoring')"
+    if ($generatedNewPassword) { Write-Host 'Generated a private Grafana admin password in the Docker Centre .env.' }
 }
 
 function Save-DatabaseBackup {
@@ -94,6 +148,26 @@ switch ($Action) {
     'down' { $composeArgs += @('down') }
     'status' { $composeArgs += @('ps', '--all') }
     'logs' { $composeArgs += @('logs', '--tail', '100', '--follow') }
+    'monitoring-up' {
+        $monitoringServices = @('prometheus', 'grafana', 'cadvisor')
+        if ($IsLinux) { $monitoringServices += 'node-exporter' }
+        $composeArgs += @('up', '-d', '--wait', '--wait-timeout', '90') + $monitoringServices
+    }
+    'monitoring-down' {
+        $monitoringServices = @('prometheus', 'grafana', 'cadvisor')
+        if ($IsLinux) { $monitoringServices += 'node-exporter' }
+        $composeArgs += @('stop') + $monitoringServices
+    }
+    'monitoring-status' {
+        $monitoringServices = @('prometheus', 'grafana', 'cadvisor')
+        if ($IsLinux) { $monitoringServices += 'node-exporter' }
+        $composeArgs += @('ps', '--all') + $monitoringServices
+    }
+    'monitoring-logs' {
+        $monitoringServices = @('prometheus', 'grafana', 'cadvisor')
+        if ($IsLinux) { $monitoringServices += 'node-exporter' }
+        $composeArgs += @('logs', '--tail', '100', '--follow') + $monitoringServices
+    }
     'admin' { $composeArgs += @('exec', 'ai-engine', 'python', '-m', 'scripts.create_admin', '--username', 'admin') }
     'demo-users' {
         & $dockerExe @composeArgs build ai-engine
