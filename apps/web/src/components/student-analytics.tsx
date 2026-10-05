@@ -5,7 +5,6 @@ import { UiText, useI18n } from "@/components/language-provider";
 import { useState } from "react";
 import {
   AlertTriangle,
-  BarChart3,
   BookOpenCheck,
   Clock3,
   Headphones,
@@ -15,6 +14,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { notifyResult } from "@/lib/dialogs";
+import { masteryLabel, studyTimeLabel } from "@/lib/analytics-display.mjs";
 import type {
   AnalyticsWindow,
   StudentAnalytics,
@@ -33,20 +33,6 @@ function percent(value: number) {
   return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
 }
 
-function minutesLabel(value: number) {
-  if (value < 60) return `${Math.round(value)} menit`;
-  const hours = Math.floor(value / 60);
-  const minutes = Math.round(value % 60);
-  return minutes ? `${hours} jam ${minutes} mnt` : `${hours} jam`;
-}
-
-function levelLabel(value: number) {
-  if (value >= 0.8) return "Mantap";
-  if (value >= 0.6) return "Berkembang";
-  if (value >= 0.4) return "Perlu penguatan";
-  return "Mulai dari dasar";
-}
-
 async function readJson<T>(response: Response, fallback: string) {
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { message?: unknown };
@@ -62,7 +48,7 @@ export function StudentAnalytics({
   initial: StudentAnalytics;
   initialSpoken: string;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [data, setData] = useState(initial);
   const [spoken, setSpoken] = useState(initialSpoken);
   const [window, setWindow] = useState<AnalyticsWindow>(initial.window);
@@ -124,10 +110,8 @@ export function StudentAnalytics({
     <section className="analytics-workspace" aria-label={t("Progres belajar siswa")}>
       <div className="analytics-toolbar">
         <div>
-          <span className="analytics-kicker">
-            <BarChart3 size={14} aria-hidden="true" /><UiText>{"RINGKASAN PERJALANANMU"}</UiText></span>
-          <h2><UiText>{"Belajar dengan arah yang jelas."}</UiText></h2>
-          <p><UiText>{"Gunakan data ini untuk memilih langkah berikutnya, bukan untuk membandingkan diri."}</UiText></p>
+          <h2><UiText>{"Perkembangan belajarmu"}</UiText></h2>
+          <p><UiText>{"Lihat hasil latihan dan tugas untuk memilih materi berikutnya."}</UiText></p>
         </div>
         <button type="button" className="button secondary" onClick={() => void refresh()} disabled={loading}>
           <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" /><UiText>{"Perbarui data"}</UiText></button>
@@ -149,14 +133,13 @@ export function StudentAnalytics({
         ))}
       </div>
 
-      {error && <p className="alert error-message analytics-error" role="alert">{error}</p>}
+      {error && <p className="alert error-message analytics-error" role="alert">{t(error)}</p>}
 
       <div className="analytics-hero panel">
         <div className="analytics-hero-copy">
-          <span className="analytics-kicker"><UiText>{"PROFIL BELAJAR"}</UiText></span>
           <h3>{data.student_name}</h3>
-          <p>{levelLabel(data.overall_mastery)} · {data.n_sessions}<UiText>{" sesi belajar pada periode ini."}</UiText></p>
-          <progress max={1} value={data.overall_mastery} aria-label={`Penguasaan materi ${percent(data.overall_mastery)}`} />
+          <p>{masteryLabel(data.overall_mastery, language)} · {data.n_sessions}<UiText>{" sesi belajar pada periode ini."}</UiText></p>
+          <progress max={1} value={data.overall_mastery} aria-label={t("Penguasaan materi {value}", { value: percent(data.overall_mastery) })} />
           <div className="analytics-progress-meta">
             <strong>{percent(data.overall_mastery)}</strong>
             <span><UiText>{"penguasaan materi"}</UiText></span>
@@ -171,14 +154,14 @@ export function StudentAnalytics({
       <div className="analytics-stat-grid">
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon blue"><BookOpenCheck size={19} aria-hidden="true" /></span>
-          <span className="analytics-stat-label"><UiText>{"Akurasi latihan"}</UiText></span>
+          <span className="analytics-stat-label"><UiText>{"Akurasi latihan dan tugas"}</UiText></span>
           <strong>{percent(data.quiz_accuracy)}</strong>
           <small>{data.n_quiz_attempts}<UiText>{" jawaban tercatat"}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon purple"><Clock3 size={19} aria-hidden="true" /></span>
           <span className="analytics-stat-label"><UiText>{"Waktu belajar"}</UiText></span>
-          <strong>{minutesLabel(data.total_minutes)}</strong>
+          <strong>{studyTimeLabel(data.total_minutes, language)}</strong>
           <small>{data.interaction_count}<UiText>{" interaksi dengan tutor"}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
@@ -187,6 +170,17 @@ export function StudentAnalytics({
           <strong>{percent(data.engagement_index)}</strong>
           <small><UiText>{"ritme belajar pada periode ini"}</UiText></small>
         </article>
+        <article className="panel analytics-stat-card">
+          <span className="analytics-stat-icon blue"><BookOpenCheck size={19} aria-hidden="true" /></span>
+          <span className="analytics-stat-label"><UiText>{"Tugas selesai"}</UiText></span>
+          <strong>{data.n_assignment_submissions ?? 0}</strong>
+          <small><UiText>{"tugas dikumpulkan pada periode ini"}</UiText></small>
+        </article>
+      </div>
+
+      <div className="analytics-answer-breakdown">
+        <span><UiText>{"Jawaban latihan"}</UiText><strong>{data.n_practice_answers ?? data.n_quiz_attempts}</strong></span>
+        <span><UiText>{"Jawaban tugas"}</UiText><strong>{data.n_assignment_answers ?? 0}</strong></span>
       </div>
 
       <div className="analytics-columns">

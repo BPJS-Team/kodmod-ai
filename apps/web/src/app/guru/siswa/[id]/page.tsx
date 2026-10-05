@@ -9,7 +9,7 @@ import { backend } from "@/lib/server-api";
 type Context = { params: Promise<{ id: string }> };
 
 export default async function TeacherStudentPage({ params }: Context) {
-  const { token } = await requireSession("teacher");
+  const { token, user } = await requireSession("teacher");
   const { id } = await params;
   const encoded = encodeURIComponent(id);
   const [detail, sessions] = await Promise.all([
@@ -23,7 +23,7 @@ export default async function TeacherStudentPage({ params }: Context) {
         title={<UiText>{"Detail siswa"}</UiText>}
         description={<UiText>{"Baca sinyal belajar dan transcript tutor sebagai bahan pendampingan."}</UiText>}
       />
-      <TeacherStudentDetailView initial={detail} initialSessions={sessions} />
+      <TeacherStudentDetailView key={user.preferred_language} initial={detail} initialSessions={sessions} />
     </>
   );
 }

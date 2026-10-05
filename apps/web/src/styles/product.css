@@ -1,3 +1,5 @@
+@import "./workspace.css";
+
 :root {
   --ink: #142d4e;
   --muted: #52677f;
@@ -1019,9 +1021,11 @@ input[readonly] {
   margin-left: 0.75rem;
 }
 .workspace-main {
-  max-width: 1440px;
-  padding: 2.5rem;
-  margin: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  padding: clamp(1rem, 2.2vw, 2.75rem);
+  margin: 0;
   min-height: calc(100dvh - 157px);
 }
 .workspace-footer {

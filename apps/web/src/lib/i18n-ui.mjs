@@ -1,6 +1,21 @@
 // Interface copy only. Lesson text, quiz questions, and conversation turns keep
 // their original language. New interface strings belong here or in i18n.mjs.
 export const englishUi = {
+  "{minutes} menit": "{minutes} min",
+  "{hours} jam {minutes} mnt": "{hours} h {minutes} min",
+  "{hours} jam": "{hours} h",
+  "Mantap": "Strong progress",
+  "Berkembang": "Developing",
+  "Perlu penguatan": "Needs practice",
+  "Mulai dari dasar": "Start with the basics",
+  "Perkembangan belajarmu": "Your learning progress",
+  "Lihat hasil latihan dan tugas untuk memilih materi berikutnya.": "Use your practice and assignment results to choose your next lesson.",
+  "Akurasi latihan dan tugas": "Practice and assignment accuracy",
+  "Jawaban latihan": "Practice answers",
+  "Jawaban tugas": "Assignment answers",
+  "Tugas selesai": "Completed assignments",
+  "tugas dikumpulkan pada periode ini": "assignments submitted in this period",
+  "Penguasaan materi {value}": "Concept mastery {value}",
   "Ringkasan": "Overview", "Kelas": "Classes", "Progres": "Progress", "Buka materi": "Open materials", "Materi selesai": "Completed materials",
   "Kuis & Tugas": "Quizzes & assignments", "Analitik": "Analytics", "Tugas": "Assignments", "Materi": "Materials",
   "Asesmen mandiri": "Independent assessment", "Mini kuis Tutor": "Tutor mini quiz", "Mini kuis": "Mini quiz", "Mini kuis materi": "Material mini quiz",

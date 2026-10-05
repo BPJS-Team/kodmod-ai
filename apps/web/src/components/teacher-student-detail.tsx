@@ -21,6 +21,7 @@ import type {
   TeacherStudentDetail,
   TeacherTranscript,
 } from "@/lib/teacher-types";
+import { analyticsWindowLabel } from "@/lib/analytics-display.mjs";
 
 function percent(value: number) {
   return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
@@ -106,7 +107,7 @@ export function TeacherStudentDetailView({
         <button type="button" className="button secondary" onClick={() => void refresh()} disabled={loading}>
           <RefreshCw size={16} className={loading ? "spin" : undefined} aria-hidden="true" /><UiText>{"Perbarui"}</UiText></button>
       </div>
-      {error && <p className="alert error-message analytics-error" role="alert">{error}</p>}
+      {error && <p className="alert error-message analytics-error" role="alert"><UiText>{error}</UiText></p>}
 
       <div className="teacher-summary panel">
         <Target size={21} aria-hidden="true" />
@@ -118,7 +119,7 @@ export function TeacherStudentDetailView({
           <span className="analytics-stat-icon blue"><Target size={19} aria-hidden="true" /></span>
           <span className="analytics-stat-label"><UiText>{"Mastery"}</UiText></span>
           <strong>{percent(analytics.overall_mastery)}</strong>
-          <small><UiText>{"periode "}</UiText>{analytics.window}</small>
+          <small><UiText>{"periode "}</UiText><UiText>{analyticsWindowLabel(analytics.window)}</UiText></small>
         </article>
         <article className="panel analytics-stat-card">
           <span className="analytics-stat-icon purple"><BookOpenCheck size={19} aria-hidden="true" /></span>

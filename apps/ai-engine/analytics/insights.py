@@ -111,7 +111,7 @@ def generate_student_spoken_summary(analytics: dict, *, language: str = "id") ->
             if english
             else f"Akurasi kuis dan tugas kamu {_pct(accuracy)}. Teruskan latihan."
         )
-    elif accuracy > 0:
+    elif accuracy > 0 or analytics.get("n_quiz_attempts", 0):
         parts.append(
             f"Your quiz and assignment accuracy is {_pct(accuracy, language)}. We will work on this together."
             if english

@@ -7,7 +7,7 @@ import { requireSession } from "@/lib/session";
 import { backend } from "@/lib/server-api";
 
 export default async function StudentProgressPage() {
-  const { token } = await requireSession("student");
+  const { token, user } = await requireSession("student");
   const [initial, spokenPayload] = await Promise.all([
     backend<StudentAnalyticsData>("/analytics/me?window=week", token),
     backend<StudentAnalyticsSpoken>("/analytics/me/spoken?window=week", token),
@@ -19,7 +19,7 @@ export default async function StudentProgressPage() {
         title={<UiText>{"Progres belajar"}</UiText>}
         description={<UiText>{"Lihat pola belajar, kekuatan, dan langkah berikutnya yang paling membantu untukmu."}</UiText>}
       />
-      <StudentAnalytics initial={initial} initialSpoken={spokenPayload.spoken} />
+      <StudentAnalytics key={user.preferred_language} initial={initial} initialSpoken={spokenPayload.spoken} />
     </>
   );
 }

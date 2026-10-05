@@ -36,6 +36,23 @@ def test_formal_answers_are_described_even_without_a_tutor_session():
     assert "belum belajar sama sekali" not in result
 
 
+def test_zero_grade_is_spoken_as_a_result_and_not_an_empty_history():
+    result = generate_student_spoken_summary(
+        {"n_sessions": 0, "n_quiz_attempts": 2, "quiz_accuracy": 0}, language="en"
+    )
+    assert "accuracy is 0 percent" in result
+    assert "no learning activity" not in result
+
+
+async def test_agent_managed_assessment_notice_uses_english():
+    from agents.analytics_agent import analytics_node
+
+    result = await analytics_node(
+        {"assessment_managed": True, "language": "en", "cumulative_quiz_score": 1}
+    )
+    assert result["generated_response"] == "Practice complete. Your score is 100 percent."
+
+
 def test_english_teacher_insights_and_cohort_alerts():
     result = generate_teacher_summary(
         {"student_name": "Budi", "n_quiz_attempts": 3, "quiz_accuracy": 0.3, "window": "all"},

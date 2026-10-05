@@ -23,6 +23,9 @@ export type StudentAnalytics = {
   total_minutes: number;
   interaction_count: number;
   n_quiz_attempts: number;
+  n_practice_answers?: number;
+  n_assignment_answers?: number;
+  n_assignment_submissions?: number;
   quiz_accuracy: number;
   avg_quiz_score: number;
   overall_mastery: number;
