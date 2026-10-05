@@ -54,4 +54,4 @@ Nama Compose project default adalah `kodmod-centre` pada Windows dan `kodmod` pa
 
 Checker memilih container layanan Compose yang aktif. Container ad hoc untuk pengujian dan perintah Compose satu kali tidak ikut dipilih sebagai layanan utama. Jika satu layanan mempunyai beberapa replica, checker meminta pemeriksaan replica tersebut.
 
-Hasil audit penguasaan konsep, bukti pengujian, dan temuan yang masih perlu dikerjakan tersedia di [Validasi Student Model](STUDENT_MODEL_VALIDATION.md).
+Hasil audit penguasaan konsep, perbaikan, bukti pengujian, dan batas validasi tersedia di [Validasi Student Model](STUDENT_MODEL_VALIDATION.md).
