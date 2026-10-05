@@ -165,9 +165,7 @@ class StudentAggregator:
         n_attempts = len(attempts) + formal_answers
         n_correct = sum(1 for a in attempts if a.is_correct) + formal_correct
         avg_score = (
-            (sum(a.score for a in attempts) + formal_correct) / n_attempts
-            if n_attempts
-            else 0.0
+            (sum(a.score for a in attempts) + formal_correct) / n_attempts if n_attempts else 0.0
         )
         accuracy = (n_correct / n_attempts) if n_attempts else 0.0
 
