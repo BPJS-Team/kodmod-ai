@@ -108,7 +108,7 @@ async def tutoring_node(state: KODMODState) -> dict[str, Any]:
             if is_remediation
             else ""
         )
-        + language_instruction()
+        + language_instruction(state.get("learning_profile", {}).get("language"))
     )
 
     quiz_question = state.get("quiz_question") or {}

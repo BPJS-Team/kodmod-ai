@@ -84,6 +84,8 @@ class QuizQuestion(TypedDict, total=False):
     options: list[str]  # for MCQ; empty for spoken
     expected_answer: str
     rubric: dict[str, Any]
+    source_indices: list[int]
+    explanation: str
     concept_id: str
     difficulty: DifficultyLevel
 
@@ -105,12 +107,18 @@ class RetrievedDoc(TypedDict, total=False):
     score: float
     source: str
     concept_ids: list[str]
+    concept_id: str | None
+    class_id: str | None
+    material_id: str | None
+    material_title: str | None
+    section_title: str | None
 
 
 class LearningProfile(TypedDict, total=False):
     learning_style: Literal["auditory", "kinesthetic", "mixed"]
     preferred_pace: Literal["slow", "normal", "fast"]
     language: str
+    preferred_voice: str
     accessibility: dict[str, Any]  # screen_reader, contrast, font_scale, etc.
 
 
@@ -141,6 +149,8 @@ class KODMODState(TypedDict, total=False):
 
     # ---- Turn I/O ----------------------------------------------------------
     user_input: str  # the student's utterance, already text
+    transcribed_text: str  # server STT adapter output, before intent routing
+    audio_input_path: str  # private temporary path; never serialized in receipts
     detected_language: str
 
     # ---- Routing & intent --------------------------------------------------
@@ -153,6 +163,8 @@ class KODMODState(TypedDict, total=False):
     current_topic: str
     current_concept_id: str
     subject_id: str | None  # scopes RAG retrieval to one subject
+    class_id: str | None  # validated classroom context for material-grounded tutoring
+    material_id: str | None
     current_difficulty: DifficultyLevel
     tutoring_context: list[TutoringTurn]
     retrieved_docs: list[RetrievedDoc]
@@ -160,6 +172,13 @@ class KODMODState(TypedDict, total=False):
     accessible_response: str  # post-accessibility-agent text; this is what ships
 
     # ---- Quiz state --------------------------------------------------------
+    assessment_managed: bool  # REST owns the database transaction and durable evidence
+    assessment_kind: Literal["assessment", "tutor"]
+    material_version: int | None
+    material_mapping_version: int | None
+    approved_material_concepts: list[dict]
+    quiz_source_docs: list[dict]  # server-selected lesson unit for a Tutor mini quiz
+    quiz_mcq_only: bool
     quiz_session_id: str
     quiz_n_questions: int  # explicit length request (0 = let the agent decide)
     quiz_questions: list[QuizQuestion]
@@ -168,6 +187,7 @@ class KODMODState(TypedDict, total=False):
     quiz_question: QuizQuestion  # the question currently being asked
     student_answer: str
     quiz_attempts: list[QuizAttempt]
+    mastery_applied_attempts: int  # cursor into quiz_attempts; never apply old evidence twice
     quiz_score: float  # 0.0 – 1.0 for current attempt
     cumulative_quiz_score: float  # session-wide
     misconceptions_detected: list[str]
@@ -221,6 +241,8 @@ def initial_state(
     user_input: str = "",
     subject_id: str | None = None,
     teacher_id: str | None = None,
+    class_id: str | None = None,
+    material_id: str | None = None,
 ) -> KODMODState:
     """Return a clean state object for a new turn."""
     from datetime import datetime
@@ -232,6 +254,8 @@ def initial_state(
         teacher_id=teacher_id,
         request_id=str(uuid4()),
         user_input=user_input,
+        transcribed_text="",
+        audio_input_path="",
         detected_language="id",
         intent="unknown",
         intent_confidence=0.0,
@@ -240,12 +264,21 @@ def initial_state(
         current_topic="",
         current_concept_id="",
         subject_id=subject_id,
+        class_id=class_id,
+        material_id=material_id,
         current_difficulty="medium",
         tutoring_context=[],
         retrieved_docs=[],
         generated_response="",
         accessible_response="",
         quiz_session_id="",
+        assessment_managed=False,
+        assessment_kind="assessment",
+        material_version=None,
+        material_mapping_version=None,
+        approved_material_concepts=[],
+        quiz_source_docs=[],
+        quiz_mcq_only=False,
         quiz_n_questions=0,
         quiz_questions=[],
         current_question_index=0,
@@ -253,6 +286,7 @@ def initial_state(
         quiz_question={},
         student_answer="",
         quiz_attempts=[],
+        mastery_applied_attempts=0,
         quiz_score=0.0,
         cumulative_quiz_score=0.0,
         misconceptions_detected=[],

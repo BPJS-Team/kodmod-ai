@@ -89,6 +89,26 @@ def test_base_url_is_forwarded_when_set(  # KM-UNIT-133
     assert recording_openai.last_kwargs["base_url"] == "http://stub:8099/v1"
 
 
+def test_gpt6_chat_completions_disable_reasoning_for_tool_calls(
+    recording_openai, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(llm_client.settings, "LLM_TUTOR_MODEL", "gpt-6-luna")
+
+    llm_client.get_tutor_llm()
+
+    assert recording_openai.last_kwargs["reasoning_effort"] == "none"
+
+
+def test_non_gpt6_models_keep_default_reasoning_mode(
+    recording_openai, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(llm_client.settings, "LLM_TUTOR_MODEL", "gpt-4.1-mini")
+
+    llm_client.get_tutor_llm()
+
+    assert "reasoning_effort" not in recording_openai.last_kwargs
+
+
 def test_unset_model_raises_a_readable_error(monkeypatch: pytest.MonkeyPatch) -> None:
     # KM-UNIT-134
     monkeypatch.setattr(llm_client.settings, "LLM_SCORING_MODEL", MODEL_UNSET)

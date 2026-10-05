@@ -21,6 +21,11 @@ Run from ``kodmod-ai/`` once the infra + schema/seed are ready::
 Overrides (shell env): ``ENV=staging`` (KM-SYS-060), ``KODMOD_API_PORT=8001``, a
 real provider for the ``@real_llm`` smoke. ``SERVE_TEST_API_RELOAD=1`` turns on
 uvicorn reload.
+
+Set ``KODMOD_TEST_SPEECH=1`` for offline HTTP contract tests that exercise
+public menu audio. Only the ElevenLabs synthesis transport is replaced;
+authorization, text validation, caching and HTTP responses remain real.
+The returned bytes are a test marker, not playable speech or provider proof.
 """
 
 from __future__ import annotations
@@ -75,6 +80,26 @@ def _log_config() -> dict:
     return cfg
 
 
+def speech_fixture_app():
+    """Build the real API with an explicitly opt-in, test-only speech transport."""
+    apply_test_env()
+    from config.settings import settings
+
+    if settings.ENV != "test" or not settings.DB_NAME.startswith("kodmod_test"):
+        raise RuntimeError("Speech fixture refuses non-test environments or application data")
+    if os.getenv("KODMOD_RUN_REAL_LLM") == "1":
+        raise RuntimeError("Speech fixture cannot be combined with real-provider tests")
+    from voice import elevenlabs
+
+    async def synthetic_speech(text: str, *, voice_id: str | None = None) -> bytes:
+        return b"ID3-kodmod-offline-test-audio"
+
+    elevenlabs.synthesise = synthetic_speech
+    from api.main import app
+
+    return app
+
+
 def main() -> None:
     apply_test_env()
 
@@ -120,7 +145,10 @@ def main() -> None:
         run_kwargs["reload_excludes"] = RELOAD_EXCLUDES
 
     try:
-        uvicorn.run("api.main:app", **run_kwargs)
+        if os.getenv("KODMOD_TEST_SPEECH") == "1":
+            uvicorn.run("scripts.serve_test_api:speech_fixture_app", factory=True, **run_kwargs)
+        else:
+            uvicorn.run("api.main:app", **run_kwargs)
     finally:
         try:
             if PID_FILE.read_text(encoding="utf-8").strip() == str(os.getpid()):

@@ -1,0 +1,226 @@
+/* Fluid dashboards; only prose keeps a reading measure. */
+.admin-shell > .admin-workspace {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-shell .workspace-main {
+  container: workspace / inline-size;
+  flex: 1;
+}
+
+.admin-shell :is(.workspace-header, .workspace-footer) {
+  padding-inline: clamp(1rem, 2.2vw, 2.75rem);
+}
+
+.admin-shell .workspace-header {
+  flex-wrap: wrap;
+  row-gap: .75rem;
+}
+
+.admin-shell .account {
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.workspace-main > * {
+  min-width: 0;
+}
+
+.workspace-main .page-heading {
+  align-items: flex-start;
+  margin-bottom: 1.75rem;
+}
+
+.workspace-main .page-heading h1 {
+  font-size: clamp(1.65rem, 1.4rem + .8vw, 2.25rem);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.workspace-main .page-heading p {
+  max-width: 72ch;
+  line-height: 1.7;
+}
+
+.workspace-main .form-panel {
+  width: 100%;
+  max-width: none;
+  padding: clamp(1.25rem, 2vw, 2rem);
+}
+
+.workspace-main .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+}
+
+.workspace-main .form-footer {
+  flex-wrap: wrap;
+}
+
+.workspace-main :is(.student-material-grid, .editorial-card-grid, .class-grid, .admin-material-grid) {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 1.25rem;
+}
+
+.workspace-main :is(.metrics, .analytics-stat-grid) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 1rem;
+}
+
+.workspace-main :is(.analytics-columns, .analytics-lower-grid, .teacher-columns, .admin-insight-columns) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.workspace-main :is(.analytics-toolbar, .analytics-hero, .class-detail-header, .editorial-status-bar) {
+  flex-wrap: wrap;
+}
+
+.workspace-main .analytics-toolbar h2 {
+  font-size: clamp(1.2rem, 1rem + .5vw, 1.5rem);
+  margin-top: 0;
+}
+
+.workspace-main .analytics-toolbar p {
+  font-size: .95rem;
+  max-width: 68ch;
+}
+
+.workspace-main :is(.analytics-kicker, .editorial-kicker) {
+  font-size: .8rem;
+  letter-spacing: .025em;
+  font-weight: 600;
+}
+
+.workspace-main :is(.analytics-stat-label, .analytics-stat-card small, .analytics-concept small) {
+  font-size: .875rem;
+  line-height: 1.6;
+}
+
+.workspace-main .analytics-stat-card {
+  padding: 1.5rem;
+}
+
+.workspace-main .analytics-hero {
+  padding: clamp(1.25rem, 2vw, 2rem);
+}
+
+.workspace-main .analytics-hero-copy {
+  max-width: none;
+}
+
+.workspace-main .analytics-answer-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 2rem;
+  padding: .875rem 1.25rem;
+  color: var(--muted);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+}
+
+.analytics-answer-breakdown > span {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
+}
+
+.analytics-answer-breakdown strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-main .guided-workspace {
+  grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+}
+
+.workspace-main .guided-sidebar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-main .guided-material-card,
+.workspace-main .guided-session-card {
+  min-width: 0;
+}
+
+.workspace-main .quiz-shell {
+  width: 100%;
+  max-width: 76rem;
+}
+
+.workspace-main .quiz-start-card {
+  max-width: none;
+}
+
+.workspace-main .editorial-start {
+  width: 100%;
+  max-width: none;
+}
+
+.workspace-main :is(.quiz-start-card > p, .editorial-start > p, .editorial-start > ul) {
+  max-width: 72ch;
+}
+
+.workspace-main .quiz-settings {
+  max-width: 56rem;
+}
+
+.workspace-main :is(.editorial-aside, .editorial-progress) {
+  top: 6.5rem;
+}
+
+@container workspace (max-width: 64rem) {
+  .workspace-main :is(.guided-workspace, .editorial-grid, .editorial-attempt-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-main .guided-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-main :is(.editorial-aside, .editorial-progress) {
+    position: static;
+  }
+}
+
+@container workspace (max-width: 46rem) {
+  .workspace-main :is(.analytics-columns, .analytics-lower-grid, .teacher-columns, .admin-insight-columns, .guided-sidebar) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-main .analytics-window-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-self: stretch;
+  }
+
+  .analytics-window-tabs button {
+    flex: 1 1 auto;
+  }
+
+  .workspace-main .quiz-progress {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .workspace-main .quiz-progress progress {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 540px) {
+  .admin-shell .account {
+    width: 100%;
+    justify-content: space-between;
+    margin-inline-start: 0;
+  }
+
+  .workspace-main .analytics-hero-mark {
+    display: none;
+  }
+}

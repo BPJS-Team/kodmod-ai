@@ -3,7 +3,7 @@ KODMOD AI - Bootstrap the test database on the host
 ==================================================
 
 Replaces the old one-shot `db-init` container. Locks the test env (so it talks
-to the ``kodmod-test`` Postgres = DB ``kodmod_test`` on host port 5433, **not**
+to the ``kodmod-test`` Postgres = DB ``kodmod_test`` on host port 5434, **not**
 the ``kodmod`` DB from the on-disk ``.env``), then:
 
   1. creates the schema  - ``scripts.create_test_db`` (ORM ``create_all`` +

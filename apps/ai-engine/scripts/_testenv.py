@@ -28,14 +28,14 @@ TEST_ENV: dict[str, str] = {
     "DEBUG": "false",
     "LOG_JSON": "true",
     "LANGCHAIN_TRACING_V2": "false",
-    # Postgres - compose `postgres` service, host port 5433.
-    "DB_HOST": "localhost",
-    "DB_PORT": "5433",
+    # Isolated test Postgres. The application's main port is 5433.
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5434",
     "DB_USER": "kodmod",
     "DB_PASSWORD": "kodmod",
     "DB_NAME": "kodmod_test",
     # Redis - compose `redis` service, host port 6380.
-    "REDIS_HOST": "localhost",
+    "REDIS_HOST": "127.0.0.1",
     "REDIS_PORT": "6380",
     "REDIS_DB": "0",
     # Vector store. The stub honours the requested `dimensions`.
@@ -46,10 +46,14 @@ TEST_ENV: dict[str, str] = {
     # concurrency (KM-PERF-003); the pool is pre-warmed at startup in session.py.
     "DB_POOL_SIZE": "40",
     "UPLOAD_DIR": str(ROOT / ".runtime" / "uploads"),
+    "AUDIO_DIR": str(ROOT / ".runtime" / "test-audio"),
     "JWT_SECRET": "test-secret-not-for-prod-0123456789abcdef",
-    # Chat models + embeddings → compose `llm-stub` service, host port 8099.
-    "OPENAI_BASE_URL": "http://localhost:8099/v1",
+    # High host port avoids Windows Hyper-V reservations around 8000.
+    "OPENAI_BASE_URL": "http://127.0.0.1:18199/v1",
     "OPENAI_API_KEY": "stub-key",
+    # Unit/provider fixtures explicitly mock speech. Ordinary HTTP test runs
+    # must not inherit paid ElevenLabs credentials from the backend .env.
+    "ELEVENLABS_API_KEY": "",
     "EMBEDDING_MODEL": "text-embedding-3-small",
     "LLM_ROUTER_MODEL": "stub-router",
     "LLM_TUTOR_MODEL": "stub-tutor",
@@ -64,4 +68,8 @@ def apply_test_env() -> None:
     """Pin the test env (idempotent, shell-overridable). Call before importing settings."""
     for key, value in TEST_ENV.items():
         os.environ.setdefault(key, value)
+    if not os.environ.get("DB_NAME", "").startswith("kodmod_test"):
+        raise RuntimeError(
+            "Test entrypoints require a kodmod_test database; refusing application data"
+        )
     Path(ROOT / ".runtime" / "uploads").mkdir(parents=True, exist_ok=True)

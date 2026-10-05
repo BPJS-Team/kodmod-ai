@@ -81,7 +81,11 @@ async def current_user(
     session: AsyncSession = Depends(db_session),
 ) -> User:
     """The authenticated account, whatever its role."""
-    return await _load_user(session, _bearer(authorization))
+    user = await _load_user(session, _bearer(authorization))
+    from tools.provider_usage import set_usage_actor
+
+    set_usage_actor(user.id)
+    return user
 
 
 def require_roles(*roles: str):
@@ -133,4 +137,7 @@ async def authenticate_ws(websocket: WebSocket) -> User:
     except HTTPException:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         raise
+    from tools.provider_usage import set_usage_actor
+
+    set_usage_actor(user.id)
     return user

@@ -1,6 +1,6 @@
-"""Stage 3 §7 - rag/stores/pgvector_store.py against real pgvector.
+"""Stage 3 Â§7 - rag/stores/pgvector_store.py against real pgvector.
 
-Spec: docs/testplan/03-integration.md §7 (KM-INT-080..088).
+Spec: docs/testplan/03-integration.md Â§7 (KM-INT-080..088).
 Embeddings are the deterministic hash-seeded 1024-d stub.
 """
 
@@ -16,6 +16,14 @@ pytestmark = [pytest.mark.integration, pytest.mark.db, pytest.mark.asyncio(loop_
 
 CID_A = str(uuid.UUID("44444444-4444-4444-4444-44444444aaaa"))
 CID_B = str(uuid.UUID("44444444-4444-4444-4444-44444444bbbb"))
+
+
+@pytest.fixture(autouse=True)
+def reviewed_concept_ids(concept_ids, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(sys.modules[__name__], "CID_A", str(concept_ids["pecahan"]))
+    monkeypatch.setattr(sys.modules[__name__], "CID_B", str(concept_ids["fotosintesis"]))
 
 
 def _rec(

@@ -58,6 +58,8 @@ models--*/
 .idea/
 .claude/
 .codegraph/
+.superpowers/
+.runtime/
 .mcp.json
 AGENTS.md
 /apps/web/CLAUDE.md
@@ -67,3 +69,6 @@ opencode.jsonc
 .DS_Store
 Thumbs.db
 desktop.ini
+
+codex_chat_last.md
+/materi/

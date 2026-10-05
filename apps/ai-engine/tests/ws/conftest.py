@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 
 import httpx
 import pytest
-from httpx_ws import WebSocketUpgradeError, aconnect_ws
+from httpx_ws import AsyncWebSocketSession, WebSocketUpgradeError, aconnect_ws
 
 pytestmark = [pytest.mark.asyncio(loop_scope="session")]
 
@@ -138,6 +138,7 @@ def ws_connect(ws_base_url):  # type: ignore[no-untyped-def]
         if token is not None:
             url += f"?token={token}"
         async with httpx.AsyncClient() as client:
+            ws: AsyncWebSocketSession
             async with aconnect_ws(url, client, headers=headers or {}) as ws:
                 yield ws
 

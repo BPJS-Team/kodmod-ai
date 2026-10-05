@@ -44,7 +44,7 @@ def test_settings_load_dotenv_example(tmp_path) -> None:  # KM-STATIC-013
     assert tail[-2] == "dev"
     # The comma-split validator ran and no JSON decode was attempted. The value
     # is an explicit origin list: "*" is invalid alongside allow_credentials.
-    assert tail[-1] == "['http://localhost:3000', 'http://127.0.0.1:3000']"
+    assert tail[-1] == "['http://localhost:3100', 'http://127.0.0.1:3100']"
 
 
 def test_settings_load_provider_openai(tmp_path) -> None:  # KM-STATIC-014

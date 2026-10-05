@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from fastapi import HTTPException
 from langchain_core.tools import Tool
 
 from config.settings import settings
@@ -76,6 +77,11 @@ class RAGTool:
         )
 
         if not candidates:
+            if filters and (filters.get("class_id") or filters.get("material_id")):
+                raise HTTPException(
+                    409,
+                    "Materi kelas berubah atau belum siap. Buka kembali materi atau minta guru memproses indeks AI.",
+                )
             return []
 
         # 3. Cross-encoder rerank for precision (optional - the bi-encoder
@@ -92,12 +98,17 @@ class RAGTool:
 
         return [
             RetrievedDoc(
-                doc_id=c.get("doc_id", ""),
-                chunk_id=c.get("chunk_id", ""),
+                doc_id=c.get("doc_id", c.get("material_id") or c.get("id", "")),
+                chunk_id=c.get("chunk_id", c.get("id", "")),
                 text=c.get("text", ""),
                 score=float(c.get("rerank_score", c.get("score", 0.0))),
                 source=c.get("source", "curriculum"),
                 concept_ids=c.get("concept_ids", []),
+                concept_id=c.get("concept_id"),
+                class_id=c.get("class_id"),
+                material_id=c.get("material_id"),
+                material_title=c.get("material_title"),
+                section_title=c.get("section_title"),
             )
             for c in reranked
         ]

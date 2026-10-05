@@ -21,18 +21,21 @@ Rate limiting
 Per-student rate limit enforced via Redis token bucket - see
 `api/middleware/rate_limit.py`.
 """
+
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from uuid import uuid4
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
+from pydantic import ValidationError
 
+from api.chat_service import log_turn, prepare_chat_turn, reply_text, sources, update_session_mode
 from api.dependencies import authenticate_ws
+from api.routes.chat import ChatMessageRequest
+from api.websockets.chat_stream import _GRAPH_NODES
+from database.session import async_session
 from graphs.main_graph import run_turn
-from graphs.state import initial_state
 from voice.streaming import StreamingSTT, stream_tts
 
 log = logging.getLogger(__name__)
@@ -49,54 +52,103 @@ async def voice_ws(websocket: WebSocket):
     await websocket.accept()
     log.info("WS opened for student=%s", student.id)
 
-    session_id = str(uuid4())
-    stt = StreamingSTT(language=student.language or "id")
+    # Optional query context follows the same validated contract as text chat.
+    try:
+        context_request = ChatMessageRequest.model_validate(
+            {
+                "text": "voice",
+                **{
+                    key: websocket.query_params[key]
+                    for key in ("session_id", "subject_id", "class_id", "material_id")
+                    if key in websocket.query_params
+                },
+            }
+        )
+    except ValidationError:
+        await websocket.send_json(
+            {"type": "error", "status": 422, "message": "Pilihan sesi atau materi tidak valid."}
+        )
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    session_id = context_request.session_id
+    stt = StreamingSTT(language=student.preferred_language or "id")
 
     try:
         while True:
             # ---- Phase 1: collect audio chunks until end-of-utterance -----
             transcript = await _collect_utterance(websocket, stt)
-            if transcript is None:
+            if not transcript:
                 continue  # client sent metadata or empty frame
             log.info("Final transcript: %s", transcript[:80])
 
             # ---- Phase 2: drive LangGraph for one turn -------------------
-            state = initial_state(
-                session_id=session_id,
-                student_id=student.id,
-                audio_input_path="",  # we already transcribed
-            )
+            try:
+                async with async_session() as session:
+                    session_id, state, context = await prepare_chat_turn(
+                        session,
+                        student=student,
+                        text=transcript,
+                        session_id=session_id,
+                        subject_id=context_request.subject_id,
+                        class_id=context_request.class_id,
+                        material_id=context_request.material_id,
+                    )
+            except HTTPException as exc:
+                await websocket.send_json(
+                    {"type": "error", "status": exc.status_code, "message": exc.detail}
+                )
+                continue
             state["transcribed_text"] = transcript
-            state["user_input"] = transcript
-            state["learning_profile"] = student.profile
 
             graph = websocket.app.state.graph
-            config = {"configurable": {"thread_id": session_id}}
+            config = {"configurable": {"thread_id": str(session_id)}}
 
-            assembled_text = []
+            final = {}
             async for event in run_turn(graph, state, config):
                 kind = event["event"]
+                if kind == "on_chain_end" and event.get("name") in _GRAPH_NODES | {"LangGraph"}:
+                    output = event.get("data", {}).get("output")
+                    if isinstance(output, dict):
+                        final.update(output)
 
                 if kind == "on_chat_model_stream":
-                    delta = event["data"]["chunk"].content if hasattr(
-                        event["data"]["chunk"], "content"
-                    ) else ""
-                    assembled_text.append(delta)
-                    await websocket.send_json({
-                        "type": "token",
-                        "text": delta,
-                    })
+                    delta = (
+                        event["data"]["chunk"].content
+                        if hasattr(event["data"]["chunk"], "content")
+                        else ""
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "token",
+                            "text": delta,
+                        }
+                    )
 
                 elif kind == "on_chain_end" and event["name"] == "accessibility":
                     # Start streaming TTS as soon as accessibility node completes
                     final_text = event["data"]["output"].get("accessible_response", "")
-                    await stream_tts(websocket, final_text)
+                    async for frame in stream_tts(final_text):
+                        await websocket.send_bytes(frame)
 
-                elif kind == "on_chain_end" and event["name"] == "tts":
-                    audio_uri = event["data"]["output"].get("audio_response_path", "")
-                    await websocket.send_json({"type": "audio_uri", "uri": audio_uri})
-
-            await websocket.send_json({"type": "final", "session_id": session_id})
+            answer = reply_text(final)
+            await log_turn(session_id, role="student", text=transcript, intent=final.get("intent"))
+            await log_turn(
+                session_id,
+                role="assistant",
+                text=answer,
+                intent=final.get("intent"),
+                source_refs=sources(final),
+            )
+            await update_session_mode(session_id, final.get("intent"))
+            await websocket.send_json(
+                {
+                    "type": "final",
+                    "session_id": str(session_id),
+                    "text": answer,
+                    "context": context,
+                    "sources": sources(final),
+                }
+            )
 
     except WebSocketDisconnect:
         log.info("WS closed for student=%s", student.id)
@@ -109,6 +161,7 @@ async def voice_ws(websocket: WebSocket):
 # Audio collection
 # ---------------------------------------------------------------------------
 
+
 async def _collect_utterance(ws: WebSocket, stt: StreamingSTT) -> str | None:
     """
     Receive audio frames until VAD says the user stopped talking, then return
@@ -118,15 +171,17 @@ async def _collect_utterance(ws: WebSocket, stt: StreamingSTT) -> str | None:
     while True:
         msg = await ws.receive()
         if msg.get("type") == "websocket.disconnect":
-            return None
-        if "bytes" in msg and msg["bytes"]:
-            partial, is_final = await stt.feed(msg["bytes"])
+            raise WebSocketDisconnect(code=msg.get("code", 1000))
+        if msg.get("bytes"):
+            result = await stt.feed(msg["bytes"])
+            partial = result.get("partial")
             if partial:
                 transcript = partial
                 await ws.send_json({"type": "partial_transcript", "text": partial})
-            if is_final:
-                return transcript
-        elif "text" in msg and msg["text"]:
+            if result.get("final"):
+                return result["final"]
+        elif msg.get("text"):
             data = json.loads(msg["text"])
             if data.get("event") == "end_of_speech":
-                return transcript or ""
+                final = await stt.flush_segment()
+                return final or transcript or ""

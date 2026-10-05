@@ -35,12 +35,15 @@ import pytest
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("DEBUG", "false")
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
+if os.getenv("KODMOD_RUN_REAL_LLM") != "1":
+    os.environ.setdefault("OPENAI_BASE_URL", "http://127.0.0.1:18199/v1")
+    os.environ.setdefault("ELEVENLABS_API_KEY", "")
 for _role in ("ROUTER", "TUTOR", "QUIZ", "SCORING", "RECOMMENDATION", "REFLECTION"):
     os.environ.setdefault(f"LLM_{_role}_MODEL", f"stub-{_role.lower()}")
 os.environ.setdefault("DB_NAME", "kodmod_test")
-os.environ.setdefault("DB_HOST", os.environ.get("DB_HOST", "localhost"))
-os.environ.setdefault("DB_PORT", os.environ.get("DB_PORT", "5433"))
-os.environ.setdefault("REDIS_HOST", os.environ.get("REDIS_HOST", "localhost"))
+os.environ.setdefault("DB_HOST", "127.0.0.1")
+os.environ.setdefault("DB_PORT", os.environ.get("DB_PORT", "5434"))
+os.environ.setdefault("REDIS_HOST", "127.0.0.1")
 os.environ.setdefault("REDIS_PORT", os.environ.get("REDIS_PORT", "6380"))
 os.environ.setdefault("EMBEDDING_DIM", "1536")
 os.environ.setdefault("UPLOAD_DIR", os.path.join(os.getcwd(), ".runtime", "uploads"))
@@ -105,6 +108,7 @@ _LLM_CONSUMERS = (
     "agents.quiz_analyzer",
     "agents.recommendation_agent",
     "agents.reflection_agent",
+    "graphs.guided_learning",
     "accessibility.simplifier",
     "accessibility.narration",
     "analytics.insights",
@@ -152,7 +156,13 @@ def stub_embeddings(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPa
         return
     import importlib
 
-    for mod_name in ("rag.embeddings", "rag.retriever", "agents.scoring_agent", "rag.ingestion"):
+    for mod_name in (
+        "rag.embeddings",
+        "rag.retriever",
+        "tools.rag_tool",
+        "agents.scoring_agent",
+        "rag.ingestion",
+    ):
         try:
             mod = importlib.import_module(mod_name)
         except Exception:
@@ -376,9 +386,11 @@ async def admin_factory(user_factory):  # type: ignore[no-untyped-def]
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 async def graph():  # type: ignore[no-untyped-def]
+    from langgraph.checkpoint.memory import InMemorySaver
+
     from graphs.main_graph import build_kodmod_graph
 
-    return await build_kodmod_graph(checkpointer=None)
+    return await build_kodmod_graph(checkpointer=InMemorySaver())
 
 
 @pytest.fixture
@@ -391,3 +403,83 @@ async def checkpointed_graph(db_engine):  # type: ignore[no-untyped-def]
     async with AsyncPostgresSaver.from_conn_string(settings.LANGGRAPH_DB_URI) as cp:
         await cp.setup()
         yield await build_kodmod_graph(checkpointer=cp)
+
+
+# Shared source fixture for live HTTP journeys. Readiness is fixture-owned;
+# extraction/indexing itself is exercised by the separate Linux worker proof.
+@pytest.fixture
+async def material_source_factory(teacher_factory, db_cleanup, concept_ids):
+    from sqlalchemy import select
+
+    from database.models import (
+        ClassMaterial,
+        Classroom,
+        Concept,
+        CurriculumChunk,
+        Enrollment,
+        MaterialConcept,
+    )
+    from database.session import async_session
+
+    async def make(student, *, teacher=None):
+        if teacher is None:
+            teacher, _ = await teacher_factory()
+        student_id = getattr(student, "id", student)
+        teacher_id = getattr(teacher, "id", teacher)
+        concept_id = uuid.UUID(concept_ids["pecahan"])
+        async with async_session() as session:
+            concept = await session.scalar(select(Concept).where(Concept.id == concept_id))
+            classroom = Classroom(
+                id=uuid.uuid4(),
+                teacher_id=teacher_id,
+                name="HTTP source fixture",
+                subject="Matematika",
+                subject_id=concept.subject_id,
+            )
+            session.add(classroom)
+            await session.flush()
+            material = ClassMaterial(
+                id=uuid.uuid4(),
+                class_id=classroom.id,
+                title="Pecahan",
+                content="# Pecahan\nSatu per dua ditambah satu per dua adalah satu.\n\n"
+                "## Pecahan senilai\nSatu per dua setara dengan dua per empat.",
+                published=True,
+                rag_status="ready",
+                content_version=1,
+                indexed_version=1,
+                mapping_version=1,
+                indexed_mapping_version=1,
+                n_chunks=1,
+            )
+            session.add_all([material, Enrollment(class_id=classroom.id, student_id=student_id)])
+            await session.flush()
+            session.add(
+                MaterialConcept(
+                    material_id=material.id,
+                    mapping_version=1,
+                    content_version=1,
+                    concept_id=concept_id,
+                    is_primary=True,
+                    approved_by=teacher_id,
+                )
+            )
+            session.add(
+                CurriculumChunk(
+                    material_id=material.id,
+                    material_version=1,
+                    material_mapping_version=1,
+                    content=material.content,
+                    embedding=[0.01] * 1536,
+                    source="http-fixture.txt",
+                    language="id",
+                    chunk_index=0,
+                )
+            )
+        db_cleanup.append(("classrooms", str(classroom.id)))
+        return {
+            "class_id": str(classroom.id),
+            "material_id": str(material.id),
+        }
+
+    return make

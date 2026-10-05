@@ -58,13 +58,13 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ------------------------------------------------------------------ api
-    API_HOST: str = "0.0.0.0"
+    API_HOST: str = "0.0.0.0"  # noqa: S104 - container listener; host ports bind to loopback
     API_PORT: int = 8000
     API_PREFIX: str = "/api/v1"
     # Comma-separated. Credentials are allowed on the CORS middleware, so "*"
     # is not a valid value - list the frontend origin(s) explicitly.
     CORS_ALLOW_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
-    JWT_SECRET: str = "change-me-in-production"
+    JWT_SECRET: str = "change-me-in-production"  # noqa: S105 - development sentinel, rejected in production
     JWT_ALG: str = "HS256"
     JWT_EXPIRE_MIN: int = 60 * 24  # 24h
 
@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     # KODMOD_LLM_PROVIDER - nothing in llm_client branches on it anymore.
     KODMOD_LLM_PROVIDER: str = "openai"
     OPENAI_API_KEY: str | None = None
+    # Optional administrator-supplied USD unit rates; absent rates are unknown.
+    PROVIDER_PRICES_JSON: str = "{}"
     # Override only to point at an OpenAI-compatible endpoint (e.g. the test
     # stub started by scripts/serve_test_api).
     OPENAI_BASE_URL: str | None = None
@@ -94,7 +96,7 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------- database
     DB_USER: str = "kodmod"
-    DB_PASSWORD: str = "kodmod"
+    DB_PASSWORD: str = "kodmod"  # noqa: S105 - local development default, deploy uses private env
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_NAME: str = "kodmod"
@@ -148,30 +150,50 @@ class Settings(BaseSettings):
     RAG_RERANK_TOP_K: int = 4
 
     # ----------------------------------------------------------------- voice
-    # NOTE: the active chat flow is text-first (see api/routes/chat.py); the
-    # voice/* modules and these settings are currently unwired but kept
-    # working (api/routes/voice.py, api/websockets/voice_stream.py still
-    # import them) so re-enabling voice doesn't require touching config.
-    STT_BACKEND: Literal["faster-whisper", "openai-whisper", "deepgram"] = "faster-whisper"
+    # Voice is optional at runtime. When ElevenLabs is selected, the provider
+    # key and voice id stay in this backend-only settings object; the browser
+    # only receives audio bytes and redacted transcription errors.
+    STT_BACKEND: Literal["faster-whisper", "openai-whisper", "deepgram", "elevenlabs"] = (
+        "faster-whisper"
+    )
     STT_MODEL: str = "large-v3"
     STT_DEVICE: Literal["cuda", "cpu", "auto"] = "auto"
     STT_COMPUTE_TYPE: str = "float16"
     STT_LANGUAGE: str = "id"
     DEEPGRAM_API_KEY: str | None = None
 
-    TTS_BACKEND: Literal["piper", "azure", "elevenlabs", "coqui"] = "piper"
+    TTS_BACKEND: Literal["piper", "azure", "elevenlabs", "coqui"] = "elevenlabs"
     TTS_VOICE: str = "id-ID-ArdiNeural"
     TTS_RATE: float = 1.0
     AZURE_TTS_KEY: str | None = None
     AZURE_TTS_REGION: str | None = None
     ELEVENLABS_API_KEY: str | None = None
+    ELEVENLABS_TTS_MODEL: str = "eleven_multilingual_v2"
+    ELEVENLABS_TTS_OUTPUT_FORMAT: str = "mp3_44100_128"
+    ELEVENLABS_TTS_VOICE_ID: str = "1k39YpzqXZn52BgyLyGO"
+    ELEVENLABS_TTS_STABILITY: float = 0.5
+    ELEVENLABS_TTS_SIMILARITY_BOOST: float = 0.75
+    ELEVENLABS_TTS_STYLE: float = 0.0
+    ELEVENLABS_TTS_SPEED: float = 1.0
+    ELEVENLABS_TTS_SPEAKER_BOOST: bool = False
+    ELEVENLABS_STT_MODEL: str = "scribe_v2"
+    ELEVENLABS_STT_NO_VERBATIM: bool = True
+    ELEVENLABS_TIMEOUT_SECONDS: float = 60.0
 
     AUDIO_DIR: Path = Path("/var/lib/kodmod/audio")
     MAX_AUDIO_SECONDS: int = 120
+    SPEECH_CACHE_TTL_DAYS: int = Field(default=30, ge=1, le=365)
+    SPEECH_CACHE_MAX_MB: int = Field(default=1024, ge=1)
+    PUBLIC_SPEECH_DAILY_CHARACTERS: int = Field(default=10000, ge=1)
+    PRIVATE_SPEECH_DAILY_CHARACTERS: int = Field(default=120000, ge=1)
 
     # --------------------------------------------------------- file uploads
     UPLOAD_DIR: Path = Path("./data/uploads")
     MAX_UPLOAD_MB: int = 25
+    OCR_LANGUAGES: str = "ind+eng"
+    OCR_PAGE_TIMEOUT: int = Field(default=45, ge=5, le=120)
+    OCR_MAX_PIXELS: int = Field(default=16_000_000, ge=1_000_000, le=30_000_000)
+    JOB_LEASE_SECONDS: int = Field(default=120, ge=30, le=600)
 
     @property
     def MAX_UPLOAD_BYTES(self) -> int:  # noqa: N802

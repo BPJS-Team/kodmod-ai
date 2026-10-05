@@ -12,6 +12,12 @@ import pytest
 pytestmark = [pytest.mark.api, pytest.mark.asyncio(loop_scope="session")]
 
 
+@pytest.fixture(autouse=True)
+async def authenticated_teacher(client, teacher_factory):
+    _, token = await teacher_factory()
+    client.headers["Authorization"] = f"Bearer {token}"
+
+
 async def test_km_api_050_list_concepts(client) -> None:  # type: ignore[no-untyped-def]
     r = await client.get("/content/concepts")
     assert r.status_code == 200

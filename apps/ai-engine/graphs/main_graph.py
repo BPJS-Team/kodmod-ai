@@ -117,11 +117,12 @@ def route_after_tutoring(state: KODMODState) -> str:
     """
     After a tutoring explanation, optionally fire the lightweight "Mini quiz"
     comprehension check (Practices & Tutoring diagram) before self-reflection.
-    Only for a plain tutoring turn on a known concept - never mid quiz session.
+    Only for a plain tutoring turn on a known concept or selected material;
+    an unmapped material may be assessed without fabricating a mastery concept.
     """
     if (
         state.get("intent") == "tutoring"
-        and state.get("current_concept_id")
+        and (state.get("current_concept_id") or state.get("material_id"))
         and not state.get("quiz_session_id")
     ):
         return "mini_quiz"
@@ -212,8 +213,9 @@ async def build_kodmod_graph(
     )
     graph.add_edge("reflection", "accessibility")
 
-    # Mini-quiz path (inside tutoring cluster, see Practices diagram)
-    graph.add_edge("mini_quiz", "scoring")
+    # Deliver the check question before accepting an answer. The next student
+    # turn re-enters through intent_router and is then routed to scoring.
+    graph.add_edge("mini_quiz", "accessibility")
 
     # Quiz cluster path
     graph.add_edge("problem_generator", "quiz_ask")

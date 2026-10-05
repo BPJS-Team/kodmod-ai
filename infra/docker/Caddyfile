@@ -1,29 +1,19 @@
-# KODMOD AI - Caddy reverse proxy
-# Replace `kodmod.example.com` with your real hostname.
-
+# Caddy obtains and renews HTTPS certificates for APP_DOMAIN automatically.
 {
-    email admin@kodmod.example.com
+	email {$ACME_EMAIL}
 }
 
-kodmod.example.com {
-    encode zstd gzip
+{$APP_DOMAIN} {
+	encode zstd gzip
 
-    # WebSocket upgrade for /ws/voice - Caddy handles this transparently.
-    reverse_proxy api:8000 {
-        flush_interval -1
-        transport http {
-            keepalive 30s
-            keepalive_idle_conns 64
-        }
-    }
+	# The existing authenticated FastAPI WebSocket transport is kept available.
+	@websocket path /ws/*
+	handle @websocket {
+		reverse_proxy ai-engine:8000
+	}
 
-    @health path /health/*
-    handle @health {
-        reverse_proxy api:8000
-    }
-
-    log {
-        output stdout
-        format json
-    }
+	# Cookie authentication and server-side API proxies belong to Next.js.
+	handle {
+		reverse_proxy web:3000
+	}
 }

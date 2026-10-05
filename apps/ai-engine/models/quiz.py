@@ -6,14 +6,25 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class QuizStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     concept_id: uuid.UUID | None = None
+    class_id: uuid.UUID | None = None
+    material_id: uuid.UUID | None = None
     n_questions: int = Field(default=5, ge=1, le=20)
     difficulty: Literal["easy", "medium", "hard"] | None = None
     language: Literal["id", "en"] = "id"
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if bool(self.class_id) != bool(self.material_id):
+            raise ValueError("Pilih kelas dan materi bersama.")
+        if self.class_id and self.concept_id:
+            raise ValueError("Konsep kurikulum dan materi kelas adalah pilihan berbeda.")
+        return self
 
 
 class QuizQuestionOut(BaseModel):
@@ -33,9 +44,15 @@ class QuizStartResponse(BaseModel):
 
 class QuizSubmitRequest(BaseModel):
     quiz_session_id: uuid.UUID
-    question_id: str
-    student_answer: str
-    response_latency_ms: int | None = None
+    question_id: uuid.UUID
+    submission_id: uuid.UUID
+    student_answer: str = Field(min_length=1, max_length=4000)
+    response_latency_ms: int | None = Field(default=None, ge=0, le=3600000, strict=True)
+
+    @field_validator("student_answer", mode="before")
+    @classmethod
+    def trim_answer(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class QuizSubmitResponse(BaseModel):
@@ -46,6 +63,21 @@ class QuizSubmitResponse(BaseModel):
     quiz_complete: bool = False
     final_summary: str | None = None
     cumulative_score: float = 0.0
+
+
+class QuizRecoveryResponse(BaseModel):
+    quiz_session_id: uuid.UUID
+    kind: Literal["assessment", "tutor"] = "assessment"
+    status: Literal["in_progress", "completed"]
+    class_id: uuid.UUID | None = None
+    material_id: uuid.UUID | None = None
+    material_title: str | None = None
+    language: Literal["id", "en"] = "id"
+    total_questions: int
+    answered_questions: int
+    current_question: QuizQuestionOut | None = None
+    last_result: QuizSubmitResponse | None = None
+    started_at: datetime
 
 
 class QuizSessionOut(BaseModel):

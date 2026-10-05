@@ -37,7 +37,7 @@ install-test:
 	$(PIP) install -e ".[test]"
 
 dev:
-	$(PY) -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+	$(PY) -m scripts.dev_server
 
 test:
 	$(PY) -m pytest -q

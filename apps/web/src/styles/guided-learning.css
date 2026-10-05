@@ -1,0 +1,328 @@
+.guided-workspace { display: grid; grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.guided-sidebar, .guided-main { display: grid; gap: 1.1rem; min-width: 0; }
+.guided-material-picker, .guided-sessions, .guided-lesson, .guided-welcome { padding: clamp(1.2rem, 3vw, 2rem); }
+.guided-card-header { display: grid; gap: .7rem; margin-bottom: 1.1rem; color: var(--ink, #12335d); }
+.guided-card-title { font-size: 1.2rem; line-height: 1.4; margin: 0; }
+.guided-material-picker [data-slot="card-content"] { display: grid; gap: 1rem; }
+.guided-material-picker select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.guided-progress { padding: 1.1rem 1.5rem; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.guided-progress h2 { margin: .25rem 0 0; font-size: 1.25rem; overflow-wrap: anywhere; }
+.guided-progress > div { flex: 1; min-width: 10rem; }
+.guided-progress strong { color: #24486f; }
+.guided-progress progress { flex-basis: 100%; width: 100%; accent-color: #2463ed; height: .6rem; }
+.guided-lesson-heading { display: flex; align-items: center; gap: .85rem; margin-bottom: 1.5rem; }
+.guided-lesson-heading h2 { margin: 0; font-size: clamp(1.3rem, 2.5vw, 1.8rem); line-height: 1.45; }
+.guided-symbol { display: inline-flex; padding: .85rem; color: #245be4; background: #ecf3ff; border-radius: 1rem; flex: 0 0 auto; }
+.guided-explanation { max-width: 70ch; font-size: 1.125rem; line-height: 1.9; }
+.guided-explanation p { white-space: pre-line; overflow-wrap: anywhere; margin: 0 0 1.5rem; }
+.guided-source { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; padding-block: 1rem; color: #244b87; font-size: .9rem; overflow-wrap: anywhere; }
+.guided-question-form { display: grid; gap: 1rem; padding-top: 1.5rem; border-top: 1px solid #dce7f6; margin-top: 1rem; }
+.guided-question-form .button { justify-self: end; }
+.guided-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.6rem; padding-top: 1.4rem; border-top: 1px solid #dce7f6; }
+.guided-your-question, .guided-check-result { padding: 1rem; background: #f0f6ff; border-radius: .75rem; margin-bottom: 1.2rem; }
+.guided-check-result { display: flex; gap: .75rem; align-items: start; margin-top: 1.1rem; }
+.guided-check-result p { margin: .4rem 0 0; }
+.guided-sessions ul { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .4rem; }
+.guided-sessions button { text-align: start; display: grid; gap: .3rem; width: 100%; padding: .85rem; border-radius: .65rem; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.guided-sessions button[aria-current="true"] { background: #eef4ff; border-color: #bfd4fc; }
+.guided-sessions small { color: #4c6380; }
+.guided-other-paths { display: grid; gap: .75rem; padding: .3rem .5rem; }
+.guided-other-paths a { display: flex; align-items: center; gap: .6rem; justify-content: space-between; color: #244b87; font-weight: 600; }
+.guided-welcome { min-height: 26rem; background-image: radial-gradient(#d7e5fa .6px, transparent .6px); background-size: 18px 18px; display: flex; flex-direction: column; align-items: start; justify-content: center; gap: 1rem; }
+.guided-welcome .guided-card-title { font-size: 1.8rem; }
+.guided-welcome p { max-width: 48ch; line-height: 1.8; }
+.guided-welcome ol { margin: 0; padding-left: 1.5rem; line-height: 2.2; }
+.guided-workspace button:disabled { cursor: not-allowed; }
+@media (max-width: 900px) { .guided-workspace { grid-template-columns: minmax(0, 1fr); } .guided-sidebar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .guided-other-paths { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .guided-sidebar { grid-template-columns: minmax(0, 1fr); } .guided-progress { padding: 1rem; } .guided-actions .button, .guided-question-form .button { width: 100%; } .guided-lesson .voice-actions { flex-wrap: wrap; } .guided-welcome { min-height: 20rem; } }
+html[data-high-contrast="true"] .guided-symbol, html[data-high-contrast="true"] .guided-check-result { background: transparent; color: inherit; border: 1px solid currentColor; }
+.guided-quiz-container { display: grid; gap: 1rem; }
+.guided-quiz-banner { display: flex; align-items: center; gap: .65rem; padding: .85rem 1.25rem; border-radius: .85rem; background: #eaf1fe; border: 1px solid #bfd4fc; color: #184382; font-weight: 650; font-size: .95rem; }
+
+/* Material Selection Grid ("kotak-kotak") */
+.guided-selection-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.guided-selection-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.6rem 1.8rem;
+  background: linear-gradient(135deg, #f0f6ff 0%, #e6f1fe 100%);
+  border: 1.5px solid #c8dcf6;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(18, 51, 93, 0.04);
+}
+.guided-selection-header h2 {
+  font-size: 1.35rem;
+  color: #12335d;
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.guided-selection-header p {
+  font-size: 0.95rem;
+  color: #4a678f;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Resume section */
+.guided-resume-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.guided-resume-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  color: #1b355d;
+  font-weight: 700;
+  margin: 0;
+}
+.guided-resume-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.guided-resume-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: #f7faff;
+  border: 1.5px solid #c9dcf7;
+  border-radius: 14px;
+  transition: all 0.15s ease;
+}
+.guided-resume-card:hover {
+  background: #eef5ff;
+  border-color: #7da9f2;
+}
+.guided-resume-card strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #18375f;
+  margin-bottom: 2px;
+}
+.guided-resume-card span {
+  font-size: 0.8125rem;
+  color: #526f94;
+}
+
+/* Material list and cards */
+.guided-materials-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.guided-materials-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-inline: 0.25rem;
+}
+.guided-materials-section-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  color: #1b355d;
+  font-weight: 700;
+  margin: 0;
+}
+.materials-count {
+  font-size: 0.85rem;
+  color: #3b5f90;
+  font-weight: 600;
+  background: #eaf1fa;
+  padding: 4px 11px;
+  border-radius: 99px;
+}
+.guided-empty-materials {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  gap: 0.75rem;
+  color: #5d7598;
+  background: #fbfdff;
+  border: 1.5px dashed #cbdcf2;
+  border-radius: 18px;
+}
+.guided-empty-materials h4 {
+  font-size: 1.15rem;
+  color: #1a355d;
+  margin: 0;
+}
+.guided-empty-materials p {
+  font-size: 0.9375rem;
+  margin: 0;
+  max-width: 44ch;
+  line-height: 1.6;
+}
+
+.guided-material-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.guided-material-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.45rem;
+  background: #ffffff;
+  border: 1.5px solid #d5e3f5;
+  border-radius: 18px;
+  box-shadow: 0 3px 12px rgba(18, 51, 93, 0.04);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  position: relative;
+  min-height: 220px;
+}
+.guided-material-card:hover {
+  transform: translateY(-2px);
+  border-color: #82aef4;
+  box-shadow: 0 8px 24px rgba(37, 101, 233, 0.12);
+}
+.material-card-select:focus-visible {
+  outline: 3px solid #f0b429;
+  outline-offset: 3px;
+}
+.material-card-select {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.guided-material-card.is-selected {
+  border-color: #2565e9;
+  background: linear-gradient(180deg, #f7faff 0%, #ffffff 100%);
+  box-shadow: 0 0 0 2px rgba(37, 101, 233, 0.2), 0 8px 24px rgba(37, 101, 233, 0.12);
+}
+.guided-material-card.is-pending {
+  background: #fdfdfd;
+  opacity: 0.9;
+}
+
+.material-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.material-subject-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1b53c7;
+  background: #e7f0fe;
+  padding: 4px 9px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.material-class-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: #5c7494;
+  font-weight: 500;
+}
+
+.material-card-title {
+  font-size: 1.15rem;
+  line-height: 1.45;
+  color: #162f55;
+  font-weight: 650;
+  margin: 0 0 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.material-card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  margin-bottom: 1.15rem;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 8px;
+}
+.status-badge.ready {
+  color: #186b57;
+  background: #eaf7f2;
+}
+.status-badge.pending {
+  color: #92580a;
+  background: #fef5e7;
+}
+.status-badge.done {
+  color: #215dbd;
+  background: #eef4ff;
+}
+
+.material-card-action {
+  margin-top: 0.25rem;
+}
+.material-start-button {
+  width: 100%;
+  min-height: 42px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+}
+
+/* Change material button inside active lesson */
+.change-material-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #2458a6;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: #eef4ff;
+  border: 1px solid #d0e1f9;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: all 0.15s ease;
+}
+.change-material-btn:hover {
+  background: #e2edff;
+  border-color: #9ebff3;
+}

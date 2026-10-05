@@ -6,7 +6,9 @@ contributor must follow.
 
 ## 1. The Audio-Only Reality
 
-Every assistant turn will be read by TTS. The learner cannot:
+Assistant text can be read aloud through the ElevenLabs TTS control. Playback
+is explicit and pausable so the learner keeps control; text remains available
+when a provider or microphone is unavailable. The learner cannot:
 
 - See colors, shapes, charts, or diagrams.
 - Scroll back to re-read a long paragraph.
@@ -53,6 +55,11 @@ The learner controls pacing via voice commands
 These commands short-circuit the LLM router for sub-millisecond
 response.
 
+The student reader also exposes `Dengarkan` and `Jawab dengan suara`. The
+first uses the authenticated `/voice/tts` proxy and never autoplays. The
+second records only after a microphone action, sends the clip to `/voice/stt`,
+and shows the transcription for review before it can become an answer.
+
 ## 4. Onboarding Without Sight
 
 - First-run: speak welcome + commands within 3 seconds of connecting.
@@ -83,7 +90,7 @@ adjusts:
 Teachers can configure per-student:
 
 - Speech rate baseline.
-- Voice gender / locale (`TTS_VOICE`).
+- Voice gender / locale (`ELEVENLABS_TTS_VOICE_ID` on the backend).
 - Verbosity level (`SOCRATIC_DEPTH`).
 - Language preference (`preferred_language`).
 

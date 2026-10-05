@@ -1,6 +1,6 @@
-"""Stage 3 §9 - agent node functions in isolation (real DB + Redis, stub LLM/embeddings).
+"""Stage 3 Â§9 - agent node functions in isolation (real DB + Redis, stub LLM/embeddings).
 
-Spec: docs/testplan/03-integration.md §9 (KM-INT-100..124).
+Spec: docs/testplan/03-integration.md Â§9 (KM-INT-100..124).
 Each node is called ``await <node>(state)`` with a hand-assembled state; we assert
 the key return fields plus ``last_node`` / ``next_action``.
 """
@@ -8,6 +8,8 @@ the key return fields plus ``last_node`` / ``next_action``.
 from __future__ import annotations
 
 import pytest
+
+from graphs.state import KODMODState, QuizQuestion
 
 pytestmark = [
     pytest.mark.integration,
@@ -42,20 +44,20 @@ def _patch_getter(monkeypatch, module: str, name: str, value) -> None:
 async def test_km_int_100_intent_router_happy_and_fallback(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     from agents.intent_router import intent_router_node
 
-    out = await intent_router_node({"transcribed_text": "tolong jelaskan pecahan"})
+    out = await intent_router_node({"user_input": "tolong jelaskan pecahan"})
     assert out["intent"] == "tutoring"
     assert out["last_node"] == "intent_router"
 
     _patch_getter(monkeypatch, "agents.intent_router", "get_router_llm", _GarbageLLM())
-    out2 = await intent_router_node({"transcribed_text": "hmm apa ya"})
+    out2 = await intent_router_node({"user_input": "hmm apa ya"})
     assert out2["intent"] == "tutoring"  # safe fallback on parse failure
 
 
 async def test_km_int_101_intent_router_midquiz_forces_quiz() -> None:
     from agents.intent_router import intent_router_node
 
-    state = {
-        "transcribed_text": "jawabannya adalah dua per empat",
+    state: KODMODState = {
+        "user_input": "jawabannya adalah dua per empat",
         "quiz_session_id": "quiz-abc",
         "quiz_questions": [{"question_id": "q1"}, {"question_id": "q2"}],
         "current_question_index": 0,
@@ -69,8 +71,8 @@ async def test_km_int_101_intent_router_midquiz_forces_quiz() -> None:
 async def test_km_int_102_intent_router_meta_command_not_forced() -> None:
     from agents.intent_router import intent_router_node
 
-    state = {
-        "transcribed_text": "ulangi",
+    state: KODMODState = {
+        "user_input": "ulangi",
         "quiz_session_id": "quiz-abc",
         "quiz_questions": [{"question_id": "q1"}],
         "current_question_index": 0,
@@ -85,7 +87,7 @@ async def test_km_int_102_intent_router_meta_command_not_forced() -> None:
 async def test_km_int_103_tutoring_node() -> None:
     from agents.tutoring_agent import tutoring_node
 
-    state = {
+    state: KODMODState = {
         "user_input": "apa itu pecahan",
         "current_concept_id": "pecahan",
         "mastery_scores": {"pecahan": 0.4},
@@ -105,7 +107,17 @@ async def test_km_int_104_problem_generator_node(clean_db) -> None:  # type: ign
     from agents.problem_generator import problem_generator_node
 
     out = await problem_generator_node(
-        {"current_concept_id": "pecahan", "current_topic": "pecahan", "emotional_state": "neutral"}
+        {
+            "current_concept_id": "pecahan",
+            "current_topic": "pecahan",
+            "emotional_state": "neutral",
+            "quiz_source_docs": [
+                {
+                    "text": "Pecahan adalah bagian dari keseluruhan. Satu per dua ditambah satu per dua adalah satu.",
+                    "source": "approved-fixture",
+                }
+            ],
+        }
     )
     assert out["quiz_session_id"].startswith("quiz-")
     assert len(out["quiz_questions"]) >= 1
@@ -117,7 +129,7 @@ async def test_km_int_104_problem_generator_node(clean_db) -> None:  # type: ign
 async def test_km_int_105_quiz_node_asks_current_question() -> None:
     from agents.quiz_agent import quiz_node
 
-    q = {
+    q: QuizQuestion = {
         "question_id": "q1",
         "text": "Berapa satu per dua tambah satu per dua?",
         "type": "mcq",
@@ -152,7 +164,7 @@ async def test_km_int_106_mini_quiz_node() -> None:
 async def test_km_int_107_scoring_mcq() -> None:
     from agents.scoring_agent import scoring_node
 
-    state = {
+    state: KODMODState = {
         "quiz_question": {
             "question_id": "q1",
             "type": "mcq",
@@ -186,8 +198,8 @@ async def test_km_int_108_scoring_spoken_semantic() -> None:
             "quiz_attempts": [],
         }
     )
-    # identical text -> stub-embedding cosine ~1 -> clip((1-0.3)/0.6)=1
-    assert out["quiz_score"] == pytest.approx(1.0, abs=1e-6)
+    # Spoken answers use the rubric scorer, whose fixture returns 0.85.
+    assert out["quiz_score"] == pytest.approx(0.85)
 
 
 async def test_km_int_109_scoring_rubric_llm() -> None:
@@ -216,7 +228,7 @@ async def test_km_int_109_scoring_rubric_llm() -> None:
 async def test_km_int_110_quiz_analyzer_node() -> None:
     from agents.quiz_analyzer import quiz_analyzer_node
 
-    state = {
+    state: KODMODState = {
         "quiz_questions": [
             {"question_id": "q1", "concept_id": "pecahan", "text": "a"},
             {"question_id": "q2", "concept_id": "pecahan", "text": "b"},
@@ -237,7 +249,7 @@ async def test_km_int_111_quiz_analyzer_json_fallback(monkeypatch) -> None:  # t
     from agents.quiz_analyzer import quiz_analyzer_node
 
     _patch_getter(monkeypatch, "agents.quiz_analyzer", "get_scoring_llm", _GarbageLLM())
-    state = {
+    state: KODMODState = {
         "quiz_questions": [{"question_id": "q1", "concept_id": "pecahan", "text": "a"}],
         "quiz_attempts": [{"question_id": "q1", "score": 0.2, "is_correct": False}],
     }
@@ -339,7 +351,7 @@ async def test_km_int_117_accessibility_node_polish() -> None:
     assert_no_markdown(acc)
     assert_no_visual_refs(acc)
     assert "3 titik 2" in acc
-    assert out["next_action"] == "speak"
+    assert out["next_action"] == "respond"
 
 
 async def test_km_int_118_accessibility_node_simplify_flag() -> None:
@@ -352,7 +364,7 @@ async def test_km_int_118_accessibility_node_simplify_flag() -> None:
         }
     )
     assert out["accessible_response"].strip()  # simplifier stub ran, no crash
-    assert out["next_action"] == "speak"
+    assert out["next_action"] == "respond"
 
 
 async def test_km_int_119_accessibility_node_empty() -> None:
@@ -396,7 +408,7 @@ async def test_km_int_121_reflection_node_low_score_interrupts(monkeypatch) -> N
                 )
             )
 
-    _patch_getter(monkeypatch, "agents.reflection_agent", "get_router_llm", _LowLLM())
+    _patch_getter(monkeypatch, "agents.reflection_agent", "get_reflection_llm", _LowLLM())
     out = await reflection_node({"generated_response": "buruk", "user_input": "x"})
     assert out.get("interrupt_reason")
     assert out["generated_response"] == "Versi lebih baik."
@@ -405,7 +417,7 @@ async def test_km_int_121_reflection_node_low_score_interrupts(monkeypatch) -> N
 async def test_km_int_122_reflection_node_parse_fail(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     from agents.reflection_agent import reflection_node
 
-    _patch_getter(monkeypatch, "agents.reflection_agent", "get_router_llm", _GarbageLLM())
+    _patch_getter(monkeypatch, "agents.reflection_agent", "get_reflection_llm", _GarbageLLM())
     out = await reflection_node({"generated_response": "teks apa saja", "user_input": "x"})
     assert out["next_action"] == "accessibility_polish"
     assert "generated_response" not in out  # pass-through, unchanged

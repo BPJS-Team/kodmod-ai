@@ -4,9 +4,8 @@ KODMOD AI - Authentication Routes
 
 Register, log in, inspect and edit your own account.
 
-Registration is gated by an invitation code an admin minted. A code is generic:
-it does not carry a role, and the person registering picks student or teacher
-for themselves. Admin accounts are never self-serve.
+Students and teachers can create their own accounts. Admin accounts are
+created only by an existing administrator or the provisioning script.
 """
 
 from __future__ import annotations
@@ -19,16 +18,18 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.audit_service import record_audit
 from api.dependencies import current_user, db_session
 from api.security import create_access_token, hash_password, verify_password
 from config.settings import settings
-from database.models import InvitationCode, User
+from database.models import User
 from models.user import (
     ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
     TokenResponse,
     UpdateProfileRequest,
+    Username,
     UserOut,
 )
 
@@ -53,23 +54,7 @@ async def register(
     body: RegisterRequest,
     session: AsyncSession = Depends(db_session),
 ) -> TokenResponse:
-    """Create an account by redeeming an invitation code, then log straight in."""
-    # Lock the code row for the rest of the transaction so two people redeeming
-    # the last use of the same code cannot both succeed.
-    code = (
-        await session.execute(
-            select(InvitationCode)
-            .where(InvitationCode.code == body.invitation_code)
-            .with_for_update()
-        )
-    ).scalar_one_or_none()
-
-    if code is None or not code.is_redeemable():
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            "That invitation code is not valid. Ask your administrator for a new one.",
-        )
-
+    """Create a student or teacher account and return its authenticated session."""
     try:
         password_hash = hash_password(body.password)
     except ValueError as e:
@@ -87,7 +72,6 @@ async def register(
         else "standard",
     )
     session.add(user)
-    code.used_count += 1
 
     try:
         await session.flush()
@@ -97,6 +81,17 @@ async def register(
 
     await session.refresh(user)
     log.info("Registered %s as %s", user.username, user.role)
+    record_audit(
+        session,
+        action="auth.registered",
+        category="auth",
+        actor=user,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+        details={"role": user.role},
+    )
+    await session.flush()
     return _token_response(user)
 
 
@@ -119,6 +114,14 @@ async def login(
         )
 
     user.last_login_at = datetime.now(UTC)
+    record_audit(
+        session,
+        action="auth.login",
+        category="auth",
+        actor=user,
+        target_type="session",
+        target_name=f"Sesi @{user.username}",
+    )
     await session.flush()
     return _token_response(user)
 
@@ -140,6 +143,15 @@ async def update_me(
         if value is not None:
             setattr(user, field, value)
     session.add(user)
+    record_audit(
+        session,
+        action="auth.profile_updated",
+        category="auth",
+        actor=user,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+    )
     await session.flush()
     return user
 
@@ -158,12 +170,21 @@ async def change_password(
     except ValueError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
     session.add(user)
+    record_audit(
+        session,
+        action="auth.password_changed",
+        category="auth",
+        actor=user,
+        target_type="user",
+        target_id=user.id,
+        target_name=f"{user.full_name} (@{user.username})",
+    )
     await session.flush()
 
 
 @router.get("/username-available")
 async def username_available(
-    username: str,
+    username: Username,
     session: AsyncSession = Depends(db_session),
 ) -> dict:
     """Lets the registration form tell someone a name is taken before they submit."""

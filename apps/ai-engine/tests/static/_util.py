@@ -28,7 +28,7 @@ try:  # 3.11+ stdlib; tomli fallback for older interpreters
     import tomllib as _toml
 except ModuleNotFoundError:  # pragma: no cover
     try:
-        import tomli as _toml  # type: ignore[no-redef]
+        import tomli as _toml  # type: ignore[no-redef, import-not-found]
     except ModuleNotFoundError:  # pragma: no cover
         _toml = None  # type: ignore[assignment]
 
@@ -50,6 +50,8 @@ def run(
         env=env,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
     )
 

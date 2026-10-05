@@ -72,6 +72,7 @@ async def accessibility_node(state: KODMODState) -> dict[str, Any]:
             "last_node": "accessibility",
         }
 
+    language = state.get("learning_profile", {}).get("language", "id")
     flags = state.get("accessibility_flags", {})
     profile = state.get("learning_profile", {}).get("accessibility", {})
     simplify = bool(flags.get("simplify_language") or profile.get("simplify_language"))
@@ -79,15 +80,20 @@ async def accessibility_node(state: KODMODState) -> dict[str, Any]:
     # ---- Step 1: fast-path rule transforms ------------------------------
     cleaned = _strip_markdown(text)
     cleaned = _normalize_dashes(cleaned)
-    cleaned = _replace_visual_refs(cleaned)
+    cleaned = (
+        _VISUAL_REFS.sub("consider the following", cleaned)
+        if language == "en"
+        else _replace_visual_refs(cleaned)
+    )
     cleaned = describe_visuals_in_text(cleaned)
     cleaned = _split_long_sentences(cleaned)
-    cleaned = _normalize_numbers(cleaned)
+    cleaned = _normalize_numbers(cleaned) if language != "en" else cleaned
 
     # ---- Step 2: optional LLM simplification ----------------------------
     if simplify or _should_simplify(cleaned):
         cleaned = await simplify_with_llm(
             cleaned,
+            language=language,
             target_grade_level=str(profile.get("target_grade", 7)),
         )
 
@@ -99,7 +105,11 @@ async def accessibility_node(state: KODMODState) -> dict[str, Any]:
         and state.get("quiz_session_id")
         and state.get("last_node") in ("tutoring", "reflection")
     ):
-        cleaned = cleaned.rstrip() + " Sekarang, coba jawab pertanyaan kuis tadi lagi."
+        cleaned = cleaned.rstrip() + (
+            " Now, try answering the quiz question again."
+            if language == "en"
+            else " Sekarang, coba jawab pertanyaan kuis tadi lagi."
+        )
 
     log.info(
         "Accessibility polish: %d -> %d chars (simplify=%s)", len(text), len(cleaned), simplify

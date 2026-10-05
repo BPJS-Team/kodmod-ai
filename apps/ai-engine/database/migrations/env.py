@@ -24,11 +24,23 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 target_metadata = Base.metadata
 
 
+def include_name(name, type_, parent_names):
+    # LangGraph owns and migrates these tables independently. Autogeneration
+    # must not propose dropping persisted sessions after the API has started.
+    return type_ != "table" or name not in {
+        "checkpoint_migrations",
+        "checkpoints",
+        "checkpoint_blobs",
+        "checkpoint_writes",
+    }
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_name=include_name,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -37,7 +49,12 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_name=include_name,
+        version_table_schema=config.attributes.get("version_table_schema"),
+    )
     with context.begin_transaction():
         context.run_migrations()
 
@@ -54,6 +71,11 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        # Supports callers that already own an isolated transaction/connection.
+        do_run_migrations(connection)
+        return
     asyncio.run(run_async_migrations())
 
 

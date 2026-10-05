@@ -172,4 +172,4 @@ def test_km_contract_038_rag_node_reads_current_concept_id() -> None:
 
     src = inspect.getsource(rag_retrieval_node)
     assert 'get("current_concept_id"' in src or "get('current_concept_id'" in src
-    assert 'get("concept_id"' not in src and "get('concept_id'" not in src
+    assert 'state.get("concept_id"' not in src and "state.get('concept_id'" not in src

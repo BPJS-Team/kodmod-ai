@@ -19,21 +19,21 @@ import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.chat_service import (
-    build_turn_state,
     close_session,
     log_turn,
-    open_session,
+    prepare_chat_turn,
     reply_text,
+    session_context,
     sources,
     update_session_mode,
 )
 from api.dependencies import db_session, require_student
-from database.models import InteractionLog, LearningSession, Subject, User
+from database.models import ClassMaterial, Classroom, InteractionLog, LearningSession, Subject, User
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -43,6 +43,14 @@ class ChatMessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     session_id: uuid.UUID | None = None
     subject_id: uuid.UUID | None = None
+    class_id: uuid.UUID | None = None
+    material_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def material_has_class(self):
+        if self.material_id is not None and self.class_id is None:
+            raise ValueError("Pilih kelas untuk materi ini.")
+        return self
 
 
 class ChatMessageResponse(BaseModel):
@@ -53,6 +61,7 @@ class ChatMessageResponse(BaseModel):
     sources: list[dict] = Field(default_factory=list)
     latency_ms: int
     quiz_progress: dict | None = None
+    context: dict | None = None
 
 
 @router.post("/message", response_model=ChatMessageResponse)
@@ -60,17 +69,18 @@ async def send_message(
     request: Request,
     body: ChatMessageRequest,
     student: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
 ) -> ChatMessageResponse:
     """Run one conversational turn and return the whole answer at once."""
     started = time.perf_counter()
-    session_id = await open_session(
-        student_id=student.id,
+    session_id, state, context = await prepare_chat_turn(
+        session,
+        student=student,
+        text=body.text,
         session_id=body.session_id,
         subject_id=body.subject_id,
-        first_text=body.text,
-    )
-    state = await build_turn_state(
-        student=student, session_id=session_id, text=body.text, subject_id=body.subject_id
+        class_id=body.class_id,
+        material_id=body.material_id,
     )
 
     graph = request.app.state.graph
@@ -86,6 +96,7 @@ async def send_message(
         text=answer,
         intent=final.get("intent"),
         latency_ms=latency_ms,
+        source_refs=sources(final),
     )
     await update_session_mode(session_id, final.get("intent"))
 
@@ -106,6 +117,7 @@ async def send_message(
         sources=sources(final),
         latency_ms=latency_ms,
         quiz_progress=quiz_progress,
+        context=context,
     )
 
 
@@ -118,8 +130,10 @@ async def list_sessions(
     """The student's conversations, newest first."""
     rows = (
         await session.execute(
-            select(LearningSession, Subject.name)
+            select(LearningSession, Subject.name, Classroom.subject, ClassMaterial.title)
             .outerjoin(Subject, LearningSession.subject_id == Subject.id)
+            .outerjoin(Classroom, LearningSession.class_id == Classroom.id)
+            .outerjoin(ClassMaterial, LearningSession.material_id == ClassMaterial.id)
             .where(LearningSession.student_id == student.id)
             .order_by(LearningSession.started_at.desc())
             .limit(limit)
@@ -131,9 +145,11 @@ async def list_sessions(
             "title": ls.title or "Sesi tanpa judul",
             "subject_id": str(ls.subject_id) if ls.subject_id else None,
             "subject_name": subject_name,
+            "context": session_context(ls, class_subject, material_title),
             "started_at": ls.started_at.isoformat() if ls.started_at else None,
+            "ended_at": ls.ended_at.isoformat() if ls.ended_at else None,
         }
-        for ls, subject_name in rows
+        for ls, subject_name, class_subject, material_title in rows
     ]
 
 
@@ -150,6 +166,8 @@ async def _own_session_or_404(
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such conversation.")
+    if row.guided_state is not None:
+        raise HTTPException(409, "Gunakan sesi belajar terpandu untuk membuka sesi ini.")
     return row
 
 
@@ -161,6 +179,8 @@ async def get_session(
 ) -> dict:
     """Replay one conversation so the student can pick it back up."""
     row = await _own_session_or_404(session, session_id, student)
+    classroom = await session.get(Classroom, row.class_id) if row.class_id else None
+    material = await session.get(ClassMaterial, row.material_id) if row.material_id else None
     turns = (
         (
             await session.execute(
@@ -176,13 +196,18 @@ async def get_session(
         "id": str(row.id),
         "title": row.title or "Sesi tanpa judul",
         "subject_id": str(row.subject_id) if row.subject_id else None,
+        "context": session_context(
+            row, classroom.subject if classroom else None, material.title if material else None
+        ),
         "started_at": row.started_at.isoformat() if row.started_at else None,
+        "ended_at": row.ended_at.isoformat() if row.ended_at else None,
         "turns": [
             {
                 "role": t.role,
                 "text": t.text,
                 "intent": t.intent,
                 "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+                "sources": (t.metadata_ or {}).get("sources", []),
             }
             for t in turns
         ],
@@ -205,7 +230,9 @@ async def delete_session(
 async def end_session(
     session_id: uuid.UUID,
     student: User = Depends(require_student),
+    session: AsyncSession = Depends(db_session),
 ) -> None:
     """Mark a conversation finished."""
+    await _own_session_or_404(session, session_id, student)
     if not await close_session(session_id, student.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such conversation.")

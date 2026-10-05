@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import TypedDict
+
+from fastapi import HTTPException
 
 from config.settings import settings
 from rag.embeddings import embed_text
@@ -23,11 +26,24 @@ from rag.stores import pgvector_store
 logger = logging.getLogger(__name__)
 
 
+class QueryFilters(TypedDict, total=False):
+    top_k: int
+    concept_id: uuid.UUID | None
+    subject_id: uuid.UUID | None
+    language: str | None
+    student_id: uuid.UUID | None
+    class_id: uuid.UUID | None
+    material_id: uuid.UUID | None
+
+
 async def retrieve(
     query: str,
     *,
     concept_id: uuid.UUID | None = None,
     subject_id: uuid.UUID | None = None,
+    student_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
+    material_id: uuid.UUID | None = None,
     language: str | None = None,
     top_k: int | None = None,
     rerank_top_k: int | None = None,
@@ -45,14 +61,27 @@ async def retrieve(
         use_reranker = settings.RAG_RERANK_ENABLED
 
     embedding = (await embed_text([query]))[0]
-    candidates = await pgvector_store.query(
-        embedding,
-        top_k=top_k,
-        concept_id=concept_id,
-        subject_id=subject_id,
-        language=language or settings.DEFAULT_LANGUAGE,
-    )
+    filters: QueryFilters = {
+        "top_k": top_k,
+        "concept_id": concept_id,
+        "subject_id": subject_id,
+        "language": language or settings.DEFAULT_LANGUAGE,
+    }
+    if class_id or material_id:
+        # Response language is a learner preference; the source can be in
+        # another language. Keep the permission scope, regardless of language.
+        filters.update(
+            QueryFilters(
+                student_id=student_id, class_id=class_id, material_id=material_id, language=None
+            )
+        )
+    candidates = await pgvector_store.query(embedding, **filters)
     if not candidates:
+        if class_id or material_id:
+            raise HTTPException(
+                409,
+                "Materi kelas berubah atau belum siap. Buka kembali materi atau minta guru memproses indeks AI.",
+            )
         return []
 
     if use_reranker and len(candidates) > rerank_top_k:
@@ -85,14 +114,28 @@ async def rag_retrieval_node(state) -> dict:
     if not query.strip():
         return {"retrieved_docs": [], "next_action": "tutor", "last_node": "rag_retrieval"}
 
-    docs = await retrieve(
-        query,
-        concept_id=_as_uuid(state.get("current_concept_id")),
-        subject_id=_as_uuid(state.get("subject_id")),
-        language=state.get("learning_profile", {}).get("language"),
-    )
+    filters = {
+        "concept_id": _as_uuid(state.get("current_concept_id")),
+        "subject_id": _as_uuid(state.get("subject_id")),
+        "language": state.get("learning_profile", {}).get("language"),
+    }
+    if state.get("class_id") or state.get("material_id"):
+        class_id = _as_uuid(state.get("class_id"))
+        student_id = _as_uuid(state.get("student_id"))
+        material_id = _as_uuid(state.get("material_id"))
+        if not class_id or not student_id or (state.get("material_id") and not material_id):
+            raise HTTPException(
+                409, "Konteks materi tidak valid. Mulai sesi dari materi yang dapat Anda akses."
+            )
+        filters.update(student_id=student_id, class_id=class_id, material_id=material_id)
+    docs = await retrieve(query, **filters)
     logger.info("RAG retrieved %d chunks for query=%r", len(docs), query[:64])
-    return {"retrieved_docs": docs, "next_action": "tutor", "last_node": "rag_retrieval"}
+    updates = {"retrieved_docs": docs, "next_action": "tutor", "last_node": "rag_retrieval"}
+    if not state.get("current_concept_id"):
+        concept = next((doc.get("concept_id") for doc in docs if doc.get("concept_id")), None)
+        if concept:
+            updates["current_concept_id"] = str(concept)
+    return updates
 
 
 def _as_uuid(value) -> uuid.UUID | None:

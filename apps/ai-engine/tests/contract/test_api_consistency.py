@@ -65,9 +65,10 @@ def _body_attr_reads(func: ast.AST, param: str = "body") -> set[str]:
 def test_km_contract_020_quiz_handler_response_kwargs_match_model() -> None:
     from models.quiz import QuizStartResponse, QuizSubmitResponse
 
-    quiz_py = _ROUTES_DIR / "quiz.py"
-    start = _func_ast(quiz_py, "start_quiz")
-    submit = _func_ast(quiz_py, "submit_answer")
+    # Response construction now lives in the transaction service used by routes.
+    quiz_py = _ROUTES_DIR.parent / "assessment_service.py"
+    start = _func_ast(quiz_py, "start_assessment")
+    submit = _func_ast(quiz_py, "submit_assessment")
 
     start_kwargs = _response_call_kwargs(start, "QuizStartResponse")
     submit_kwargs = _response_call_kwargs(submit, "QuizSubmitResponse")

@@ -5,11 +5,11 @@ KODMOD AI - Text-to-Speech Pipeline
 Final node before the response leaves the graph. Reads `state["accessible_response"]`
 (or falls back to `generated_response`) and synthesizes audio.
 
-Backends (selected via KODMOD_TTS_BACKEND)
+Backends (selected via TTS_BACKEND)
 ------------------------------------------
-* `piper`     - fully offline, low-latency, surprisingly natural. Default.
-* `azure`     - neural voices, SSML support, multilingual. Recommended for prod.
-* `elevenlabs`- most natural, emotion-aware. Premium tier.
+* `elevenlabs`- natural, emotion-aware voice. Default for the app.
+* `piper`     - fully offline, low-latency option for development/fallback.
+* `azure`     - neural voices, SSML support, multilingual.
 * `coqui`     - open-source, voice cloning capable.
 
 Streaming
@@ -23,54 +23,53 @@ The Accessibility Agent emits lightweight `<break time="..."/>` markers.
 Each backend converts them to its native syntax (Azure has SSML; Piper
 ignores them; ElevenLabs supports them via the `text` parameter).
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
-import tempfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from graphs.state import KODMODState
+from config.settings import settings
+from voice import elevenlabs
+from voice.audio_cache import cached_audio
+
+if TYPE_CHECKING:
+    from graphs.state import KODMODState
 
 log = logging.getLogger(__name__)
 
-OUTPUT_DIR = Path(os.getenv("KODMOD_TTS_OUTPUT_DIR", "/var/lib/kodmod/audio"))
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR = settings.AUDIO_DIR
+try:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    # Local Windows/dev users may not be allowed to create the Linux default.
+    OUTPUT_DIR = Path("./data/audio")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------
 # LangGraph node
 # ---------------------------------------------------------------------------
 
+
 async def tts_node(state: KODMODState) -> dict[str, Any]:
-    text = (
-        state.get("accessible_response")
-        or state.get("generated_response")
-        or ""
-    ).strip()
+    text = (state.get("accessible_response") or state.get("generated_response") or "").strip()
 
     if not text:
         return {"audio_response_path": "", "next_action": "end", "last_node": "tts"}
 
-    voice = (
-        state.get("learning_profile", {}).get("preferred_voice")
-        or os.getenv("KODMOD_TTS_VOICE", "id-ID-ArdiNeural")
+    profile = state.get("learning_profile", {})
+    path = await synthesise_to_file(
+        text,
+        voice=profile.get("preferred_voice"),
+        language=profile.get("language", "id"),
+        scope="user:" + str(state.get("student_id", "internal")),
     )
-    backend = os.getenv("KODMOD_TTS_BACKEND", "piper")
-
-    if backend == "azure":
-        path = await _azure_tts(text, voice)
-    elif backend == "elevenlabs":
-        path = await _elevenlabs_tts(text, voice)
-    elif backend == "coqui":
-        path = await _coqui_tts(text, voice)
-    else:
-        path = await _piper_tts(text, voice)
 
     log.info("TTS: %d chars → %s", len(text), path)
     return {
@@ -84,11 +83,13 @@ async def tts_node(state: KODMODState) -> dict[str, Any]:
 # Engines
 # ---------------------------------------------------------------------------
 
+
 @lru_cache(maxsize=4)
 def _piper_voice(model_name: str):
     """Lazy-load a Piper voice model."""
     from piper import PiperVoice
-    voices_dir = Path(os.getenv("KODMOD_PIPER_VOICES_DIR", "/opt/piper/voices"))
+
+    voices_dir = Path("/opt/piper/voices")
     return PiperVoice.load(voices_dir / f"{model_name}.onnx")
 
 
@@ -100,16 +101,18 @@ async def _piper_tts(text: str, voice: str) -> Path:
         v = _piper_voice(voice_id)
         with open(out, "wb") as f:
             v.synthesize(_strip_ssml(text), f)
+
     await asyncio.get_running_loop().run_in_executor(None, _run)
     return out
 
 
 async def _azure_tts(text: str, voice: str) -> Path:
     import azure.cognitiveservices.speech as speechsdk
+
     out = OUTPUT_DIR / f"tts-{uuid4().hex}.wav"
     cfg = speechsdk.SpeechConfig(
-        subscription=os.environ["AZURE_SPEECH_KEY"],
-        region=os.environ["AZURE_SPEECH_REGION"],
+        subscription=settings.AZURE_TTS_KEY or "",
+        region=settings.AZURE_TTS_REGION or "",
     )
     cfg.speech_synthesis_voice_name = voice
     cfg.set_speech_synthesis_output_format(
@@ -121,34 +124,44 @@ async def _azure_tts(text: str, voice: str) -> Path:
 
     def _run():
         synth.speak_ssml_async(ssml).get()
+
     await asyncio.get_running_loop().run_in_executor(None, _run)
     return out
 
 
-async def _elevenlabs_tts(text: str, voice: str) -> Path:
-    from elevenlabs.client import AsyncElevenLabs
-    out = OUTPUT_DIR / f"tts-{uuid4().hex}.mp3"
-    client = AsyncElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
-    audio_iter = client.text_to_speech.convert(
-        voice_id=voice,
-        text=_strip_ssml(text),
-        model_id="eleven_multilingual_v2",
-        output_format="mp3_44100_128",
+async def _cached_elevenlabs(text: str, voice: str, language: str, scope: str):
+    plain = " ".join(_strip_ssml(text).split())
+    if not plain or len(plain) > 5000:
+        raise ValueError("Speech text must contain 1 to 5000 characters.")
+    return await cached_audio(
+        OUTPUT_DIR / "speech-cache",
+        plain,
+        voice=voice,
+        language=language,
+        scope=scope,
+        generate=lambda: elevenlabs.synthesise(plain, voice_id=voice),
     )
-    with open(out, "wb") as f:
-        async for chunk in audio_iter:
-            f.write(chunk)
-    return out
+
+
+async def _elevenlabs_tts(text: str, voice: str) -> Path:
+    _, path = await _cached_elevenlabs(text, voice, "id", "internal")
+    return path
 
 
 async def _coqui_tts(text: str, voice: str) -> Path:
     from TTS.api import TTS
+
     out = OUTPUT_DIR / f"tts-{uuid4().hex}.wav"
     tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
+
     def _run():
-        tts.tts_to_file(text=_strip_ssml(text), file_path=str(out),
-                        speaker_wav=voice if voice.endswith(".wav") else None,
-                        language="id")
+        tts.tts_to_file(
+            text=_strip_ssml(text),
+            file_path=str(out),
+            speaker_wav=voice if voice.endswith(".wav") else None,
+            language="id",
+        )
+
     await asyncio.get_running_loop().run_in_executor(None, _run)
     return out
 
@@ -159,44 +172,44 @@ async def _coqui_tts(text: str, voice: str) -> Path:
 
 _SSML_BREAK_RE = re.compile(r'<break\s+time="(\d+)(ms|s)"\s*/?\s*>', re.IGNORECASE)
 
+
 def _strip_ssml(text: str) -> str:
     return _SSML_BREAK_RE.sub(" ", text).strip()
 
 
 def _to_ssml(text: str, voice: str) -> str:
-    body = _SSML_BREAK_RE.sub(
-        lambda m: f'<break time="{m.group(1)}{m.group(2)}"/>', text
-    )
+    body = _SSML_BREAK_RE.sub(lambda m: f'<break time="{m.group(1)}{m.group(2)}"/>', text)
     return (
         f'<speak version="1.0" xml:lang="id-ID" '
         f'xmlns="http://www.w3.org/2001/10/synthesis">'
         f'<voice name="{voice}"><prosody rate="0.95">{body}</prosody></voice>'
-        f'</speak>'
+        f"</speak>"
     )
 
 
 # ---------------------------------------------------------------------------
 # Public helpers - used by tools/voice_tool.py and voice/streaming.py
-# ---------------------------------------------------------------------------
-from config.settings import settings  # noqa: E402  (kept here to avoid cycles)
-
-
 async def synthesise_to_file(
     text: str,
     *,
     voice: str | None = None,
     rate: float = 1.0,
+    language: str = "id",
+    scope: str = "internal",
 ) -> Path:
     """Synthesise text to an audio file and return its path."""
-    voice = voice or settings.TTS_VOICE
     backend = settings.TTS_BACKEND
+    voice = voice or (
+        settings.ELEVENLABS_TTS_VOICE_ID if backend == "elevenlabs" else settings.TTS_VOICE
+    )
     plain = _strip_ssml(text)
     if backend == "piper":
         return await _piper_tts(plain, voice)
     if backend == "azure":
         return await _azure_tts(text, voice)
     if backend == "elevenlabs":
-        return await _elevenlabs_tts(plain, voice)
+        _, path = await _cached_elevenlabs(plain, voice, language, scope)
+        return path
     if backend == "coqui":
         return await _coqui_tts(plain, voice)
     raise ValueError(f"Unknown TTS_BACKEND: {backend}")
@@ -207,8 +220,18 @@ async def synthesise_bytes(
     *,
     voice: str | None = None,
     rate: float = 1.0,
+    language: str = "id",
+    scope: str = "internal",
 ) -> bytes:
     """Synthesise text and return raw audio bytes (mp3/wav depending on backend)."""
+    if settings.TTS_BACKEND == "elevenlabs":
+        audio, _ = await _cached_elevenlabs(
+            text,
+            voice or settings.ELEVENLABS_TTS_VOICE_ID,
+            language,
+            scope,
+        )
+        return audio
     path = await synthesise_to_file(text, voice=voice, rate=rate)
     try:
         return Path(path).read_bytes()

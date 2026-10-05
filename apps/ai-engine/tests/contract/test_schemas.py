@@ -33,11 +33,10 @@ def test_km_contract_001_register_request_valid() -> None:
         password="rahasia-panjang",
         full_name="Budi Santoso",
         role="student",
-        invitation_code="abc123",
     )
-    # Usernames are compared case-insensitively, codes are shown in upper case.
+    # Usernames are compared case-insensitively; registration is open.
     assert r.username == "budi.s"
-    assert r.invitation_code == "ABC123"
+    assert "invitation_code" not in type(r).model_fields
     assert r.preferred_language == "id"
 
 
@@ -58,11 +57,10 @@ def test_km_contract_002_register_request_rejects(field: str, value: str) -> Non
         "password": "rahasia-panjang",
         "full_name": "Budi",
         "role": "student",
-        "invitation_code": "ABC123",
     }
     payload[field] = value
     with pytest.raises(ValidationError):
-        RegisterRequest(**payload)
+        RegisterRequest.model_validate(payload)
 
 
 # --------------------------------------------------------------------------- #
@@ -112,16 +110,18 @@ def test_km_contract_005_quiz_start_request_bounds() -> None:
     from models.quiz import QuizStartRequest
 
     sid = uuid.uuid4()
-    ok = QuizStartRequest(student_id=sid, n_questions=1, difficulty="easy")
+    ok = QuizStartRequest(n_questions=1, difficulty="easy")
     assert ok.n_questions == 1
-    assert QuizStartRequest(student_id=sid, n_questions=20).n_questions == 20
+    assert QuizStartRequest(n_questions=20).n_questions == 20
+    with pytest.raises(ValidationError):
+        QuizStartRequest.model_validate({"student_id": sid})
 
     for bad in (0, 21, -1):
         with pytest.raises(ValidationError):
-            QuizStartRequest(student_id=sid, n_questions=bad)
+            QuizStartRequest(n_questions=bad)
 
     with pytest.raises(ValidationError):
-        QuizStartRequest(student_id=sid, difficulty="trivial")
+        QuizStartRequest.model_validate({"difficulty": "trivial"})
 
 
 def test_km_contract_006_quiz_start_response_shape() -> None:
@@ -149,11 +149,44 @@ def test_km_contract_007_quiz_submit_request_field_names() -> None:
     assert set(QuizSubmitRequest.model_fields) == {
         "quiz_session_id",
         "question_id",
+        "submission_id",
         "student_answer",
         "response_latency_ms",
     }
-    r = QuizSubmitRequest(quiz_session_id=uuid.uuid4(), question_id="q1", student_answer="A")
+    r = QuizSubmitRequest(
+        quiz_session_id=uuid.uuid4(),
+        question_id=uuid.uuid4(),
+        submission_id=uuid.uuid4(),
+        student_answer=" A ",
+    )
     assert r.response_latency_ms is None
+    assert r.student_answer == "A"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("submission_id", "not-a-uuid"),
+        ("question_id", "q1"),
+        ("student_answer", "   "),
+        ("student_answer", "a" * 4001),
+        ("response_latency_ms", -1),
+        ("response_latency_ms", 3600001),
+        ("response_latency_ms", 1.5),
+    ],
+)
+def test_quiz_submission_rejects_invalid_evidence(field, value):
+    from models.quiz import QuizSubmitRequest
+
+    payload = {
+        "quiz_session_id": uuid.uuid4(),
+        "question_id": uuid.uuid4(),
+        "submission_id": uuid.uuid4(),
+        "student_answer": "A",
+    }
+    payload[field] = value
+    with pytest.raises(ValidationError):
+        QuizSubmitRequest(**payload)
 
 
 def test_km_contract_008_quiz_submit_response_defaults_and_bounds() -> None:
@@ -193,7 +226,7 @@ def test_km_contract_010_content_retrieve_response() -> None:
 def test_km_contract_011_exercise_generate_round_trip() -> None:
     from models.content import ExerciseGenerateRequest, ExerciseGenerateResponse
 
-    req = ExerciseGenerateRequest(student_id=uuid.uuid4(), n_questions=3, difficulty="medium")
+    req = ExerciseGenerateRequest(n_questions=3, difficulty="medium")
     assert req.n_questions == 3
     resp = ExerciseGenerateResponse(exercises=[{"q": "1+1?"}], generated_at=datetime.now(UTC))
     assert resp.exercises[0]["q"] == "1+1?"
@@ -252,6 +285,16 @@ def test_km_contract_013_no_schema_exposes_audio_fields() -> None:
                 if any(marker in field for marker in ("audio_url", "audio_uri", "transcrib"))
             ]
     assert not offenders, f"audio-era fields still in the API schema: {offenders}"
+
+
+def test_voice_chat_response_reports_playback_availability_without_a_file_url() -> None:
+    from models.session import VoiceChatResponse
+
+    response = VoiceChatResponse(
+        session_id=uuid.uuid4(), intent="tutoring", response_text="Mari belajar pecahan."
+    )
+    assert response.model_dump()["audio_available"] is False
+    assert "response_audio_url" not in response.model_dump()
 
 
 # --------------------------------------------------------------------------- #

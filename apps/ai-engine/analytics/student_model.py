@@ -47,6 +47,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import text
 
@@ -59,6 +60,21 @@ log = logging.getLogger(__name__)
 LEARNING_RATE = 0.25
 # Decay applied per day of inactivity (forgetting curve, very mild)
 DAILY_DECAY = 0.005
+
+
+def mastery_at(
+    score: float, last_practiced: datetime | None, *, now: datetime | None = None
+) -> float:
+    """Project stored evidence to the current time without changing it."""
+    if last_practiced is None:
+        return max(0.0, min(1.0, score))
+    last = last_practiced.replace(tzinfo=UTC) if last_practiced.tzinfo is None else last_practiced
+    current = now if now is not None else datetime.now(UTC)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=UTC)
+    days = max(0, (current - last).days)
+    return max(0.0, min(1.0, score - DAILY_DECAY * days))
+
 
 # Tunables for predict_correct_probability(), ported from HELP-DKT Eq. (8).
 # ALPHA controls how sharply probability swings around the threshold (paper
@@ -82,6 +98,10 @@ class StudentModel:
     _confidence: dict[str, float] = field(default_factory=dict)
     _attempts: dict[str, int] = field(default_factory=dict)
     _last_practiced: dict[str, datetime] = field(default_factory=dict)
+    _dirty_concepts: set[str] = field(default_factory=set, init=False, repr=False)
+    _decay_bases: dict[str, tuple[datetime, float]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     # ------------------------------------------------------------------
     # Loading & saving
@@ -113,8 +133,13 @@ class StudentModel:
         return m
 
     async def persist(self) -> None:
+        changed = tuple(self._dirty_concepts)
+        if not changed:
+            return
         async with async_session() as s:
-            for cid, score in self._scores.items():
+            for cid in changed:
+                base = self._decay_bases.get(cid)
+                score = base[1] if base is not None else self._scores[cid]
                 await s.execute(
                     text(
                         """
@@ -140,6 +165,7 @@ class StudentModel:
                     },
                 )
             await s.commit()
+        self._dirty_concepts.difference_update(changed)
 
     # ------------------------------------------------------------------
     # Updates
@@ -156,6 +182,8 @@ class StudentModel:
         self._confidence[concept_id] = new_conf
         self._attempts[concept_id] = self._attempts.get(concept_id, 0) + 1
         self._last_practiced[concept_id] = datetime.now(UTC)
+        self._decay_bases.pop(concept_id, None)
+        self._dirty_concepts.add(concept_id)
 
         log.info(
             "Mastery update: student=%s concept=%s %.3f → %.3f (conf=%.2f)",
@@ -167,13 +195,14 @@ class StudentModel:
         )
 
     def apply_decay(self) -> None:
-        """Mild forgetting curve - call before reading scores for analytics."""
+        """Read current mastery from its evidence base; repeated reads are stable."""
         now = datetime.now(UTC)
         for cid, last in self._last_practiced.items():
-            days = max(0, (now - last).days)
-            if days == 0:
-                continue
-            self._scores[cid] = max(0.0, self._scores[cid] - DAILY_DECAY * days)
+            base = self._decay_bases.get(cid)
+            if base is None or base[0] != last:
+                base = (last, self._scores[cid])
+                self._decay_bases[cid] = base
+            self._scores[cid] = mastery_at(base[1], last, now=now)
 
     # ------------------------------------------------------------------
     # Queries
@@ -239,22 +268,41 @@ async def update_student_model_node(state) -> dict[str, Any]:
     if not student_id or not attempts:
         return {"next_action": "generate_analytics", "last_node": "update_student_model"}
 
-    model = await StudentModel.load(student_id)
+    managed = state.get("assessment_managed", False)
+    # Imported class/material quizzes have no approved global Concept mapping yet.
+    scoped_material = bool(state.get("class_id") or state.get("material_id"))
+    model = (
+        StudentModel(
+            student_id,
+            _scores=dict(state.get("mastery_scores", {})),
+            _confidence=dict(state.get("mastery_confidence", {})),
+        )
+        if managed
+        else await StudentModel.load(student_id)
+    )
     q_by_id = {q.get("question_id"): q for q in questions}
-    for a in attempts:
+    applied = min(max(int(state.get("mastery_applied_attempts", 0)), 0), len(attempts))
+    for a in attempts[applied:]:
         q = q_by_id.get(a.get("question_id"), {})
         cid = q.get("concept_id")
-        if not cid:
+        if not cid or scoped_material:
+            continue
+        try:
+            cid = str(UUID(str(cid)))
+        except (ValueError, TypeError, AttributeError):
+            # Imported class materials can be assessed before their concepts
+            # are mapped. A topic label such as "general" is never a DB UUID.
             continue
         model.update(cid, float(a.get("score", 0.0)), confidence=float(a.get("confidence", 0.9)))
 
-    await model.persist()
+    if not managed and not scoped_material:
+        await model.persist()
 
     # Advance the question index and mirror the progress into short-term
     # memory so the next utterance re-enters the graph on the right question.
     new_index = state.get("current_question_index", 0) + 1
     session_id = state.get("session_id")
-    if session_id:
+    if session_id and not managed:
         try:
             from memory.short_term import clear_quiz_session, store_quiz_session
 
@@ -270,6 +318,7 @@ async def update_student_model_node(state) -> dict[str, Any]:
                         "current_question_attempts": 0,
                         "quiz_question": questions[new_index],
                         "quiz_attempts": attempts,
+                        "mastery_applied_attempts": len(attempts),
                         "cumulative_quiz_score": state.get("cumulative_quiz_score", 0.0),
                     },
                 )
@@ -279,6 +328,7 @@ async def update_student_model_node(state) -> dict[str, Any]:
     return {
         "mastery_scores": await model.mastery_scores(),
         "mastery_confidence": dict(model._confidence),
+        "mastery_applied_attempts": len(attempts),
         "current_question_index": new_index,
         "current_question_attempts": 0,  # reset for the next question
         "next_action": "generate_analytics",

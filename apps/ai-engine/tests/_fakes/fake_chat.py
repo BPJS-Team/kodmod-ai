@@ -47,7 +47,12 @@ _ROLE_PAYLOADS: dict[str, str] = {
         }
     ),
     "scoring": json.dumps(
-        {"score": 0.85, "is_correct": True, "feedback": "Jawabanmu tepat. Bagus."}
+        {
+            "score": 0.85,
+            "confidence": 0.9,
+            "is_correct": True,
+            "feedback": "Jawabanmu tepat. Bagus.",
+        }
     ),
     "recommendation": json.dumps(
         {
@@ -128,6 +133,9 @@ def make_fake_chat(role: str) -> Any:
     """
     import itertools
 
+    if role == "quiz":
+        return _QuizStub()
+
     payload = role_payload(role)
 
     if GenericFakeChatModel is not object:
@@ -139,6 +147,33 @@ def make_fake_chat(role: str) -> Any:
         except Exception:  # pragma: no cover
             pass
     return _BareStub(payload)
+
+
+class _QuizStub:
+    """A fixture set with the requested length, never production filler."""
+
+    async def ainvoke(self, messages, **kwargs):
+        import re
+
+        match = re.search(r"<n_questions>(\d+)</n_questions>", str(messages))
+        count = int(match.group(1)) if match else 1
+        return AIMessage(
+            content=json.dumps(
+                {
+                    "questions": [
+                        {
+                            "text": f"Pada latihan {i + 1}, berapa hasil satu per dua ditambah satu per dua?",
+                            "type": "mcq",
+                            "options": ["A. satu", "B. dua", "C. nol", "D. tiga"],
+                            "expected_answer": "A",
+                            "source_indices": [1],
+                            "difficulty": "easy",
+                        }
+                        for i in range(count)
+                    ]
+                }
+            )
+        )
 
 
 def _make_structured_shim():  # type: ignore[no-untyped-def]

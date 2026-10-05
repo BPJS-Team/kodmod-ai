@@ -53,12 +53,15 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     """Ask the next question in the quiz session."""
     questions = state.get("quiz_questions", [])
     idx = state.get("current_question_index", 0)
+    english = state.get("learning_profile", {}).get("language") == "en"
 
     if not questions or idx >= len(questions):
         log.info("Quiz session has no more questions")
         return {
             "generated_response": (
-                "Bagus! Kuis ini sudah selesai. Mari kita lihat hasilnya bersama."
+                "Great! This quiz is complete. Let's review the results together."
+                if english
+                else "Bagus! Kuis ini sudah selesai. Mari kita lihat hasilnya bersama."
             ),
             "next_action": "analyze_quiz",
             "last_node": "quiz_ask",
@@ -83,7 +86,11 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     llm = get_quiz_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": ASK_PROMPT + language_instruction()},
+            {
+                "role": "system",
+                "content": ASK_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {"role": "user", "content": user_block},
         ]
     )
@@ -93,13 +100,17 @@ async def quiz_node(state: KODMODState) -> dict[str, Any]:
     # questions, carry the previous answer's feedback forward so the student
     # hears it before the next question, instead of losing it.
     if idx == 0:
-        spoken_question = (
-            f"Baik, kita mulai kuis. Ada {total} soal. Soal pertama: " + spoken_question
+        intro = (
+            f"Let's begin the quiz. There are {total} questions. First question: "
+            if english
+            else f"Baik, kita mulai kuis. Ada {total} soal. Soal pertama: "
         )
+        spoken_question = intro + spoken_question
     else:
         feedback = (state.get("generated_response") or "").strip()
         if feedback:
-            spoken_question = f"{feedback} Soal berikutnya: {spoken_question}"
+            transition = "Next question:" if english else "Soal berikutnya:"
+            spoken_question = f"{feedback} {transition} {spoken_question}"
 
     log.info(
         "Asking question %d/%d (concept=%s, difficulty=%s)",
@@ -146,16 +157,30 @@ Output JSON ONLY:
 async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     """Generate a single quick-check question after a tutoring explanation."""
     last_explanation = state.get("generated_response", "")
-    concept_id = state.get("current_concept_id", "")
+    classroom_scope = bool(state.get("class_id") or state.get("material_id"))
+    # Class materials cannot provide curriculum evidence until their mapping
+    # is approved. Keep the explanation's topic separate from Concept identity.
+    concept_id = "" if classroom_scope else state.get("current_concept_id", "")
+    topic = (state.get("current_topic") or "").strip()
+    if classroom_scope and not topic:
+        material_titles = (
+            str(doc.get("material_title") or "").strip() for doc in state.get("retrieved_docs", [])
+        )
+        topic = next((title for title in material_titles if title), "materi kelas")
+    topic_context = f"Topic: {topic}" if classroom_scope else f"Concept: {concept_id}"
 
     llm = get_quiz_llm()
     response = await llm.ainvoke(
         [
-            {"role": "system", "content": MINI_PROMPT + language_instruction()},
+            {
+                "role": "system",
+                "content": MINI_PROMPT
+                + language_instruction(state.get("learning_profile", {}).get("language")),
+            },
             {
                 "role": "user",
                 "content": (
-                    f"Concept: {concept_id}\n"
+                    f"{topic_context}\n"
                     f"Tutor's explanation just given:\n---\n{last_explanation}\n---"
                 ),
             },
@@ -186,12 +211,33 @@ async def mini_quiz_node(state: KODMODState) -> dict[str, Any]:
     }
 
     log.info("Mini-quiz generated: %s", question["text"][:60])
-    return {
+    check_label = (
+        "Quick understanding check:"
+        if state.get("learning_profile", {}).get("language") == "en"
+        else "Cek pemahaman cepat:"
+    )
+    out = {
         "quiz_question": question,
         "quiz_questions": [question],
         "current_question_index": 0,
+        "current_question_attempts": 0,
+        "quiz_attempts": [],
+        "mastery_applied_attempts": 0,
+        "student_answer": "",
+        "cumulative_quiz_score": 0.0,
         "quiz_session_id": f"mini-{uuid4().hex[:8]}",
-        "generated_response": (f"Cek pemahaman cepat: {question['text']}"),
+        "generated_response": (
+            f"{last_explanation.rstrip()}\n\n{check_label} {question['text']}"
+        ).strip(),
         "next_action": "speak",
         "last_node": "mini_quiz",
     }
+    session_id = state.get("session_id")
+    if session_id and not state.get("assessment_managed"):
+        try:
+            from memory.short_term import store_quiz_session
+
+            await store_quiz_session(session_id, out)
+        except Exception:  # pragma: no cover - a checkpoint still retains the question
+            log.warning("Could not store pending mini-quiz", exc_info=True)
+    return out

@@ -96,7 +96,8 @@ async def test_km_int_071_engagement_index_formula(make_student, concept_ids) ->
     out = await StudentAggregator().summarise(student_id=st.id, window="week")
 
     start = _window_start("week")
-    days = max(1, (datetime.utcnow() - start).days)
+    assert start is not None
+    days = max(1, (datetime.now(UTC) - start).days)
     sessions_per_day = out["n_sessions"] / days
     avg_minutes = out["total_minutes"] / max(1, out["n_sessions"])
     expected = min(1.0, sessions_per_day * avg_minutes / 30.0)
@@ -136,7 +137,8 @@ def test_km_int_074_window_start_all_windows() -> None:
     assert today is not None and today.hour == 0 and today.minute == 0
     week = _window_start("week")
     month = _window_start("month")
-    now = datetime.utcnow()
+    assert week is not None and month is not None
+    now = datetime.now(UTC)
     assert 6 <= (now - week).days <= 7
     assert 29 <= (now - month).days <= 30
 
