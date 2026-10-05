@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SessionStartRequest(BaseModel):
@@ -14,15 +14,14 @@ class SessionStartRequest(BaseModel):
 
 
 class SessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     student_id: uuid.UUID
     started_at: datetime
     ended_at: datetime | None = None
     mode: str
     summary: str | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class VoiceChatRequest(BaseModel):

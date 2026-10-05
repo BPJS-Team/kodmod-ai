@@ -68,7 +68,9 @@ async def test_km_api_015_expired_token_is_401(client, student_factory, make_tok
 
 async def test_km_api_016_foreign_secret_is_401(client, student_factory, make_token) -> None:  # type: ignore[no-untyped-def]
     student, _ = await student_factory()
-    forged = make_token(student.id, "student", secret="a-different-secret-entirely")
+    forged = make_token(
+        student.id, "student", secret="test-only-foreign-signing-key-not-kodmod-0123"
+    )
     assert (await client.get(ME, headers=_bearer(forged))).status_code == 401
 
 
@@ -87,7 +89,7 @@ async def test_km_api_017_alg_none_token_is_rejected(client, student_factory) ->
 async def test_km_api_018_tampered_payload_is_401(client, student_factory) -> None:  # type: ignore[no-untyped-def]
     _student, token = await student_factory()
     head, _payload, sig = token.split(".")
-    other = pyjwt.encode({"sub": str(uuid.uuid4()), "role": "admin"}, "x", algorithm="HS256")
+    other = pyjwt.encode({"sub": str(uuid.uuid4()), "role": "admin"}, "x" * 32, algorithm="HS256")
     tampered = f"{head}.{other.split('.')[1]}.{sig}"
     assert (await client.get(ME, headers=_bearer(tampered))).status_code == 401
 
@@ -193,6 +195,6 @@ async def test_km_api_027_cannot_self_register_as_admin(client) -> None:  # type
     assert r.status_code == 422, "role=admin must fail schema validation before creating an account"
 
 
-def test_km_api_028_jwt_settings_are_sane() -> None:
+async def test_km_api_028_jwt_settings_are_sane() -> None:
     assert settings.JWT_ALG == "HS256"
     assert settings.JWT_EXPIRE_MIN > 0

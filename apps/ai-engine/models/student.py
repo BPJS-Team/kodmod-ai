@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StudentBase(BaseModel):
@@ -21,13 +21,12 @@ class StudentCreate(StudentBase):
 
 
 class StudentOut(StudentBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     voice_settings: dict
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class StudentProfileOut(StudentOut):

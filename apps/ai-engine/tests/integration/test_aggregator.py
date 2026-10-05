@@ -129,7 +129,7 @@ async def test_km_int_073_include_recommendations(make_student) -> None:  # type
     assert "active_recommendations" not in off
 
 
-def test_km_int_074_window_start_all_windows() -> None:
+async def test_km_int_074_window_start_all_windows() -> None:
     from analytics.aggregator import _window_start
 
     assert _window_start("all") is None

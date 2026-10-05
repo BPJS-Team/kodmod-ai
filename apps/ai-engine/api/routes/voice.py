@@ -141,7 +141,7 @@ async def speech_to_text(
 
     content = await audio.read(settings.MAX_UPLOAD_BYTES + 1)
     if len(content) > settings.MAX_UPLOAD_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File audio terlalu besar.")
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "File audio terlalu besar.")
     if not content:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "File audio kosong.")
 

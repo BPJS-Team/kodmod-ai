@@ -35,20 +35,20 @@ def _register_body(**overrides) -> RegisterRequest:
 # --------------------------------------------------------------------------- #
 # Password hashing
 # --------------------------------------------------------------------------- #
-def test_password_hash_is_salted_and_verifiable() -> None:
+async def test_password_hash_is_salted_and_verifiable() -> None:
     a, b = hash_password(TEST_PASSWORD), hash_password(TEST_PASSWORD)
     assert a != b, "identical passwords must not produce identical hashes"
     assert verify_password(TEST_PASSWORD, a)
     assert not verify_password("wrong-password", a)
 
 
-def test_password_verify_survives_a_garbage_hash() -> None:
+async def test_password_verify_survives_a_garbage_hash() -> None:
     """A corrupt row must fail the login, not crash the endpoint."""
     assert verify_password(TEST_PASSWORD, "not-a-bcrypt-hash") is False
 
 
 @pytest.mark.parametrize("bad", ["short", "x" * 73])
-def test_password_length_bounds_rejected(bad: str) -> None:
+async def test_password_length_bounds_rejected(bad: str) -> None:
     with pytest.raises(ValueError):
         hash_password(bad)
 

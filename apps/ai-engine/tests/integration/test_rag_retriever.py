@@ -161,7 +161,7 @@ async def test_km_int_096_ingest_paths(clean_db, tmp_path) -> None:  # type: ign
 # --------------------------------------------------------------------------- #
 # KM-INT-097 - PDF ingest without pypdf degrades to "" (no crash)
 # --------------------------------------------------------------------------- #
-def test_km_int_097_pdf_without_pypdf(monkeypatch, tmp_path) -> None:
+async def test_km_int_097_pdf_without_pypdf(monkeypatch, tmp_path) -> None:
     from rag.ingestion import _load_text
 
     monkeypatch.setitem(sys.modules, "pypdf", None)  # -> `import pypdf` raises ImportError
